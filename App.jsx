@@ -117,7 +117,7 @@ export default function App() {
   
   // Custom Toast Notification State
   const [toast, setToast] = useState(null); 
-  const [printMode, setPrintMode] = useState(null);
+  const [printMode, setPrintMode] = useState(null); // State untuk cetak aman: null | 'penanda' | 'bukti'
 
   // State Master Dinamis
   const [masterLokasi, setMasterLokasi] = useState(initialDataLokasi);
@@ -350,21 +350,7 @@ export default function App() {
         ? `\nTarif Sewa Lokasi: ${formatRupiah(biayaLokasi)}\nTambahan Listrik: ${formatRupiah(biayaListrik)}\nJumlah yang harus dibayar: *${formatRupiah(totalBayar)}*`
         : `\nJumlah yang harus dibayar: *${formatRupiah(totalBayar)}*`;
 
-    const msg = `Terima kasih telah melakukan pemesanan fasilitas di Taman Margasatwa Ragunan.
-
-ID Sewa: *${selectedRecord.id_sewa}*
-Nama Penyewa: ${selectedRecord.nama_penyewa} ${selectedRecord.pic_rombongan !== '-' && selectedRecord.pic_rombongan !== selectedRecord.nama_penyewa ? `(${selectedRecord.pic_rombongan})` : ''}
-Lokasi Sewa: ${selectedRecord.lokasi_sewa}${luasText}
-Tanggal Sewa: ${formatTanggalPendek(selectedRecord.tanggal_sewa)}${rincianBiayaText}
-
-Silahkan transfer ke:
-Bank: >>Bank DKI<<, Cabang Pondok Labu
-No. Rek: 40142700918
-Atas Nama: TM Ragunan Penerimaan BLUD
-
-Setelah transfer, silakan kirim bukti pembayaran melalui link khusus pengunjung.
-
-Terima kasih.`;
+    const msg = `Terima kasih telah melakukan pemesanan fasilitas di Taman Margasatwa Ragunan.\n\nID Sewa: *${selectedRecord.id_sewa}*\nNama Penyewa: ${selectedRecord.nama_penyewa} ${selectedRecord.pic_rombongan !== '-' && selectedRecord.pic_rombongan !== selectedRecord.nama_penyewa ? `(${selectedRecord.pic_rombongan})` : ''}\nLokasi Sewa: ${selectedRecord.lokasi_sewa}${luasText}\nTanggal Sewa: ${formatTanggalPendek(selectedRecord.tanggal_sewa)}${rincianBiayaText}\n\nSilahkan transfer ke:\nBank: >>Bank DKI<<, Cabang Pondok Labu\nNo. Rek: 40142700918\nAtas Nama: TM Ragunan Penerimaan BLUD\n\nSetelah transfer, silakan kirim bukti pembayaran melalui link khusus pengunjung.\n\nTerima kasih.`;
 
     const rawPhone = String(selectedRecord.no_hp_penyewa || '');
     let phone = rawPhone.replace(/\D/g, ''); 
@@ -604,9 +590,15 @@ Terima kasih.`;
       showToast('Bukti pembayaran LISTRIK berhasil dikirim!');
   };
 
-  return (
-    <div className="flex h-screen bg-[#F4F7F4] font-sans selection:bg-amber-200 selection:text-emerald-900">
-      <div>Aplikasi Facility Management TMR berhasil dimuat. Silakan gunakan dengan baik.</div>
-    </div>
-  );
-}
+  // --- RENDER MASTER DATA ---
+  const renderMasterData = () => (
+    <div className="space-y-6 max-w-[90rem] mx-auto pb-32 lg:pb-12">
+      <div className="sticky top-0 z-40 bg-[#F4F7F4]/95 backdrop-blur-md pt-4 sm:pt-5 lg:pt-8 pb-4 mb-6 -mx-4 px-4 sm:-mx-5 sm:px-5 lg:-mx-8 lg:px-8 border-b border-emerald-100">
+        <h2 className="text-xl md:text-2xl font-black text-emerald-950 tracking-tight">Master Data & Pengaturan</h2>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Master PIC Kantor */}
+          <div className="bg-white rounded-3xl p-6 md:p-8 border border-emerald-100 shadow-sm relative overflow-hidden">
+             <div className="absolute top-0 right-0 w-32 h-32 bg-amber-50 rounded-bl-full -z-10"></div>
+             <h3 className="font-bold text-emerald-900 mb-1 flex items-center text-lg"><Users className="mr-2 text-amber-500" si
