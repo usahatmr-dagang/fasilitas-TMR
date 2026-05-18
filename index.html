@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fasilitas TMR</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Fasilitas TMR</h1>
+            <p>Sistem Informasi & Layanan Fasilitas</p>
+        </header>
+
+        <main>
+            <section class="card">
+                <h2>Status Sistem</h2>
+                <p>Status: <span class="badge success">Online</span></p>
+                <p>Aplikasi ini telah siap untuk di-deploy ke Vercel.</p>
+                <button id="testApiBtn">Test API Vercel</button>
+                <p id="apiResponse" class="api-response"></p>
+            </section>
+        </main>
+
+        <footer>
+            <p>&copy; 2026 Fasilitas TMR. Dideploy dengan Vercel.</p>
+        </footer>
+    </div>
+
+    <script>
+        document.getElementById('testApiBtn').addEventListener('click', async () => {
+            const responseElement = document.getElementById('apiResponse');
+            responseElement.textContent = 'Memuat...';
+            try {
+                const res = await fetch('/api/hello');
+                const data = await res.json();
+                responseElement.textContent = `Respon API: ${data.message}`;
+            } catch (err) {
+                responseElement.textContent = 'Gagal memanggil API.';
+            }
+        });
+    </script>
+</body>
+</html>
