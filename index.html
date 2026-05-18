@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fasilitas TMR</title>
+    <title>Sewa Fasilitas TMR</title>
     <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
@@ -17,9 +17,59 @@
             <section class="card">
                 <h2>Status Sistem</h2>
                 <p>Status: <span class="badge success">Online</span></p>
-                <p>Aplikasi ini telah siap untuk di-deploy ke Vercel.</p>
-                <button id="testApiBtn">Test API Vercel</button>
+                <button id="testApiBtn" style="width: auto; margin: 1rem auto 0 auto;">Test API Vercel</button>
                 <p id="apiResponse" class="api-response"></p>
+            </section>
+
+            <section class="card" style="margin-top: 1.5rem;">
+                <h2>Formulir Sewa Fasilitas</h2>
+                <form id="sewaForm" class="form-container">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="nama">Nama Lengkap</label>
+                            <input type="text" id="nama" name="nama" placeholder="Masukkan nama Anda" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="fasilitas">Pilihan Fasilitas</label>
+                            <select id="fasilitas" name="fasilitas" required>
+                                <option value="">-- Pilih Fasilitas --</option>
+                                <option value="Aula Utama">Aula Utama</option>
+                                <option value="Ruang Rapat A">Ruang Rapat A</option>
+                                <option value="Lapangan Olahraga">Lapangan Olahraga</option>
+                                <option value="Plaza Terbuka">Plaza Terbuka</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="tanggal">Tanggal Sewa</label>
+                            <input type="date" id="tanggal" name="tanggal" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="waktuMulai">Waktu Mulai</label>
+                            <input type="time" id="waktuMulai" name="waktuMulai" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="waktuSelesai">Waktu Selesai</label>
+                            <input type="time" id="waktuSelesai" name="waktuSelesai" required>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="tujuan">Tujuan Sewa / Kegiatan</label>
+                        <textarea id="tujuan" name="tujuan" rows="3" placeholder="Jelaskan secara singkat kegiatan yang akan dilakukan" required></textarea>
+                    </div>
+
+                    <div style="display: flex; justify-content: flex-end;">
+                        <button type="submit" id="submitBtn">
+                            <span class="btn-text">Ajukan Sewa</span>
+                            <span class="loader" style="display: none;"></span>
+                        </button>
+                    </div>
+                    
+                    <div id="alertBox" class="alert"></div>
+                </form>
             </section>
         </main>
 
@@ -29,6 +79,11 @@
     </div>
 
     <script>
+        // Set minimal date to today for the date input
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('tanggal').setAttribute('min', today);
+
+        // Test API button
         document.getElementById('testApiBtn').addEventListener('click', async () => {
             const responseElement = document.getElementById('apiResponse');
             responseElement.textContent = 'Memuat...';
@@ -38,6 +93,53 @@
                 responseElement.textContent = `Respon API: ${data.message}`;
             } catch (err) {
                 responseElement.textContent = 'Gagal memanggil API.';
+            }
+        });
+
+        // Form Sewa Fasilitas submission
+        document.getElementById('sewaForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const submitBtn = document.getElementById('submitBtn');
+            const btnText = submitBtn.querySelector('.btn-text');
+            const loader = submitBtn.querySelector('.loader');
+            const alertBox = document.getElementById('alertBox');
+            
+            // Set loading state
+            submitBtn.disabled = true;
+            btnText.textContent = 'Memproses...';
+            loader.style.display = 'inline-block';
+            alertBox.className = 'alert'; // reset classes
+            alertBox.textContent = '';
+            
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData.entries());
+
+            try {
+                const res = await fetch('/api/sewa', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await res.json();
+                
+                if (res.ok) {
+                    alertBox.textContent = `✅ Berhasil: ${result.message}`;
+                    alertBox.classList.add('alert-success');
+                    e.target.reset(); // Reset form
+                } else {
+                    alertBox.textContent = `❌ Gagal: ${result.error || 'Terjadi kesalahan'}`;
+                    alertBox.classList.add('alert-error');
+                }
+            } catch (err) {
+                alertBox.textContent = '❌ Gagal terhubung ke server. Pastikan koneksi internet Anda aktif.';
+                alertBox.classList.add('alert-error');
+            } finally {
+                // Remove loading state
+                submitBtn.disabled = false;
+                btnText.textContent = 'Ajukan Sewa';
+                loader.style.display = 'none';
             }
         });
     </script>
