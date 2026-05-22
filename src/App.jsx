@@ -35,7 +35,7 @@ import {
 import { db, storage, auth } from './firebase';
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, signInWithEmailAndPassword } from 'firebase/auth';
 import Login from './Login';
 import MainDashboard from './MainDashboard';
 
@@ -180,6 +180,7 @@ export default function App() {
 
   const [selectedRecord, setSelectedRecord] = useState(null); 
   const [detailMode, setDetailMode] = useState('view'); 
+  const [deletePassword, setDeletePassword] = useState('');
   const [editFormData, setEditFormData] = useState({});
   const [rescheduleData, setRescheduleData] = useState({ tanggal: '', lokasi: '' });
 
@@ -1268,7 +1269,7 @@ Terima kasih.`;
 
              {detailMode === 'view' && (
                   <>
-                      <div className="grid grid-cols-4 gap-2">
+                      <div className="grid grid-cols-5 gap-2">
                          <button type="button" onClick={handleKirimWA} className="flex flex-col items-center justify-center bg-emerald-500/10 hover:bg-emerald-500 hover:text-white text-emerald-800 p-3 rounded-2xl text-[10px] font-bold border border-emerald-500/20 transition-all duration-200 shadow-sm text-center leading-tight hover:-translate-y-0.5">
                              <Send size={16} className="mb-1.5" /> Kirim WA
                          </button>
@@ -1280,6 +1281,9 @@ Terima kasih.`;
                          </button>
                          <button type="button" onClick={handlePrintPenanda} className="flex flex-col items-center justify-center bg-teal-500/10 hover:bg-teal-500 hover:text-white text-teal-800 p-3 rounded-2xl text-[10px] font-bold border border-teal-500/20 transition-all duration-200 shadow-sm text-center leading-tight hover:-translate-y-0.5">
                              <Printer size={16} className="mb-1.5" /> Tag Tanda
+                         </button>
+                         <button type="button" onClick={() => setDetailMode('delete')} className="flex flex-col items-center justify-center bg-rose-500/10 hover:bg-rose-500 hover:text-white text-rose-800 p-3 rounded-2xl text-[10px] font-bold border border-rose-500/20 transition-all duration-200 shadow-sm text-center leading-tight hover:-translate-y-0.5">
+                             <Trash2 size={16} className="mb-1.5" /> Hapus
                          </button>
                       </div>
 
@@ -1447,6 +1451,30 @@ Terima kasih.`;
                       <div className="flex space-x-2 pt-4 border-t border-slate-100">
                           <button type="button" onClick={() => handleOpenDetail(selectedRecord)} className="flex-1 px-4 py-3 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-all duration-200">Batal</button>
                           <button type="submit" className="flex-1 px-4 py-3 text-sm font-black text-white bg-amber-500 hover:bg-amber-600 rounded-2xl shadow-[0_4px_12px_rgba(245,158,11,0.2)] hover:shadow-[0_6px_16px_rgba(245,158,11,0.3)] transition-all duration-200">Simpan Perubahan</button>
+                      </div>
+                  </form>
+              )}
+
+              {detailMode === 'delete' && (
+                  <form onSubmit={async (e) => {
+                      e.preventDefault();
+                      try {
+                          await signInWithEmailAndPassword(auth, adminUser.email, deletePassword);
+                          setDeletePassword('');
+                          handleDeleteRecordInline(selectedRecord, 'Data reservasi berhasil dihapus permanen.');
+                      } catch (error) {
+                          showToast('Password yang Anda masukkan salah!', 'error');
+                      }
+                  }} className="bg-white rounded-3xl p-6 shadow-[0_4px_20px_rgba(4,120,87,0.03)] border border-rose-200/60 space-y-4">
+                      <div className="bg-rose-50/60 p-3 rounded-2xl border border-rose-100 flex items-center text-rose-800 text-xs font-bold mb-2"><Trash2 size={14} className="mr-2"/> Hapus Reservasi</div>
+                      <p className="text-[11px] font-bold text-rose-600 mb-2 leading-relaxed bg-rose-50 p-3 rounded-xl border border-rose-100">Tindakan ini <b className="text-rose-800">tidak dapat dibatalkan</b>. Seluruh data pemesanan, termasuk file struk jika ada, akan terhapus dari sistem TMR.</p>
+                      <div>
+                         <label className="block text-[10px] font-extrabold text-rose-950 uppercase tracking-wider mb-1 mt-2">Konfirmasi Password Admin</label>
+                         <input required type="password" value={deletePassword} onChange={e => setDeletePassword(e.target.value)} placeholder="Masukkan password Anda untuk menghapus" className="w-full px-4 py-2.5 border border-rose-200 rounded-2xl text-sm focus:ring-4 focus:ring-rose-500/10 focus:border-rose-600 outline-none font-semibold text-rose-950 bg-white placeholder:text-rose-300" />
+                      </div>
+                      <div className="flex space-x-2 pt-4 border-t border-slate-100">
+                          <button type="button" onClick={() => { setDetailMode('view'); setDeletePassword(''); }} className="flex-1 px-4 py-3 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-all duration-200">Batal</button>
+                          <button type="submit" className="flex-1 px-4 py-3 text-sm font-black text-white bg-rose-600 hover:bg-rose-700 rounded-2xl shadow-[0_4px_12px_rgba(225,29,72,0.2)] hover:shadow-[0_6px_16px_rgba(225,29,72,0.3)] transition-all duration-200 flex items-center justify-center"><Trash2 size={16} className="mr-2"/> Hapus Permanen</button>
                       </div>
                   </form>
               )}
