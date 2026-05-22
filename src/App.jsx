@@ -1448,8 +1448,8 @@ Terima kasih.`;
 
       {/* Form Reservasi Baru */}
       {bookingLokasi && (
-        <div className="fixed inset-0 bg-[#022c22]/60 backdrop-blur-sm z-[50] flex justify-center items-center p-4 animate-fade-in">
-            <div className="bg-white rounded-3xl shadow-[0_25px_50px_-12px_rgba(4,120,87,0.15)] w-full max-w-lg overflow-hidden flex flex-col max-h-[92vh] border border-emerald-100/50 scale-100 transition-all duration-300">
+        <div className="fixed inset-0 bg-[#022c22]/60 backdrop-blur-sm z-[50] flex justify-center items-end sm:items-center p-0 sm:p-4 animate-fade-in">
+            <div className="bg-white rounded-t-3xl sm:rounded-3xl shadow-[0_-8px_40px_-4px_rgba(4,120,87,0.18)] sm:shadow-[0_25px_50px_-12px_rgba(4,120,87,0.15)] w-full sm:max-w-lg overflow-hidden flex flex-col max-h-[94vh] sm:max-h-[92vh] border border-emerald-100/50 transition-all duration-300 animate-slide-up-sheet sm:animate-none">
                 <div className="px-6 py-5 border-b border-emerald-800/10 flex items-center justify-between bg-gradient-to-r from-[#022c22] via-[#043e30] to-[#01140f] text-white shadow-md">
                     <div>
                         <h3 className="font-black text-lg tracking-tight bg-gradient-to-r from-white to-emerald-100 bg-clip-text text-transparent">Formulir Reservasi</h3>
@@ -1457,7 +1457,7 @@ Terima kasih.`;
                     </div>
                     <button type="button" onClick={() => setBookingLokasi(null)} className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all duration-200 hover:scale-105"><X size={18} /></button>
                 </div>
-                <form onSubmit={handleSubmitBooking} className="p-6 overflow-y-auto space-y-4 flex-1 bg-slate-50/50 hide-scrollbar relative z-10">
+                <form onSubmit={handleSubmitBooking} className="p-4 sm:p-6 overflow-y-auto space-y-4 flex-1 bg-slate-50/50 hide-scrollbar relative z-10">
                     
                     {/* KHUSUS LAPANGAN: Input Luas Lahan */}
                     {bookingLokasi.tipe === 'lapangan' && (
@@ -1541,9 +1541,9 @@ Terima kasih.`;
                             </label>
                         </div>
                     </div>
-                    <div className="pt-5 border-t border-slate-100 flex space-x-3">
-                        <button type="button" onClick={() => setBookingLokasi(null)} className="w-1/3 py-3.5 text-sm font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-all duration-200">Batal</button>
-                        <button type="submit" className="w-2/3 py-3.5 text-sm font-black text-white bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 rounded-2xl shadow-[0_8px_20px_-4px_rgba(16,185,129,0.3)] hover:shadow-[0_10px_25px_-4px_rgba(16,185,129,0.4)] hover:-translate-y-0.5 transition-all duration-200 flex justify-center items-center"><Save size={18} className="mr-2"/> Simpan Reservasi</button>
+                    <div className="pt-4 sm:pt-5 border-t border-slate-100 flex space-x-3 pb-safe-extra">
+                        <button type="button" onClick={() => setBookingLokasi(null)} className="w-1/3 py-4 sm:py-3.5 text-sm font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-all duration-200 active:scale-95">Batal</button>
+                        <button type="submit" className="w-2/3 py-4 sm:py-3.5 text-sm font-black text-white bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 rounded-2xl shadow-[0_8px_20px_-4px_rgba(16,185,129,0.3)] hover:shadow-[0_10px_25px_-4px_rgba(16,185,129,0.4)] transition-all duration-200 flex justify-center items-center active:scale-95"><Save size={18} className="mr-2"/> Simpan Reservasi</button>
                     </div>
                 </form>
             </div>
@@ -1652,7 +1652,7 @@ Terima kasih.`;
                     </div>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 gap-3.5 relative z-10">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 gap-3 sm:gap-3.5 relative z-10">
                   {fasilitasHarian.map(fasilitas => {
                     const { icon: IconComponent, color, bg } = getIconData(fasilitas.tipe);
                     const isTersedia = fasilitas.status === 'Tersedia';
@@ -1669,12 +1669,12 @@ Terima kasih.`;
                             if (fasilitas.status === 'Tersedia') setBookingLokasi(fasilitas);
                             else if (fasilitas.bookingInfo) handleOpenDetail(fasilitas.bookingInfo);
                         }}
-                        className={`group relative rounded-2xl p-3 flex flex-col justify-between min-h-[105px] overflow-hidden cursor-pointer transition-all duration-300 border bg-white ${ 
+                        className={`group relative rounded-2xl p-3 sm:p-3.5 flex flex-col justify-between min-h-[112px] sm:min-h-[115px] overflow-hidden cursor-pointer transition-all duration-300 border bg-white active:scale-[0.97] ${ 
                           isTersedia 
-                            ? 'border-slate-100/80 hover:border-emerald-500/50 hover:shadow-[0_12px_24px_-8px_rgba(16,185,129,0.15)] hover:-translate-y-1' 
+                            ? 'border-slate-100/80 hover:border-emerald-500/50 hover:shadow-[0_12px_24px_-8px_rgba(16,185,129,0.15)] hover:-translate-y-0.5' 
                             : isDitutup 
-                              ? 'bg-slate-50/80 border-slate-200 opacity-60 hover:shadow-sm' 
-                              : 'border-rose-100 hover:border-rose-400/50 hover:shadow-[0_12px_24px_-8px_rgba(239,68,68,0.15)] hover:-translate-y-1' 
+                              ? 'bg-slate-50/80 border-slate-200 opacity-60' 
+                              : 'border-rose-100 hover:border-rose-400/50 hover:shadow-[0_12px_24px_-8px_rgba(239,68,68,0.15)] hover:-translate-y-0.5' 
                         }`}
                       >
                         {/* Decorative background gradients */}
@@ -1700,36 +1700,31 @@ Terima kasih.`;
                         )}
 
                         <div className="flex items-start justify-between mb-2 pointer-events-none">
-                          <div className={`p-1.5 rounded-xl shadow-sm transition-all duration-300 ${ 
+                          <div className={`p-1.5 sm:p-2 rounded-xl shadow-sm transition-all duration-300 ${ 
                             isTersedia 
                               ? 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white' 
                               : isDitutup 
                                 ? 'bg-slate-200 text-slate-500' 
                                 : 'bg-rose-50 text-rose-500' 
                           }`}>
-                            <IconComponent size={14} strokeWidth={2.5} />
+                            <IconComponent size={15} strokeWidth={2.5} />
                           </div>
                           
-                          <div className="relative flex items-center justify-center w-3.5 h-3.5">
-                            <span className={`absolute inline-flex h-2 w-2 rounded-full opacity-75 ${ 
-                              isTersedia 
-                                ? 'bg-emerald-400 animate-ping' 
-                                : isDitutup 
-                                  ? 'hidden' 
-                                  : 'bg-rose-400 animate-ping' 
-                            }`}></span>
-                            <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${ 
-                              isTersedia 
-                                ? 'bg-emerald-500' 
-                                : isDitutup 
-                                  ? 'bg-slate-400' 
-                                  : 'bg-rose-500' 
-                            }`}></span>
+                          {/* Status dot — static only for available (no ping to save resources) */}
+                          <div className="flex items-center justify-center w-4 h-4">
+                            {!isDitutup && (
+                              <span className={`inline-flex rounded-full ${
+                                isTersedia
+                                  ? 'w-2.5 h-2.5 bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.15)]'
+                                  : 'w-2 h-2 bg-rose-500 animate-ping opacity-75'
+                              }`}></span>
+                            )}
+                            {isDitutup && <span className="inline-flex rounded-full w-2 h-2 bg-slate-300"></span>}
                           </div>
                         </div>
 
-                        <div className="mt-auto mb-1.5 pointer-events-none">
-                          <h4 className={`font-bold text-[10.5px] leading-tight line-clamp-2 transition-colors duration-300 ${ 
+                        <div className="mt-auto mb-1 pointer-events-none">
+                          <h4 className={`font-bold text-[11px] leading-tight line-clamp-2 transition-colors duration-300 ${ 
                             isTersedia 
                               ? 'text-emerald-950 group-hover:text-emerald-900' 
                               : isDitutup 
@@ -1740,15 +1735,15 @@ Terima kasih.`;
 
                         <div className="pointer-events-none w-full">
                           {isTersedia ? (
-                              <span className="text-[8px] font-extrabold text-emerald-600 uppercase tracking-widest flex items-center group-hover:text-emerald-700 transition-colors">
-                                Pesan <ChevronRight size={8} className="ml-0.5 transform group-hover:translate-x-0.5 transition-transform" />
+                              <span className="text-[8.5px] font-extrabold text-emerald-600 uppercase tracking-widest flex items-center group-hover:text-emerald-700 transition-colors">
+                                Pesan <ChevronRight size={9} className="ml-0.5 transform group-hover:translate-x-0.5 transition-transform" />
                               </span>
                           ) : isDitutup ? (
                               <span className="text-[8px] font-extrabold text-slate-400 uppercase tracking-widest flex items-center"><Lock size={8} className="mr-0.5"/> Maintenance</span>
                           ) : (
                               <div className="bg-rose-50/40 border border-rose-100/50 rounded-xl p-1.5 mt-0.5 w-full overflow-hidden">
-                                  <span className="text-[8px] font-extrabold text-rose-900 block truncate">{fasilitas.bookingInfo?.nama_penyewa}</span>
-                                  <span className="text-[7.5px] font-medium text-rose-600/80 block truncate">PIC: {fasilitas.bookingInfo?.pic_rombongan}</span>
+                                  <span className="text-[8.5px] font-extrabold text-rose-900 block truncate">{fasilitas.bookingInfo?.nama_penyewa}</span>
+                                  <span className="text-[8px] font-medium text-rose-600/80 block truncate">PIC: {fasilitas.bookingInfo?.pic_rombongan}</span>
                               </div>
                           )}
                         </div>
@@ -2185,7 +2180,7 @@ Terima kasih.`;
              )}
         </div>
 
-        <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-lg border-t border-emerald-100 flex justify-between px-2 pb-safe z-[55] shadow-[0_-15px_40px_rgba(4,120,87,0.08)]">
+        <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-emerald-100/80 flex justify-between px-1 pb-safe z-[55] shadow-[0_-8px_30px_rgba(4,120,87,0.07)]">
           {[
             { id: 'reservasi', label: 'Reservasi', icon: LayoutDashboard },
             { id: 'sewa', label: 'Tamu', icon: Users },
@@ -2193,12 +2188,12 @@ Terima kasih.`;
             { id: 'master', label: 'Master', icon: Settings },
             { id: 'portal', label: 'Upload', icon: UploadCloud }
           ].map(item => (
-            <button key={item.id} onClick={() => setActiveTab(item.id)} className={`flex flex-col items-center justify-center flex-1 pt-3 pb-2 relative group`}>
-              {activeTab === item.id && <div className="absolute top-0 w-8 h-1 bg-gradient-to-r from-amber-400 to-amber-500 rounded-b-full"></div>}
-              <div className={`p-2 rounded-2xl mb-1 transition-all duration-300 ${activeTab === item.id ? 'bg-gradient-to-br from-emerald-100 to-emerald-200 shadow-sm scale-110 -translate-y-1' : 'group-hover:bg-emerald-50'}`}>
-                <item.icon size={20} strokeWidth={activeTab === item.id ? 2.5 : 2} className={activeTab === item.id ? 'text-emerald-700' : 'text-emerald-900/40'} />
+            <button key={item.id} onClick={() => setActiveTab(item.id)} className={`flex flex-col items-center justify-center flex-1 pt-2.5 pb-1.5 relative min-h-[56px] sm:min-h-[64px] active:opacity-75 transition-opacity`}>
+              {activeTab === item.id && <div className="absolute top-0 left-1/2 -translate-x-1/2 w-10 h-[3px] bg-gradient-to-r from-emerald-500 to-teal-500 rounded-b-full"></div>}
+              <div className={`p-2 sm:p-2.5 rounded-2xl mb-0.5 transition-all duration-200 ${activeTab === item.id ? 'bg-emerald-50 shadow-sm' : ''}`}>
+                <item.icon size={22} strokeWidth={activeTab === item.id ? 2.5 : 1.75} className={activeTab === item.id ? 'text-emerald-700' : 'text-slate-400'} />
               </div>
-              <span className={`text-[9px] font-black tracking-wider transition-colors ${activeTab === item.id ? 'text-emerald-800' : 'text-emerald-900/40'}`}>{item.label}</span>
+              <span className={`text-[10px] sm:text-[11px] font-bold transition-colors leading-none ${activeTab === item.id ? 'text-emerald-800' : 'text-slate-400'}`}>{item.label}</span>
             </button>
           ))}
         </nav>
@@ -2209,8 +2204,10 @@ Terima kasih.`;
       <style dangerouslySetInnerHTML={{__html: `
         @keyframes slide-in-right { from { transform: translateX(100%); } to { transform: translateX(0); } } 
         @keyframes fade-in-down { 0% { opacity: 0; transform: translate(-50%, -20px); } 100% { opacity: 1; transform: translate(-50%, 0); } }
+        @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
         .animate-slide-in-right { animation: slide-in-right 0.25s ease-out both; } 
         .animate-fade-in-down { animation: fade-in-down 0.3s ease-out forwards; }
+        .animate-fade-in { animation: fade-in 0.2s ease-out both; }
         .pb-safe { padding-bottom: calc(0.5rem + env(safe-area-inset-bottom)); } 
         .hide-scrollbar::-webkit-scrollbar { display: none; } 
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

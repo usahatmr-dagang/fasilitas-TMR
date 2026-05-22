@@ -97,3 +97,40 @@ body {
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(16, 185, 129, 0.1);
 }
+
+/* =============================================
+   MOBILE & TABLET OPTIMIZATIONS
+   ============================================= */
+
+/* Safe area insets for iOS home bar */
+.pb-safe {
+  padding-bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px));
+}
+
+.pb-safe-extra {
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* Touch: remove tap highlight flash on mobile */
+@media (hover: none) and (pointer: coarse) {
+  button, [role="button"], label, .cursor-pointer {
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* Tablet-specific readability (640px–1023px) */
+@media (min-width: 640px) and (max-width: 1023px) {
+  body {
+    font-size: 15px;
+  }
+}
+
+/* Bottom sheet slide-up animation (mobile booking modal) */
+@keyframes slide-up-sheet {
+  from { transform: translateY(20px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+.animate-slide-up-sheet {
+  animation: slide-up-sheet 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
