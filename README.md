@@ -1,16 +1,29 @@
-# React + Vite
+# Sistem Informasi Manajemen Fasilitas - Taman Margasatwa Ragunan (TMR)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Aplikasi berbasis web untuk mengelola dan reservasi fasilitas di Taman Margasatwa Ragunan (TMR). Dibuat menggunakan React + Vite, TailwindCSS, dan diintegrasikan dengan sistem backend.
 
-Currently, two official plugins are available:
+## Fitur Utama
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **Reservasi Fasilitas**: Pemesanan harian untuk Pendopo dan Lapangan.
+- **Peta Lokasi & Manajemen Fasilitas**: Pemantauan status ketersediaan fasilitas secara real-time.
+- **Manajemen Pembayaran**: Pencatatan pembayaran, verifikasi bukti transfer, dan cetak bukti pembayaran.
+- **Cetak Penanda & Kwitansi**: Fitur cetak penanda lokasi (format F4 Landscape) dan Kwitansi/Kwitansi Pembayaran (format F4 Portrait).
+- **Pemblokiran Maintenance**: Pengaturan administratif untuk memblokir lokasi pada tanggal tertentu guna keperluan pemeliharaan.
+- **WhatsApp Integrasi**: Pengiriman struk reservasi otomatis ke nomor WhatsApp penyewa.
 
-## React Compiler
+## Pengembangan Lokal
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+1. Pasang dependensi:
+   ```bash
+   npm install
+   ```
 
-## Expanding the ESLint configuration
+2. Jalankan server lokal:
+   ```bash
+   npm run dev
+   ```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+3. Bangun proyek untuk produksi:
+   ```bash
+   npm run build
+   ```
