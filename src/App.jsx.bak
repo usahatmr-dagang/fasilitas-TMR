@@ -29,15 +29,8 @@ import {
   LayoutGrid,
   List,
   Printer,
-  Trash2,
-  ArrowLeft
+  Trash2
 } from 'lucide-react';
-import { db, storage, auth } from './firebase';
-import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
-import { ref, uploadString, getDownloadURL } from 'firebase/storage';
-import { onAuthStateChanged } from 'firebase/auth';
-import Login from './Login';
-import MainDashboard from './MainDashboard';
 
 // --- DATA LOKASI ---
 const defaultDataLokasi = [
@@ -110,39 +103,9 @@ const formatRupiah = (angka) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
 };
 
+
 export default function App() {
-  // Routing & Authentication State
-  const isPortalRoute = window.location.pathname === '/portal';
-  const [adminUser, setAdminUser] = useState(null);
-  const [activeApp, setActiveApp] = useState('dashboard'); // 'dashboard', 'fasilitas'
-  
-  // Data State (Firebase)
-  const [masterLokasi, setMasterLokasi] = useState([]);
-  const [sewaList, setSewaList] = useState([]);
-  const [dataLoaded, setDataLoaded] = useState(false);
-
-  useEffect(() => {
-    // Auth Listener
-    const unsubAuth = onAuthStateChanged(auth, (user) => {
-      setAdminUser(user);
-    });
-
-    // Firestore Listeners
-    const unsubLokasi = onSnapshot(collection(db, 'masterLokasi'), (snapshot) => {
-      const lokasiData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      // Fallback to default if empty on first run
-      setMasterLokasi(lokasiData.length > 0 ? lokasiData : defaultDataLokasi);
-    });
-
-    const unsubSewa = onSnapshot(collection(db, 'sewaList'), (snapshot) => {
-      setSewaList(snapshot.docs.map(doc => ({ docId: doc.id, ...doc.data() })));
-      setDataLoaded(true);
-    });
-
-    return () => { unsubAuth(); unsubLokasi(); unsubSewa(); };
-  }, []);
-
-  const getBiayaLokasi = (namaLokasi, luasLahan = 50) => {
+const getBiayaLokasi = (namaLokasi, luasLahan = 50) => {
     if (!namaLokasi) return 0;
     if (namaLokasi === 'PENDOPO TSA 1') return 500000;
     if (['PENDOPO TSA 2', 'PENDOPO TSA 3', 'PENDOPO TSA 4', 'TERAS INFORMASI', 'GAZEBO'].includes(namaLokasi)) return 250000;
@@ -154,17 +117,18 @@ export default function App() {
         return luasValid * 2000;
     }
     return 0; 
-  };
-
-  const [newMasterLokasiNama, setNewMasterLokasiNama] = useState('');
-  const [newMasterLokasiTipe, setNewMasterLokasiTipe] = useState('pendopo');
-  const [activeTab, setActiveTab] = useState(isPortalRoute ? 'portal' : 'reservasi');
-  const [toast, setToast] = useState(null); 
+};
+  const [masterLokasi, setMasterLokasi] = useState(defaultDataLokasi);
+const [newMasterLokasiNama, setNewMasterLokasiNama] = useState('');
+const [newMasterLokasiTipe, setNewMasterLokasiTipe] = useState('pendopo');
+const [activeTab, setActiveTab] = useState('reservasi');
+const [toast, setToast] = useState(null); 
 
   const [picList, setPicList] = useState(['Tari', 'Rizmy', 'Alan', 'Isna', 'Erna', 'Suhendra', 'Putri']);
   const [newPic, setNewPic] = useState('');
   const [blockData, setBlockData] = useState({ tanggal: getTodayString(), lokasi: 'Semua Lokasi' });
 
+  const [sewaList, setSewaList] = useState(initialDataSewa);
   const [selectedDate, setSelectedDate] = useState(getTodayString());
   const [filterTipe, setFilterTipe] = useState('semua');
   const [filterDateSewa, setFilterDateSewa] = useState('');
@@ -283,7 +247,7 @@ export default function App() {
       setRescheduleData({ tanggal: record.tanggal_sewa, lokasi: record.lokasi_sewa });
   };
 
-  const handleSubmitBooking = async (e) => {
+  const handleSubmitBooking = (e) => {
     e.preventDefault();
     const currentDateTime = new Date().toLocaleString('id-ID', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
     const generatedId = `TMR-${Math.floor(10000 + Math.random() * 90000)}`;
@@ -316,16 +280,12 @@ export default function App() {
       history_reschedule: []
     };
 
-    try {
-      const docRef = await addDoc(collection(db, 'sewaList'), newBooking);
-      newBooking.docId = docRef.id;
-      setBookingLokasi(null);
-      setFormData({ namaRombongan: '', picRombongan: '', noWa: '', picKantor: '', keterangan: '', statusPembayaran: 'Belum Transfer', listrikTambahan: false, luasLahan: 50 });
-      handleOpenDetail(newBooking);
-      showToast('Reservasi baru berhasil ditambahkan!');
-    } catch (error) {
-      showToast('Gagal menyimpan reservasi!', 'error');
-    }
+    setSewaList(prev => [...prev, newBooking]);
+    setBookingLokasi(null);
+    setFormData({ namaRombongan: '', picRombongan: '', noWa: '', picKantor: '', keterangan: '', statusPembayaran: 'Belum Transfer', listrikTambahan: false, luasLahan: 50 });
+    
+    handleOpenDetail(newBooking);
+    showToast('Reservasi baru berhasil ditambahkan!');
   };
 
   const handleKirimWA = () => {
@@ -370,7 +330,7 @@ Terima kasih.`;
     document.body.removeChild(link);
   };
 
-  const handleSaveEdit = async (e) => {
+  const handleSaveEdit = (e) => {
     e.preventDefault();
     const biayaLokasi = getBiayaLokasi(selectedRecord.lokasi_sewa, editFormData.luas_lahan);
     const biayaListrik = editFormData.listrik_tambahan ? 100000 : 0;
@@ -381,18 +341,13 @@ Terima kasih.`;
         total_biaya: biayaLokasi + biayaListrik 
     };
 
-    try {
-        const { docId, ...dataToUpdate } = updatedRecord;
-        await updateDoc(doc(db, 'sewaList', selectedRecord.docId), dataToUpdate);
-        setSelectedRecord(updatedRecord);
-        setDetailMode('view');
-        showToast('Data pengunjung berhasil diperbarui!');
-    } catch (error) {
-        showToast('Gagal memperbarui data!', 'error');
-    }
+    setSewaList(prev => prev.map(s => s.id_sewa === selectedRecord.id_sewa ? updatedRecord : s));
+    setSelectedRecord(updatedRecord);
+    setDetailMode('view');
+    showToast('Data pengunjung berhasil diperbarui!');
   };
 
-  const handleSaveReschedule = async (e) => {
+  const handleSaveReschedule = (e) => {
     e.preventDefault();
     if (!rescheduleData.lokasi) {
         showToast('Pilih lokasi yang tersedia terlebih dahulu!', 'error');
@@ -418,15 +373,10 @@ Terima kasih.`;
         history_reschedule: newHistory 
     };
     
-    try {
-        const { docId, ...dataToUpdate } = updatedRecord;
-        await updateDoc(doc(db, 'sewaList', selectedRecord.docId), dataToUpdate);
-        setSelectedRecord(updatedRecord);
-        setDetailMode('view');
-        showToast('Jadwal berhasil dipindahkan!', 'success');
-    } catch (error) {
-        showToast('Gagal memindahkan jadwal!', 'error');
-    }
+    setSewaList(prev => prev.map(s => s.id_sewa === selectedRecord.id_sewa ? updatedRecord : s));
+    setSelectedRecord(updatedRecord);
+    setDetailMode('view');
+    showToast('Jadwal berhasil dipindahkan!', 'success');
   };
 
   // --- HANDLER FITUR CETAK PENANDA LOKASI (F4 LANDSCAPE) ---
@@ -929,20 +879,15 @@ Terima kasih.`;
       const file = e.target.files[0];
       if(!file) return;
       const reader = new FileReader();
-      reader.onloadend = async () => {
+      reader.onloadend = () => {
           const updatedRecord = { 
               ...selectedRecord, 
               bukti_transfer_listrik: reader.result,
               tanggal_transfer: selectedRecord.tanggal_transfer || getTodayString() 
           };
-          try {
-              const { docId, ...dataToUpdate } = updatedRecord;
-              await updateDoc(doc(db, 'sewaList', selectedRecord.docId), dataToUpdate);
-              setSelectedRecord(updatedRecord);
-              showToast('Struk listrik berhasil ditambahkan!');
-          } catch (error) {
-              showToast('Gagal menambah struk!', 'error');
-          }
+          setSewaList(prev => prev.map(s => s.id_sewa === selectedRecord.id_sewa ? updatedRecord : s));
+          setSelectedRecord(updatedRecord);
+          showToast('Struk listrik berhasil ditambahkan!');
       };
       reader.readAsDataURL(file);
   };
@@ -956,7 +901,7 @@ Terima kasih.`;
       }
   };
 
-  const handleBlockLokasi = async (e) => {
+  const handleBlockLokasi = (e) => {
       e.preventDefault();
       const currentDateTime = new Date().toLocaleString('id-ID', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
       const lokasiTarget = blockData.lokasi === 'Semua Lokasi' ? masterLokasi.map(l => l.nama) : [blockData.lokasi];
@@ -971,12 +916,8 @@ Terima kasih.`;
       const existingBookings = sewaList.filter(s => s.tanggal_sewa === blockData.tanggal);
       const filteredBlocks = newBlocks.filter(b => !existingBookings.find(ex => ex.lokasi_sewa === b.lokasi_sewa));
 
-      try {
-          await Promise.all(filteredBlocks.map(block => addDoc(collection(db, 'sewaList'), block)));
-          showToast(`Berhasil menutup ${filteredBlocks.length} lokasi pada tanggal ${formatTanggalPendek(blockData.tanggal)}.`);
-      } catch (error) {
-          showToast('Gagal memblokir lokasi!', 'error');
-      }
+      setSewaList([...sewaList, ...filteredBlocks]);
+      showToast(`Berhasil menutup ${filteredBlocks.length} lokasi pada tanggal ${formatTanggalPendek(blockData.tanggal)}.`);
   };
 
   const extractPaymentInfo = async (base64Data, mimeType) => {
@@ -1152,18 +1093,13 @@ Terima kasih.`;
       reader.readAsDataURL(file);
   };
 
-  const handleKirimBukti = async () => {
+  const handleKirimBukti = () => {
       const updatedBooking = { ...portalBooking, status_pembayaran: 'Menunggu Verifikasi', bukti_transfer: uploadFile, ocr_data: ocrResult, tanggal_transfer: tanggalUploadPortal };
-      try {
-          const { docId, ...dataToUpdate } = updatedBooking;
-          await updateDoc(doc(db, 'sewaList', portalBooking.docId), dataToUpdate);
-          setPortalBooking(updatedBooking); 
-          setUploadFile(null);
-          setOcrResult(null);
-          showToast('Bukti pembayaran LOKASI berhasil dikirim!');
-      } catch (error) {
-          showToast('Gagal mengirim bukti lokasi!', 'error');
-      }
+      setSewaList(prev => prev.map(s => s.id_sewa === portalBooking.id_sewa ? updatedBooking : s));
+      setPortalBooking(updatedBooking); 
+      setUploadFile(null);
+      setOcrResult(null);
+      showToast('Bukti pembayaran LOKASI berhasil dikirim!');
   };
 
   const handleFileListrikChangePortal = (e) => {
@@ -1176,38 +1112,12 @@ Terima kasih.`;
       reader.readAsDataURL(file);
   };
 
-  const handleKirimBuktiListrik = async () => {
+  const handleKirimBuktiListrik = () => {
       const updatedBooking = { ...portalBooking, bukti_transfer_listrik: uploadListrikFile, tanggal_transfer_listrik: tanggalUploadPortal };
-      try {
-          const { docId, ...dataToUpdate } = updatedBooking;
-          await updateDoc(doc(db, 'sewaList', portalBooking.docId), dataToUpdate);
-          setPortalBooking(updatedBooking); 
-          setUploadListrikFile(null);
-          showToast('Bukti pembayaran LISTRIK berhasil dikirim!');
-      } catch (error) {
-          showToast('Gagal mengirim bukti listrik!', 'error');
-      }
-  };
-
-  const handleUpdateRecordInline = async (record, updates, successMsg) => {
-      try {
-          const { docId, ...dataToUpdate } = { ...record, ...updates };
-          await updateDoc(doc(db, 'sewaList', record.docId), dataToUpdate);
-          setSelectedRecord({ ...record, ...updates });
-          if (successMsg) showToast(successMsg, 'success');
-      } catch (error) {
-          showToast('Gagal update data!', 'error');
-      }
-  };
-
-  const handleDeleteRecordInline = async (record, successMsg) => {
-      try {
-          await deleteDoc(doc(db, 'sewaList', record.docId));
-          setSelectedRecord(null);
-          if (successMsg) showToast(successMsg, 'success');
-      } catch (error) {
-          showToast('Gagal menghapus data!', 'error');
-      }
+      setSewaList(prev => prev.map(s => s.id_sewa === portalBooking.id_sewa ? updatedBooking : s));
+      setPortalBooking(updatedBooking); 
+      setUploadListrikFile(null);
+      showToast('Bukti pembayaran LISTRIK berhasil dikirim!');
   };
 
   // --- MODALS RENDER ---
@@ -1237,7 +1147,7 @@ Terima kasih.`;
                     <p className="text-sm font-bold text-emerald-800 mb-1">{selectedRecord.lokasi_sewa}</p>
                     <p className="text-xs font-semibold text-slate-400 mb-8">{formatTanggalIndo(selectedRecord.tanggal_sewa)}</p>
                     <div className="bg-slate-50 p-4 rounded-2xl text-xs font-semibold text-slate-600 border border-slate-100/85 mb-8">Keterangan: {selectedRecord.keterangan || '-'}</div>
-                    <button type="button" onClick={() => handleDeleteRecordInline(selectedRecord, 'Lokasi berhasil dibuka kembali!')} className="w-full bg-emerald-600 text-white font-bold py-4 rounded-2xl shadow-[0_8px_20px_-4px_rgba(16,185,129,0.3)] hover:bg-emerald-700 hover:-translate-y-0.5 transition-all duration-200">
+                    <button type="button" onClick={() => { setSewaList(sewaList.filter(s => s.id_sewa !== selectedRecord.id_sewa)); setSelectedRecord(null); showToast('Lokasi berhasil dibuka kembali!'); }} className="w-full bg-emerald-600 text-white font-bold py-4 rounded-2xl shadow-[0_8px_20px_-4px_rgba(16,185,129,0.3)] hover:bg-emerald-700 hover:-translate-y-0.5 transition-all duration-200">
                         Buka Kembali Fasilitas Ini
                     </button>
                 </div>
@@ -1332,7 +1242,9 @@ Terima kasih.`;
                                      const isChecked = e.target.checked;
                                      const biayaLok = getBiayaLokasi(selectedRecord.lokasi_sewa, selectedRecord.luas_lahan);
                                      const biayaLis = isChecked ? 100000 : 0;
-                                     handleUpdateRecordInline(selectedRecord, { listrik_tambahan: isChecked, akses_upload_listrik: isChecked, total_biaya: biayaLok + biayaLis }, 'Status listrik diperbarui.');
+                                     const updatedRecord = { ...selectedRecord, listrik_tambahan: isChecked, akses_upload_listrik: isChecked, total_biaya: biayaLok + biayaLis };
+                                     setSewaList(prev => prev.map(s => s.id_sewa === selectedRecord.id_sewa ? updatedRecord : s));
+                                     setSelectedRecord(updatedRecord);
                                  }} 
                              />
                              <div className="w-11 h-6 bg-slate-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
@@ -1349,7 +1261,7 @@ Terima kasih.`;
                                   </div>
                                   <label className={`flex items-center cursor-pointer px-3 py-1.5 rounded-xl border transition-all duration-200 ${selectedRecord.akses_upload_listrik ? 'bg-amber-100 border-amber-300 shadow-sm' : 'bg-slate-50 border-slate-200'}`}>
                                       <span className={`text-[10px] font-bold mr-2 ${selectedRecord.akses_upload_listrik ? 'text-amber-800' : 'text-slate-500'}`}>{selectedRecord.akses_upload_listrik ? 'Aktif' : 'Non-Aktif'}</span>
-                                      <input type="checkbox" checked={selectedRecord.akses_upload_listrik || false} onChange={(e) => handleUpdateRecordInline(selectedRecord, { akses_upload_listrik: e.target.checked })} className="w-4 h-4 text-amber-600 rounded border-slate-300 focus:ring-amber-500 cursor-pointer" />
+                                      <input type="checkbox" checked={selectedRecord.akses_upload_listrik || false} onChange={(e) => { const updated = {...selectedRecord, akses_upload_listrik: e.target.checked}; setSewaList(prev => prev.map(s => s.id_sewa === selectedRecord.id_sewa ? updated : s)); setSelectedRecord(updated); }} className="w-4 h-4 text-amber-600 rounded border-slate-300 focus:ring-amber-500 cursor-pointer" />
                                   </label>
                               </div>
 
@@ -1362,7 +1274,7 @@ Terima kasih.`;
                                           <button type="button" onClick={handlePrintBuktiListrik} className="w-full bg-slate-100 text-slate-700 font-bold py-2.5 rounded-xl hover:bg-slate-200 transition-all duration-200 shadow-sm flex flex-col justify-center items-center text-[10px] border border-slate-200 text-center leading-tight h-14">
                                               <Printer size={16} className="mb-1 text-slate-500"/> Cetak Struk Listrik
                                           </button>
-                                          <button type="button" onClick={() => handleUpdateRecordInline(selectedRecord, { bukti_transfer_listrik: null }, 'Struk listrik dihapus.')} className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold py-2.5 rounded-xl transition-all duration-200 text-[10px] flex flex-col justify-center items-center h-14">
+                                          <button type="button" onClick={() => { const updated = {...selectedRecord, bukti_transfer_listrik: null}; setSewaList(prev => prev.map(s => s.id_sewa === selectedRecord.id_sewa ? updated : s)); setSelectedRecord(updated); }} className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold py-2.5 rounded-xl transition-all duration-200 text-[10px] flex flex-col justify-center items-center h-14">
                                               <X size={16} className="mb-1 text-rose-500"/> Hapus Struk Listrik
                                           </button>
                                       </div>
@@ -1385,7 +1297,11 @@ Terima kasih.`;
                             <span className={`px-3 py-1.5 rounded-xl text-[11px] font-extrabold ${getStatusBadgeClass(selectedRecord.status_pembayaran)}`}>{selectedRecord.status_pembayaran}</span>
                          </div>
                          {selectedRecord.status_pembayaran === 'Menunggu Verifikasi' && selectedRecord.bukti_transfer && (
-                             <button type="button" onClick={() => handleUpdateRecordInline(selectedRecord, { status_pembayaran: 'Sudah Transfer' }, 'Pembayaran berhasil diverifikasi!')} className="w-full bg-emerald-600 text-white font-bold py-3 rounded-xl hover:bg-emerald-700 shadow-md hover:shadow-lg transition-all duration-200 mb-3 flex justify-center items-center"><CheckCircle2 size={16} className="mr-2"/> Verifikasi Valid</button>
+                             <button type="button" onClick={() => {
+                                 setSewaList(prev => prev.map(s => s.id_sewa === selectedRecord.id_sewa ? { ...s, status_pembayaran: 'Sudah Transfer' } : s));
+                                 setSelectedRecord({...selectedRecord, status_pembayaran: 'Sudah Transfer'});
+                                 showToast('Pembayaran berhasil diverifikasi!');
+                             }} className="w-full bg-emerald-600 text-white font-bold py-3 rounded-xl hover:bg-emerald-700 shadow-md hover:shadow-lg transition-all duration-200 mb-3 flex justify-center items-center"><CheckCircle2 size={16} className="mr-2"/> Verifikasi Valid</button>
                          )}
                          {selectedRecord.bukti_transfer && (
                              <div className="mt-2 space-y-3">
@@ -1498,7 +1414,7 @@ Terima kasih.`;
     );
   };
 
-  const handleAddMasterLokasi = async (e) => {
+  const handleAddMasterLokasi = (e) => {
     e.preventDefault();
     if (!newMasterLokasiNama.trim()) return;
     const nameUpper = newMasterLokasiNama.toUpperCase();
@@ -1507,25 +1423,18 @@ Terima kasih.`;
       return;
     }
     const newLok = {
+      id: Date.now(),
       nama: nameUpper,
       tipe: newMasterLokasiTipe
     };
-    try {
-      await addDoc(collection(db, 'masterLokasi'), newLok);
-      setNewMasterLokasiNama('');
-      setToast({ show: true, msg: 'Lokasi fasilitas baru berhasil ditambahkan!', type: 'success' });
-    } catch (error) {
-      setToast({ show: true, msg: 'Gagal menambah lokasi!', type: 'error' });
-    }
+    setMasterLokasi([...masterLokasi, newLok]);
+    setNewMasterLokasiNama('');
+    setToast({ show: true, msg: 'Lokasi fasilitas baru berhasil ditambahkan!', type: 'success' });
   };
 
-  const handleDeleteMasterLokasi = async (id) => {
-    try {
-      await deleteDoc(doc(db, 'masterLokasi', id));
-      setToast({ show: true, msg: 'Lokasi fasilitas berhasil dihapus.', type: 'success' });
-    } catch (error) {
-      setToast({ show: true, msg: 'Gagal menghapus lokasi!', type: 'error' });
-    }
+  const handleDeleteMasterLokasi = (id) => {
+    setMasterLokasi(masterLokasi.filter(l => l.id !== id));
+    setToast({ show: true, msg: 'Lokasi fasilitas berhasil dihapus.', type: 'success' });
   };
 
   const renderMasterData = () => {
@@ -1682,16 +1591,6 @@ Terima kasih.`;
     );
   };
 
-  if (!dataLoaded) return <div className="h-screen w-full flex items-center justify-center bg-[#F4F7F4] text-emerald-800 font-bold">Memuat Sistem...</div>;
-  
-  if (!adminUser && !isPortalRoute) {
-    return <Login onLoginSuccess={() => {}} />;
-  }
-
-  if (activeApp === 'dashboard' && adminUser && !isPortalRoute) {
-    return <MainDashboard onNavigate={(appId) => setActiveApp(appId)} onLogout={() => auth.signOut()} />;
-  }
-
   return (
     <div className="flex h-screen bg-[#F4F7F4] font-sans selection:bg-amber-200 selection:text-emerald-900">
       
@@ -1830,7 +1729,6 @@ Terima kasih.`;
       )}
 
       {/* Sidebar Desktop */}
-      {!isPortalRoute && (
       <aside className="hidden lg:flex inset-y-0 left-0 z-30 w-[280px] bg-gradient-to-b from-[#022c22] via-[#041e17] to-[#01140f] border-r border-emerald-800/20 flex-col shadow-2xl relative overflow-hidden">
         {/* Subtle decorative background elements */}
         <div className="absolute top-0 left-0 w-full h-72 bg-gradient-to-b from-emerald-500/10 to-transparent pointer-events-none"></div>
@@ -1874,18 +1772,7 @@ Terima kasih.`;
             </button>
           ))}
         </nav>
-        <div className="p-4 relative z-10 border-t border-emerald-800/20">
-          <button 
-            type="button" 
-            onClick={() => setActiveApp('dashboard')}
-            className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-emerald-900/40 hover:bg-emerald-800/60 border border-emerald-700/30 hover:border-emerald-600/50 text-emerald-100 hover:text-white rounded-2xl transition-all duration-300 text-xs font-bold group shadow-sm"
-          >
-            <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
-            <span>Master Menu</span>
-          </button>
-        </div>
       </aside>
-      )}
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
@@ -1895,11 +1782,6 @@ Terima kasih.`;
             <div className="w-8 h-8 bg-gradient-to-br from-amber-400 to-amber-500 rounded-lg flex items-center justify-center shadow-md"><Leaf className="text-white" size={16} strokeWidth={2.5} /></div>
             <span className="font-extrabold text-white text-base tracking-tight">TMR System</span>
           </div>
-          {!isPortalRoute && (
-             <button onClick={() => setActiveApp('dashboard')} className="flex items-center justify-center p-2 bg-emerald-900/40 hover:bg-emerald-800/60 border border-emerald-700/30 rounded-xl text-emerald-100 transition-colors" title="Kembali ke Master Menu">
-               <ArrowLeft size={16} />
-             </button>
-          )}
         </header>
 
         <div className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-10 pb-20 relative z-10 bg-[#f8faf9]">
@@ -2480,25 +2362,23 @@ Terima kasih.`;
              )}
         </div>
 
-        {!isPortalRoute && (
-          <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-emerald-100/80 flex justify-between px-1 pb-safe z-[55] shadow-[0_-8px_30px_rgba(4,120,87,0.07)]">
-            {[
-              { id: 'reservasi', label: 'Reservasi', icon: LayoutDashboard },
-              { id: 'sewa', label: 'Tamu', icon: Users },
-              { id: 'pembayaran', label: 'Keuangan', icon: CreditCard },
-              { id: 'master', label: 'Master', icon: Settings },
-              { id: 'portal', label: 'Upload', icon: UploadCloud }
-            ].map(item => (
-              <button key={item.id} onClick={() => setActiveTab(item.id)} className={`flex flex-col items-center justify-center flex-1 pt-2.5 pb-1.5 relative min-h-[56px] sm:min-h-[64px] active:opacity-75 transition-opacity`}>
-                {activeTab === item.id && <div className="absolute top-0 left-1/2 -translate-x-1/2 w-10 h-[3px] bg-gradient-to-r from-emerald-500 to-teal-500 rounded-b-full"></div>}
-                <div className={`p-2 sm:p-2.5 rounded-2xl mb-0.5 transition-all duration-200 ${activeTab === item.id ? 'bg-emerald-50 shadow-sm' : ''}`}>
-                  <item.icon size={22} strokeWidth={activeTab === item.id ? 2.5 : 1.75} className={activeTab === item.id ? 'text-emerald-700' : 'text-slate-400'} />
-                </div>
-                <span className={`text-[10px] sm:text-[11px] font-bold transition-colors leading-none ${activeTab === item.id ? 'text-emerald-800' : 'text-slate-400'}`}>{item.label}</span>
-              </button>
-            ))}
-          </nav>
-        )}
+        <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-emerald-100/80 flex justify-between px-1 pb-safe z-[55] shadow-[0_-8px_30px_rgba(4,120,87,0.07)]">
+          {[
+            { id: 'reservasi', label: 'Reservasi', icon: LayoutDashboard },
+            { id: 'sewa', label: 'Tamu', icon: Users },
+            { id: 'pembayaran', label: 'Keuangan', icon: CreditCard },
+            { id: 'master', label: 'Master', icon: Settings },
+            { id: 'portal', label: 'Upload', icon: UploadCloud }
+          ].map(item => (
+            <button key={item.id} onClick={() => setActiveTab(item.id)} className={`flex flex-col items-center justify-center flex-1 pt-2.5 pb-1.5 relative min-h-[56px] sm:min-h-[64px] active:opacity-75 transition-opacity`}>
+              {activeTab === item.id && <div className="absolute top-0 left-1/2 -translate-x-1/2 w-10 h-[3px] bg-gradient-to-r from-emerald-500 to-teal-500 rounded-b-full"></div>}
+              <div className={`p-2 sm:p-2.5 rounded-2xl mb-0.5 transition-all duration-200 ${activeTab === item.id ? 'bg-emerald-50 shadow-sm' : ''}`}>
+                <item.icon size={22} strokeWidth={activeTab === item.id ? 2.5 : 1.75} className={activeTab === item.id ? 'text-emerald-700' : 'text-slate-400'} />
+              </div>
+              <span className={`text-[10px] sm:text-[11px] font-bold transition-colors leading-none ${activeTab === item.id ? 'text-emerald-800' : 'text-slate-400'}`}>{item.label}</span>
+            </button>
+          ))}
+        </nav>
       </main>
 
       {selectedRecord && renderDetailModal()}
