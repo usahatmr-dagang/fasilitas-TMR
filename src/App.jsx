@@ -58,21 +58,17 @@ const defaultDataLokasi = [
   { id: 15, nama: 'LAP BERINGIN', tipe: 'lapangan' },
   { id: 16, nama: 'LAP TIMUR INF 1', tipe: 'lapangan' },
   { id: 17, nama: 'LAP TIMUR INF 2', tipe: 'lapangan' },
-  { id: 18, nama: 'LAP TSIK 1', tipe: 'lapangan' },
-  { id: 19, nama: 'LAP TSIK 2', tipe: 'lapangan' },
-  { id: 20, nama: 'LAP TSIK 3', tipe: 'lapangan' },
-  { id: 21, nama: 'LAP TSIK 4', tipe: 'lapangan' },
-  { id: 22, nama: 'LAP TL 1', tipe: 'lapangan' },
-  { id: 23, nama: 'LAP TL 2', tipe: 'lapangan' },
-  { id: 24, nama: 'LAP TL 3', tipe: 'lapangan' },
-  { id: 25, nama: 'LAP TL 4', tipe: 'lapangan' },
-  { id: 26, nama: 'LAP TL 5', tipe: 'lapangan' },
-  { id: 27, nama: 'LAP GAJAH TIMUR 1', tipe: 'lapangan' },
-  { id: 28, nama: 'LAP GAJAH TIMUR 2', tipe: 'lapangan' },
-  { id: 29, nama: 'LAP ALTERNATIF 1', tipe: 'lapangan' },
-  { id: 30, nama: 'LAP ALTERNATIF 2', tipe: 'lapangan' },
-  { id: 31, nama: 'LAP ALTERNATIF 3', tipe: 'lapangan' },
-  { id: 32, nama: 'LAP ALTERNATIF 4', tipe: 'lapangan' },
+];
+
+// --- DATA PIC DEFAULT ---
+const defaultPicData = [
+  { id: '1', nama: 'Tari' },
+  { id: '2', nama: 'Rizmy' },
+  { id: '3', nama: 'Alan' },
+  { id: '4', nama: 'Isna' },
+  { id: '5', nama: 'Erna' },
+  { id: '6', nama: 'Suhendra' },
+  { id: '7', nama: 'Putri' }
 ];
 
 const initialDataSewa = [
@@ -119,6 +115,7 @@ export default function App() {
   // Data State (Firebase)
   const [masterLokasi, setMasterLokasi] = useState([]);
   const [sewaList, setSewaList] = useState([]);
+  const [picList, setPicList] = useState([]);
   const [dataLoaded, setDataLoaded] = useState(false);
 
   useEffect(() => {
@@ -139,7 +136,12 @@ export default function App() {
       setDataLoaded(true);
     });
 
-    return () => { unsubAuth(); unsubLokasi(); unsubSewa(); };
+    const unsubPic = onSnapshot(collection(db, 'masterPic'), (snapshot) => {
+      const picData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setPicList(picData.length > 0 ? picData : defaultPicData);
+    });
+
+    return () => { unsubAuth(); unsubLokasi(); unsubSewa(); unsubPic(); };
   }, []);
 
   const getBiayaLokasi = (namaLokasi, luasLahan = 50) => {
@@ -161,7 +163,6 @@ export default function App() {
   const [activeTab, setActiveTab] = useState(isPortalRoute ? 'portal' : 'reservasi');
   const [toast, setToast] = useState(null); 
 
-  const [picList, setPicList] = useState(['Tari', 'Rizmy', 'Alan', 'Isna', 'Erna', 'Suhendra', 'Putri']);
   const [newPic, setNewPic] = useState('');
   const [blockData, setBlockData] = useState({ tanggal: getTodayString(), lokasi: 'Semua Lokasi' });
 
@@ -175,7 +176,7 @@ export default function App() {
   
   const [bookingLokasi, setBookingLokasi] = useState(null);
   const [formData, setFormData] = useState({
-    namaRombongan: '', picRombongan: '', noWa: '', picKantor: '', keterangan: '', statusPembayaran: 'Belum Transfer', listrikTambahan: false, luasLahan: 50
+    namaRombongan: '', picRombongan: '', noWa: '', picKantor: '-', keterangan: '', statusPembayaran: 'Belum Transfer', listrikTambahan: false, luasLahan: 50
   });
 
   const [selectedRecord, setSelectedRecord] = useState(null); 
@@ -321,7 +322,7 @@ export default function App() {
       const docRef = await addDoc(collection(db, 'sewaList'), newBooking);
       newBooking.docId = docRef.id;
       setBookingLokasi(null);
-      setFormData({ namaRombongan: '', picRombongan: '', noWa: '', picKantor: '', keterangan: '', statusPembayaran: 'Belum Transfer', listrikTambahan: false, luasLahan: 50 });
+      setFormData({ namaRombongan: '', picRombongan: '', noWa: '', picKantor: '-', keterangan: '', statusPembayaran: 'Belum Transfer', listrikTambahan: false, luasLahan: 50 });
       handleOpenDetail(newBooking);
       showToast('Reservasi baru berhasil ditambahkan!');
     } catch (error) {
@@ -948,12 +949,30 @@ Terima kasih.`;
       reader.readAsDataURL(file);
   };
 
-  const handleAddPic = (e) => {
+  const handleAddPic = async (e) => {
       e.preventDefault();
-      if(newPic.trim() !== '' && !picList.includes(newPic)) {
-          setPicList([...picList, newPic]);
-          setNewPic('');
-          showToast('PIC baru berhasil ditambahkan.');
+      if(newPic.trim() !== '') {
+          const isExist = picList.find(p => p.nama.toLowerCase() === newPic.trim().toLowerCase());
+          if (!isExist) {
+              try {
+                  await addDoc(collection(db, 'masterPic'), { nama: newPic.trim() });
+                  setNewPic('');
+                  showToast('PIC baru berhasil ditambahkan.', 'success');
+              } catch (error) {
+                  showToast('Gagal menambahkan PIC!', 'error');
+              }
+          } else {
+              showToast('Nama PIC sudah ada!', 'error');
+          }
+      }
+  };
+
+  const handleDeletePic = async (picObj) => {
+      try {
+          await deleteDoc(doc(db, 'masterPic', picObj.id));
+          showToast('PIC berhasil dihapus.', 'success');
+      } catch (error) {
+          showToast('Gagal menghapus PIC!', 'error');
       }
   };
 
@@ -1444,7 +1463,7 @@ Terima kasih.`;
                       <div>
                          <label className="block text-[10px] font-extrabold text-emerald-950 uppercase tracking-wider mb-1">PIC Kantor TMR</label>
                          <select required value={editFormData.pic_kantor || ''} onChange={e => setEditFormData({...editFormData, pic_kantor: e.target.value})} className="w-full px-4 py-2.5 border border-slate-200 rounded-2xl text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 outline-none font-semibold text-emerald-950 bg-white cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2310b981%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E')] bg-[right_1rem_center] bg-[length:1.25em_1.25em] bg-no-repeat pr-10">
-                             {picList.map((pic, idx) => <option key={idx} value={pic}>{pic}</option>)}
+                             {picList.map((pic, idx) => <option key={pic.id || idx} value={pic.nama}>{pic.nama}</option>)}
                          </select>
                       </div>
                       <div><label className="block text-[10px] font-extrabold text-emerald-950 uppercase tracking-wider mb-1">Keterangan</label><textarea value={editFormData.keterangan || ''} onChange={e => setEditFormData({...editFormData, keterangan: e.target.value})} rows="3" className="w-full px-4 py-2.5 border border-slate-200 rounded-2xl text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 outline-none font-semibold text-emerald-950 bg-white" /></div>
@@ -1588,11 +1607,11 @@ Terima kasih.`;
               <div className="flex-1 overflow-y-auto max-h-52 pr-1 hide-scrollbar">
                 <div className="flex flex-wrap gap-2.5">
                   {picList.map((pic, idx) => (
-                    <div key={idx} className="bg-white pl-3.5 pr-2.5 py-2 rounded-xl border border-slate-200/80 text-xs font-extrabold text-emerald-950 flex items-center shadow-sm hover:border-emerald-300 transition-colors group">
-                      <span>{pic}</span>
+                    <div key={pic.id || idx} className="bg-white pl-3.5 pr-2.5 py-2 rounded-xl border border-slate-200/80 text-xs font-extrabold text-emerald-950 flex items-center shadow-sm hover:border-emerald-300 transition-colors group">
+                      <span>{pic.nama}</span>
                       <button 
                         type="button" 
-                        onClick={() => setPicList(picList.filter(p => p !== pic))} 
+                        onClick={() => handleDeletePic(pic)} 
                         className="ml-2.5 p-1 bg-slate-50 group-hover:bg-rose-50 text-slate-400 group-hover:text-rose-600 rounded-lg transition-colors cursor-pointer"
                       >
                         <X size={12} strokeWidth={3}/>
