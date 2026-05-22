@@ -1098,7 +1098,7 @@ Terima kasih.`;
                          </label>
                       </div>
 
-                      {selectedRecord.listrik_tambahan && selectedRecord.status_pembayaran === 'Lunas' && (
+                      {selectedRecord.listrik_tambahan && (selectedRecord.status_pembayaran === 'Lunas' || selectedRecord.status_pembayaran === 'Sudah Transfer') && (
                           <div className="bg-white rounded-3xl p-5 shadow-[0_4px_20px_rgba(4,120,87,0.03)] border border-amber-200 relative overflow-hidden">
                               <div className="absolute top-0 right-0 w-24 h-24 bg-amber-50/50 rounded-bl-full -z-10"></div>
                               <div className="flex items-center justify-between mb-4 border-b border-amber-100 pb-3">
@@ -2165,7 +2165,7 @@ Terima kasih.`;
                              </div>
 
                              {/* SEKSI 2: UPLOAD BUKTI LISTRIK */}
-                             {portalBooking.listrik_tambahan && portalBooking.akses_upload_listrik && portalBooking.status_pembayaran === 'Lunas' && (
+                             {portalBooking.listrik_tambahan && portalBooking.akses_upload_listrik && (portalBooking.status_pembayaran === 'Lunas' || portalBooking.status_pembayaran === 'Sudah Transfer') && (
                                  <div className="border-t border-amber-200 pt-6 mt-6 bg-amber-500/[0.03] -mx-6 px-6 pb-6 rounded-b-3xl border-b border-amber-100">
                                      <h4 className="font-black text-amber-900 text-sm mb-1 flex items-center"><Zap size={18} className="mr-2 text-amber-500" /> Tagihan Listrik Tambahan (+Rp 100.000)</h4>
                                      <p className="text-[11px] text-amber-800 mb-5 font-semibold">Admin telah mengaktifkan pemakaian listrik untuk acara Anda. Silakan unggah bukti transfer tambahan di bawah ini.</p>
