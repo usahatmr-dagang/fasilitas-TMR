@@ -960,7 +960,7 @@ Terima kasih.`;
   };
 
   const handleKirimBuktiListrik = () => {
-      const updatedBooking = { ...portalBooking, bukti_transfer_listrik: uploadListrikFile, tanggal_transfer: tanggalUploadPortal };
+      const updatedBooking = { ...portalBooking, bukti_transfer_listrik: uploadListrikFile, tanggal_transfer_listrik: tanggalUploadPortal };
       setSewaList(prev => prev.map(s => s.id_sewa === portalBooking.id_sewa ? updatedBooking : s));
       setPortalBooking(updatedBooking); 
       setUploadListrikFile(null);
@@ -1114,7 +1114,8 @@ Terima kasih.`;
 
                               {selectedRecord.bukti_transfer_listrik ? (
                                   <div>
-                                      <span className="px-2.5 py-1 rounded-md text-[10px] font-bold bg-amber-100 text-amber-700 flex w-max items-center mb-3"><CheckCircle2 size={12} className="mr-1"/> Struk Listrik Tersedia</span>
+                                      <span className="px-2.5 py-1 rounded-md text-[10px] font-bold bg-amber-100 text-amber-700 flex w-max items-center mb-2"><CheckCircle2 size={12} className="mr-1"/> Struk Listrik Tersedia</span>
+                                      {selectedRecord.tanggal_transfer_listrik && <p className="text-[10px] text-amber-800 font-bold mb-2 tracking-wide">Tgl Transfer: {formatTanggalIndo(selectedRecord.tanggal_transfer_listrik)}</p>}
                                       <img src={selectedRecord.bukti_transfer_listrik} alt="Struk Listrik" className="w-full rounded-2xl border border-slate-200 mt-1 mb-3 object-contain max-h-48 bg-slate-50" />
                                       <button type="button" onClick={() => { const updated = {...selectedRecord, bukti_transfer_listrik: null}; setSewaList(prev => prev.map(s => s.id_sewa === selectedRecord.id_sewa ? updated : s)); setSelectedRecord(updated); }} className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold py-3 rounded-xl transition-all duration-200 text-xs">Hapus Struk Listrik</button>
                                   </div>
@@ -2169,7 +2170,11 @@ Terima kasih.`;
                                      <h4 className="font-black text-amber-900 text-sm mb-1 flex items-center"><Zap size={18} className="mr-2 text-amber-500" /> Tagihan Listrik Tambahan (+Rp 100.000)</h4>
                                      <p className="text-[11px] text-amber-800 mb-5 font-semibold">Admin telah mengaktifkan pemakaian listrik untuk acara Anda. Silakan unggah bukti transfer tambahan di bawah ini.</p>
                                      {portalBooking.bukti_transfer_listrik ? (
-                                         <div className="text-center py-6 bg-white rounded-2xl border border-amber-200/50 shadow-sm"><CheckCircle2 size={36} className="mx-auto text-amber-500 mb-2" /><p className="font-extrabold text-amber-900 text-xs">Bukti Pembayaran Listrik Anda Sudah Diterima Admin.</p></div>
+                                         <div className="text-center py-6 bg-white rounded-2xl border border-amber-200/50 shadow-sm">
+                                             <CheckCircle2 size={36} className="mx-auto text-amber-500 mb-2" />
+                                             <p className="font-extrabold text-amber-900 text-xs">Bukti Pembayaran Listrik Anda Sudah Diterima Admin.</p>
+                                             {portalBooking.tanggal_transfer_listrik && <p className="text-[10px] text-amber-700 font-bold mt-2">Tgl Transfer: {formatTanggalIndo(portalBooking.tanggal_transfer_listrik)}</p>}
+                                         </div>
                                      ) : (
                                          <div className="space-y-4">
                                              {!uploadListrikFile && (
