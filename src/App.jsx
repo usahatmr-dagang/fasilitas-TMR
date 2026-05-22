@@ -1457,7 +1457,9 @@ Terima kasih.`;
                     </div>
                     <button type="button" onClick={() => setBookingLokasi(null)} className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all duration-200 hover:scale-105"><X size={18} /></button>
                 </div>
-                <form onSubmit={handleSubmitBooking} className="p-4 sm:p-6 overflow-y-auto space-y-4 flex-1 bg-slate-50/50 hide-scrollbar relative z-10">
+                {/* Scrollable form fields */}
+                <div className="overflow-y-auto flex-1 hide-scrollbar bg-slate-50/50">
+                <form id="booking-form" onSubmit={handleSubmitBooking} className="p-4 sm:p-6 space-y-4 relative z-10">
                     
                     {/* KHUSUS LAPANGAN: Input Luas Lahan */}
                     {bookingLokasi.tipe === 'lapangan' && (
@@ -1541,11 +1543,26 @@ Terima kasih.`;
                             </label>
                         </div>
                     </div>
-                    <div className="pt-4 sm:pt-5 border-t border-slate-100 flex space-x-3 pb-safe-extra">
-                        <button type="button" onClick={() => setBookingLokasi(null)} className="w-1/3 py-4 sm:py-3.5 text-sm font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-all duration-200 active:scale-95">Batal</button>
-                        <button type="submit" className="w-2/3 py-4 sm:py-3.5 text-sm font-black text-white bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 rounded-2xl shadow-[0_8px_20px_-4px_rgba(16,185,129,0.3)] hover:shadow-[0_10px_25px_-4px_rgba(16,185,129,0.4)] transition-all duration-200 flex justify-center items-center active:scale-95"><Save size={18} className="mr-2"/> Simpan Reservasi</button>
-                    </div>
                 </form>
+                </div>{/* end scrollable wrapper */}
+
+                {/* Sticky action footer — always visible, never behind bottom nav */}
+                <div
+                  className="shrink-0 bg-white border-t border-slate-100 px-4 sm:px-6 pt-4 flex space-x-3"
+                  style={{ paddingBottom: 'max(1rem, calc(0.75rem + env(safe-area-inset-bottom, 0px)))' }}
+                >
+                    <button
+                      type="button"
+                      form="booking-form"
+                      onClick={() => setBookingLokasi(null)}
+                      className="w-1/3 py-4 sm:py-3.5 text-sm font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-all duration-200 active:scale-95"
+                    >Batal</button>
+                    <button
+                      type="submit"
+                      form="booking-form"
+                      className="w-2/3 py-4 sm:py-3.5 text-sm font-black text-white bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 rounded-2xl shadow-[0_8px_20px_-4px_rgba(16,185,129,0.3)] hover:shadow-[0_10px_25px_-4px_rgba(16,185,129,0.4)] transition-all duration-200 flex justify-center items-center active:scale-95"
+                    ><Save size={18} className="mr-2"/> Simpan Reservasi</button>
+                </div>
             </div>
         </div>
       )}
