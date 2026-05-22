@@ -722,6 +722,159 @@ Terima kasih.`;
     }, 800); 
   };
 
+  const handlePrintBuktiListrik = () => {
+    if (!selectedRecord || !selectedRecord.bukti_transfer_listrik) return;
+    
+    const tglSewaStr = formatTanggalPendek(selectedRecord.tanggal_sewa);
+    const tglTransferStr = selectedRecord.tanggal_transfer_listrik ? formatTanggalPendek(selectedRecord.tanggal_transfer_listrik) : '-';
+    
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    document.body.appendChild(iframe);
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Cetak Bukti Listrik - ${selectedRecord.id_sewa}</title>
+          <style>
+            @page { 
+              size: 215mm 330mm; 
+              margin: 0; 
+            }
+            body { 
+              font-family: 'Arial', sans-serif; 
+              background-color: #ffffff; 
+              margin: 0; 
+              padding: 0; 
+              width: 215mm;
+              height: 330mm;
+              overflow: hidden; 
+              -webkit-print-color-adjust: exact; 
+              print-color-adjust: exact; 
+            }
+            .print-container {
+              width: 100%;
+              height: 100%;
+              padding: 15mm;
+              box-sizing: border-box;
+              display: flex;
+              flex-direction: column;
+              border: 10px solid #d97706;
+              background-color: #fffbeb;
+            }
+            .header {
+              text-align: center;
+              border-bottom: 3px solid #d97706;
+              padding-bottom: 5mm;
+              margin-bottom: 5mm;
+              flex-shrink: 0;
+            }
+            .header h1 { 
+              font-size: 24px; 
+              color: #78350f; 
+              margin: 0; 
+              font-weight: 900; 
+              letter-spacing: 1px; 
+            }
+            .header h2 { 
+              font-size: 16px; 
+              color: #d97706; 
+              margin: 5px 0 0 0; 
+              letter-spacing: 2px; 
+            }
+            .details {
+              font-size: 12pt;
+              color: #78350f;
+              margin-bottom: 10mm;
+              line-height: 1.5;
+              flex-shrink: 0;
+            }
+            .details table {
+              width: 100%;
+              border-collapse: collapse;
+            }
+            .details td {
+              padding: 4px 0;
+              vertical-align: top;
+            }
+            .details td:first-child {
+              font-weight: bold;
+              width: 150px;
+            }
+            .image-container {
+              flex: 1;
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              border: 2px dashed #d97706;
+              padding: 5mm;
+              background-color: #ffffff;
+              overflow: hidden;
+            }
+            .image-container img {
+              max-width: 100%;
+              max-height: 100%;
+              object-fit: contain;
+            }
+            .footer {
+              text-align: center;
+              margin-top: 5mm;
+              font-size: 10pt;
+              color: #78350f;
+              font-weight: bold;
+              flex-shrink: 0;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="print-container">
+            <div class="header">
+              <h1>TAMAN MARGASATWA RAGUNAN</h1>
+              <h2>BUKTI PEMBAYARAN LISTRIK TAMBAHAN</h2>
+            </div>
+            
+            <div class="details">
+              <table>
+                <tr><td>ID Transaksi</td><td>: <b>${selectedRecord.id_sewa}</b></td></tr>
+                <tr><td>Nama Penyewa</td><td>: ${selectedRecord.nama_penyewa}</td></tr>
+                <tr><td>Lokasi Sewa</td><td>: ${selectedRecord.lokasi_sewa}</td></tr>
+                <tr><td>Tanggal Sewa</td><td>: ${tglSewaStr}</td></tr>
+                <tr><td>Tanggal Transfer Listrik</td><td>: ${tglTransferStr}</td></tr>
+              </table>
+            </div>
+
+            <div class="image-container">
+              <img src="${selectedRecord.bukti_transfer_listrik}" alt="Bukti Transfer Listrik" />
+            </div>
+
+            <div class="footer">
+              Sistem Informasi Manajemen Fasilitas Taman Margasatwa Ragunan
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+
+    const doc = iframe.contentWindow.document;
+    doc.open();
+    doc.write(htmlContent);
+    doc.close();
+
+    setTimeout(() => {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+      setTimeout(() => {
+        document.body.removeChild(iframe);
+      }, 1000);
+    }, 800); 
+  };
+
   const handleUploadListrikChange = (e) => {
       const file = e.target.files[0];
       if(!file) return;
@@ -1117,7 +1270,14 @@ Terima kasih.`;
                                       <span className="px-2.5 py-1 rounded-md text-[10px] font-bold bg-amber-100 text-amber-700 flex w-max items-center mb-2"><CheckCircle2 size={12} className="mr-1"/> Struk Listrik Tersedia</span>
                                       {selectedRecord.tanggal_transfer_listrik && <p className="text-[10px] text-amber-800 font-bold mb-2 tracking-wide">Tgl Transfer: {formatTanggalIndo(selectedRecord.tanggal_transfer_listrik)}</p>}
                                       <img src={selectedRecord.bukti_transfer_listrik} alt="Struk Listrik" className="w-full rounded-2xl border border-slate-200 mt-1 mb-3 object-contain max-h-48 bg-slate-50" />
-                                      <button type="button" onClick={() => { const updated = {...selectedRecord, bukti_transfer_listrik: null}; setSewaList(prev => prev.map(s => s.id_sewa === selectedRecord.id_sewa ? updated : s)); setSelectedRecord(updated); }} className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold py-3 rounded-xl transition-all duration-200 text-xs">Hapus Struk Listrik</button>
+                                      <div className="grid grid-cols-2 gap-2 mt-2">
+                                          <button type="button" onClick={handlePrintBuktiListrik} className="w-full bg-slate-100 text-slate-700 font-bold py-2.5 rounded-xl hover:bg-slate-200 transition-all duration-200 shadow-sm flex flex-col justify-center items-center text-[10px] border border-slate-200 text-center leading-tight h-14">
+                                              <Printer size={16} className="mb-1 text-slate-500"/> Cetak Struk Listrik
+                                          </button>
+                                          <button type="button" onClick={() => { const updated = {...selectedRecord, bukti_transfer_listrik: null}; setSewaList(prev => prev.map(s => s.id_sewa === selectedRecord.id_sewa ? updated : s)); setSelectedRecord(updated); }} className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold py-2.5 rounded-xl transition-all duration-200 text-[10px] flex flex-col justify-center items-center h-14">
+                                              <X size={16} className="mb-1 text-rose-500"/> Hapus Struk Listrik
+                                          </button>
+                                      </div>
                                   </div>
                               ) : (
                                   <div className="text-center mt-2">
