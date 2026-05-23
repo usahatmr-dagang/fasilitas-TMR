@@ -107,8 +107,15 @@ export default function PublicUpload() {
       };
       
       setLoadingText('Mengunggah file ke server (1/2)...');
-      // Upload file to Firebase Storage
-      await uploadBytes(storageRef, uploadFile, metadata);
+      
+      // Setup timeout to prevent infinite hang (e.g., due to CORS or Adblocker)
+      const uploadPromise = uploadBytes(storageRef, uploadFile, metadata);
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error("Koneksi terputus. Pastikan Anda tidak menggunakan Adblocker, atau coba gunakan mode Incognito / browser lain.")), 15000);
+      });
+      
+      // Race between upload and timeout
+      await Promise.race([uploadPromise, timeoutPromise]);
       
       setLoadingText('Menyimpan data transaksi (2/2)...');
       const downloadURL = await getDownloadURL(storageRef);
