@@ -117,12 +117,19 @@ export default function App() {
   const [sewaList, setSewaList] = useState([]);
   const [picList, setPicList] = useState([]);
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
 
   useEffect(() => {
     // Auth Listener
     const unsubAuth = onAuthStateChanged(auth, (user) => {
       setAdminUser(user);
+      setIsAuthChecking(false);
     });
+    return () => unsubAuth();
+  }, []);
+
+  useEffect(() => {
+    if (!adminUser) return;
 
     // Firestore Listeners
     const unsubLokasi = onSnapshot(collection(db, 'masterLokasi'), (snapshot) => {
@@ -141,8 +148,8 @@ export default function App() {
       setPicList(picData.length > 0 ? picData : defaultPicData);
     });
 
-    return () => { unsubAuth(); unsubLokasi(); unsubSewa(); unsubPic(); };
-  }, []);
+    return () => { unsubLokasi(); unsubSewa(); unsubPic(); };
+  }, [adminUser]);
 
   const getBiayaLokasi = (namaLokasi, luasLahan = 50) => {
     if (!namaLokasi) return 0;
@@ -1731,11 +1738,13 @@ Terima kasih.`;
     );
   };
 
-  if (!dataLoaded) return <div className="h-screen w-full flex items-center justify-center bg-[#F4F7F4] text-emerald-800 font-bold">Memuat Sistem...</div>;
+  if (isAuthChecking) return <div className="h-screen w-full flex items-center justify-center bg-[#F4F7F4] text-emerald-800 font-bold">Memeriksa Akses...</div>;
   
   if (!adminUser && !isPortalRoute) {
     return <Login onLoginSuccess={() => {}} />;
   }
+
+  if (!dataLoaded) return <div className="h-screen w-full flex items-center justify-center bg-[#F4F7F4] text-emerald-800 font-bold">Memuat Data Server...</div>;
 
   if (activeApp === 'dashboard' && adminUser && !isPortalRoute) {
     return <MainDashboard onNavigate={(appId) => setActiveApp(appId)} onLogout={() => auth.signOut()} />;
