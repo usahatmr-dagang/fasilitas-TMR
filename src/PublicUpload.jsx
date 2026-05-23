@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UploadCloud, CheckCircle2, AlertCircle, Search, ShieldCheck } from 'lucide-react';
+import { UploadCloud, CheckCircle2, AlertCircle, Search, ShieldCheck, Zap } from 'lucide-react';
 import { db } from './firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 
@@ -35,10 +35,14 @@ export default function PublicUpload() {
       
       if (docSnap.exists()) {
         const data = docSnap.data();
-        if (data.status_pembayaran === 'Lunas' || data.status_pembayaran === 'Sudah Transfer') {
+        const isMainPaid = data.status_pembayaran === 'Lunas' || data.status_pembayaran === 'Sudah Transfer';
+        const needsListrik = data.listrik_tambahan && data.akses_upload_listrik && !data.bukti_transfer_listrik;
+        const isMainPending = data.status_pembayaran === 'Menunggu Verifikasi';
+
+        if (isMainPaid && !needsListrik) {
           setErrorMsg('Transaksi ini sudah lunas atau sudah memiliki bukti transfer yang valid.');
           setBookingData(null);
-        } else if (data.status_pembayaran === 'Menunggu Verifikasi') {
+        } else if (isMainPending && !needsListrik) {
           setSuccessMsg('Bukti transfer Anda sudah diterima dan sedang Menunggu Verifikasi oleh Admin.');
           setBookingData(null);
         } else {
@@ -160,15 +164,25 @@ export default function PublicUpload() {
       setLoadingText('Menyimpan data transaksi (2/2)...');
       const todayStr = new Date().toISOString().split('T')[0];
 
+      const isListrikUpload = bookingData.listrik_tambahan && bookingData.akses_upload_listrik && (bookingData.status_pembayaran === 'Lunas' || bookingData.status_pembayaran === 'Sudah Transfer');
+
       // Update Firestore directly bypassing Storage
       const docRef = doc(db, 'sewaList', bookingData.id);
-      await updateDoc(docRef, {
-        status_pembayaran: 'Menunggu Verifikasi',
-        bukti_transfer: finalDataUrl,
-        tanggal_transfer: todayStr
-      });
-
-      setSuccessMsg('Bukti transfer berhasil di-upload! Mohon tunggu verifikasi dari Admin.');
+      
+      if (isListrikUpload) {
+        await updateDoc(docRef, {
+          bukti_transfer_listrik: finalDataUrl,
+          tanggal_transfer_listrik: todayStr
+        });
+        setSuccessMsg('Bukti pembayaran listrik tambahan berhasil di-upload! Mohon tunggu verifikasi.');
+      } else {
+        await updateDoc(docRef, {
+          status_pembayaran: 'Menunggu Verifikasi',
+          bukti_transfer: finalDataUrl,
+          tanggal_transfer: todayStr
+        });
+        setSuccessMsg('Bukti transfer berhasil di-upload! Mohon tunggu verifikasi dari Admin.');
+      }
       setBookingData(null);
       setFilePreview(null);
       setUploadFile(null);
@@ -289,7 +303,14 @@ export default function PublicUpload() {
 
               <form onSubmit={handleSubmit}>
                 <div className="mb-6">
-                  <p className="text-sm font-bold text-slate-700 mb-2">Pilih File Bukti Pembayaran</p>
+                  {bookingData?.listrik_tambahan && bookingData?.akses_upload_listrik && (bookingData?.status_pembayaran === 'Lunas' || bookingData?.status_pembayaran === 'Sudah Transfer') ? (
+                    <>
+                      <p className="text-sm font-black text-amber-600 flex items-center mb-1"><Zap size={16} className="mr-1" /> Bukti Pembayaran Listrik (+Rp 100.000)</p>
+                      <p className="text-[10px] text-slate-500 mb-3">Admin telah mengaktifkan pemakaian listrik. Silakan unggah bukti transfer tambahan di sini.</p>
+                    </>
+                  ) : (
+                    <p className="text-sm font-bold text-slate-700 mb-2">Pilih File Bukti Pembayaran</p>
+                  )}
                   
                   {!filePreview ? (
                     <label className="w-full border-2 border-dashed border-slate-300 bg-slate-50 hover:bg-emerald-50 hover:border-emerald-300 text-slate-500 hover:text-emerald-600 transition-colors py-10 rounded-2xl flex flex-col items-center justify-center cursor-pointer group">

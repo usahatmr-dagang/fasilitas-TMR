@@ -1388,7 +1388,7 @@ Terima kasih.`;
                                   <div>
                                       <span className="px-2.5 py-1 rounded-md text-[10px] font-bold bg-amber-100 text-amber-700 flex w-max items-center mb-2"><CheckCircle2 size={12} className="mr-1"/> Struk Listrik Tersedia</span>
                                       {selectedRecord.tanggal_transfer_listrik && <p className="text-[10px] text-amber-800 font-bold mb-2 tracking-wide">Tgl Transfer: {formatTanggalIndo(selectedRecord.tanggal_transfer_listrik)}</p>}
-                                      <img src={selectedRecord.bukti_transfer_listrik} alt="Struk Listrik" className="w-full rounded-2xl border border-slate-200 mt-1 mb-3 object-contain max-h-48 bg-slate-50" />
+                                      <img src={selectedRecord.bukti_transfer_listrik} alt="Struk Listrik" className="w-full rounded-2xl border border-slate-200 mt-1 mb-3 object-contain max-h-[500px] bg-slate-50" />
                                       <div className="grid grid-cols-2 gap-2 mt-2">
                                           <button type="button" onClick={handlePrintBuktiListrik} className="w-full bg-slate-100 text-slate-700 font-bold py-2.5 rounded-xl hover:bg-slate-200 transition-all duration-200 shadow-sm flex flex-col justify-center items-center text-[10px] border border-slate-200 text-center leading-tight h-14">
                                               <Printer size={16} className="mb-1 text-slate-500"/> Cetak Struk Listrik
@@ -1420,7 +1420,7 @@ Terima kasih.`;
                          )}
                          {selectedRecord.bukti_transfer && (
                              <div className="mt-2 space-y-3">
-                                 <img src={selectedRecord.bukti_transfer} alt="Struk Utama" className="w-full rounded-2xl border border-slate-200 object-contain max-h-56 bg-slate-50" />
+                                 <img src={selectedRecord.bukti_transfer} alt="Struk Utama" className="w-full rounded-2xl border border-slate-200 object-contain max-h-[500px] bg-slate-50" />
                                  <div className={`grid ${selectedRecord.status_pembayaran === 'Lunas' ? 'grid-cols-3' : 'grid-cols-2'} gap-2`}>
                                      <button type="button" onClick={handlePrintBukti} className="w-full bg-slate-100 text-slate-700 font-bold py-2.5 rounded-xl hover:bg-slate-200 transition-all duration-200 shadow-sm flex flex-col justify-center items-center text-[10px] border border-slate-200 text-center leading-tight h-14">
                                          <Printer size={16} className="mb-1 text-slate-500"/> Cetak Bukti Transfer
