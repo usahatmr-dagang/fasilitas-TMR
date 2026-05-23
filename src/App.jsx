@@ -198,6 +198,7 @@ export default function App() {
   const [uploadListrikFile, setUploadListrikFile] = useState(null); 
   const [isScanning, setIsScanning] = useState(false);
   const [ocrResult, setOcrResult] = useState(null);
+  const [fullScreenImage, setFullScreenImage] = useState(null);
   const [scanError, setScanError] = useState('');
   const [tanggalUploadPortal, setTanggalUploadPortal] = useState(getTodayString());
 
@@ -825,32 +826,32 @@ Terima kasih.`;
               box-sizing: border-box;
               display: flex;
               flex-direction: column;
-              border: 10px solid #d97706;
-              background-color: #fffbeb;
+              border: 10px solid #059669;
+              background-color: #f0fdf4;
             }
             .header {
               text-align: center;
-              border-bottom: 3px solid #d97706;
+              border-bottom: 3px solid #059669;
               padding-bottom: 5mm;
               margin-bottom: 5mm;
               flex-shrink: 0;
             }
             .header h1 { 
               font-size: 24px; 
-              color: #78350f; 
+              color: #064e3b; 
               margin: 0; 
               font-weight: 900; 
               letter-spacing: 1px; 
             }
             .header h2 { 
               font-size: 16px; 
-              color: #d97706; 
+              color: #059669; 
               margin: 5px 0 0 0; 
               letter-spacing: 2px; 
             }
             .details {
               font-size: 12pt;
-              color: #78350f;
+              color: #064e3b;
               margin-bottom: 10mm;
               line-height: 1.5;
               flex-shrink: 0;
@@ -872,7 +873,7 @@ Terima kasih.`;
               display: flex;
               justify-content: center;
               align-items: center;
-              border: 2px dashed #d97706;
+              border: 2px dashed #059669;
               padding: 5mm;
               background-color: #ffffff;
               overflow: hidden;
@@ -886,7 +887,7 @@ Terima kasih.`;
               text-align: center;
               margin-top: 5mm;
               font-size: 10pt;
-              color: #78350f;
+              color: #064e3b;
               font-weight: bold;
               flex-shrink: 0;
             }
@@ -1388,7 +1389,7 @@ Terima kasih.`;
                                   <div>
                                       <span className="px-2.5 py-1 rounded-md text-[10px] font-bold bg-amber-100 text-amber-700 flex w-max items-center mb-2"><CheckCircle2 size={12} className="mr-1"/> Struk Listrik Tersedia</span>
                                       {selectedRecord.tanggal_transfer_listrik && <p className="text-[10px] text-amber-800 font-bold mb-2 tracking-wide">Tgl Transfer: {formatTanggalIndo(selectedRecord.tanggal_transfer_listrik)}</p>}
-                                      <img src={selectedRecord.bukti_transfer_listrik} alt="Struk Listrik" className="w-full rounded-2xl border border-slate-200 mt-1 mb-3 object-contain max-h-[500px] bg-slate-50" />
+                                      <img src={selectedRecord.bukti_transfer_listrik} alt="Struk Listrik" className="w-full rounded-2xl border border-slate-200 mt-1 mb-3 object-contain max-h-[500px] bg-slate-50 cursor-pointer hover:opacity-90 transition-opacity" onClick={() => setFullScreenImage(selectedRecord.bukti_transfer_listrik)} />
                                       <div className="grid grid-cols-2 gap-2 mt-2">
                                           <button type="button" onClick={handlePrintBuktiListrik} className="w-full bg-slate-100 text-slate-700 font-bold py-2.5 rounded-xl hover:bg-slate-200 transition-all duration-200 shadow-sm flex flex-col justify-center items-center text-[10px] border border-slate-200 text-center leading-tight h-14">
                                               <Printer size={16} className="mb-1 text-slate-500"/> Cetak Struk Listrik
@@ -1420,7 +1421,7 @@ Terima kasih.`;
                          )}
                          {selectedRecord.bukti_transfer && (
                              <div className="mt-2 space-y-3">
-                                 <img src={selectedRecord.bukti_transfer} alt="Struk Utama" className="w-full rounded-2xl border border-slate-200 object-contain max-h-[500px] bg-slate-50" />
+                                 <img src={selectedRecord.bukti_transfer} alt="Struk Utama" className="w-full rounded-2xl border border-slate-200 object-contain max-h-[500px] bg-slate-50 cursor-pointer hover:opacity-90 transition-opacity" onClick={() => setFullScreenImage(selectedRecord.bukti_transfer)} />
                                  <div className={`grid ${selectedRecord.status_pembayaran === 'Lunas' ? 'grid-cols-3' : 'grid-cols-2'} gap-2`}>
                                      <button type="button" onClick={handlePrintBukti} className="w-full bg-slate-100 text-slate-700 font-bold py-2.5 rounded-xl hover:bg-slate-200 transition-all duration-200 shadow-sm flex flex-col justify-center items-center text-[10px] border border-slate-200 text-center leading-tight h-14">
                                          <Printer size={16} className="mb-1 text-slate-500"/> Cetak Bukti Transfer
@@ -2563,6 +2564,15 @@ Terima kasih.`;
       </main>
 
       {selectedRecord && renderDetailModal()}
+
+      {fullScreenImage && (
+        <div className="fixed inset-0 z-[9999] bg-black/95 flex justify-center items-center p-4 animate-fade-in" onClick={() => setFullScreenImage(null)}>
+          <button className="absolute top-4 right-4 bg-white/10 hover:bg-rose-500 text-white rounded-full p-2 transition-colors shadow-lg backdrop-blur-sm" onClick={() => setFullScreenImage(null)}>
+            <X size={24} />
+          </button>
+          <img src={fullScreenImage} alt="Fullscreen Preview" className="max-w-full max-h-full object-contain drop-shadow-2xl" onClick={(e) => e.stopPropagation()} />
+        </div>
+      )}
 
       <style dangerouslySetInnerHTML={{__html: `
         @keyframes slide-in-right { from { transform: translateX(100%); } to { transform: translateX(0); } } 
