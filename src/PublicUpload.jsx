@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { UploadCloud, CheckCircle2, AlertCircle, Search, ShieldCheck } from 'lucide-react';
-import { db, storage } from './firebase';
+import { db } from './firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 export default function PublicUpload() {
   const [docId, setDocId] = useState('');
@@ -88,45 +87,81 @@ export default function PublicUpload() {
     reader.readAsDataURL(file);
   };
 
+  const compressImage = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target.result;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 1200;
+          const MAX_HEIGHT = 1200;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+          resolve(dataUrl);
+        };
+        img.onerror = (error) => reject(error);
+      };
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!uploadFile || !bookingData) return;
 
     setIsLoading(true);
-    setLoadingText('Mempersiapkan file...');
+    setLoadingText('Mengompresi file...');
     setErrorMsg('');
     
     try {
-      // Create a unique file name to avoid overwriting
-      const fileExt = uploadFile.name.split('.').pop();
-      const fileName = `bukti_transfer/${bookingData.id}_${Date.now()}.${fileExt}`;
-      const storageRef = ref(storage, fileName);
-
-      const metadata = {
-        contentType: uploadFile.type
-      };
+      let finalDataUrl = '';
       
-      setLoadingText('Mengunggah file ke server (1/2)...');
-      
-      // Setup timeout to prevent infinite hang (e.g., due to CORS or Adblocker)
-      const uploadPromise = uploadBytes(storageRef, uploadFile, metadata);
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error("Koneksi terputus. Pastikan Anda tidak menggunakan Adblocker, atau coba gunakan mode Incognito / browser lain.")), 15000);
-      });
-      
-      // Race between upload and timeout
-      await Promise.race([uploadPromise, timeoutPromise]);
+      if (uploadFile.type.startsWith('image/')) {
+        finalDataUrl = await compressImage(uploadFile);
+      } else {
+        // Jika PDF, gunakan file asli sebagai base64 (hati-hati batas 1MB Firestore)
+        const reader = new FileReader();
+        finalDataUrl = await new Promise((resolve) => {
+           reader.onload = () => resolve(reader.result);
+           reader.readAsDataURL(uploadFile);
+        });
+        
+        // Peringatan ukuran untuk PDF
+        const sizeInKB = Math.round((finalDataUrl.length * 3) / 4 / 1024);
+        if (sizeInKB > 900) {
+           throw new Error("File PDF terlalu besar. Gunakan file berukuran maksimal 600KB, atau gunakan format Gambar (JPG/PNG).");
+        }
+      }
       
       setLoadingText('Menyimpan data transaksi (2/2)...');
-      const downloadURL = await getDownloadURL(storageRef);
-
       const todayStr = new Date().toISOString().split('T')[0];
 
-      // Update Firestore
+      // Update Firestore directly bypassing Storage
       const docRef = doc(db, 'sewaList', bookingData.id);
       await updateDoc(docRef, {
         status_pembayaran: 'Menunggu Verifikasi',
-        bukti_transfer: downloadURL,
+        bukti_transfer: finalDataUrl,
         tanggal_transfer: todayStr
       });
 
@@ -136,7 +171,7 @@ export default function PublicUpload() {
       setUploadFile(null);
     } catch (err) {
       console.error("Upload error: ", err);
-      setErrorMsg(`Terjadi kesalahan: ${err.message || err.code || 'Gagal terhubung ke server'}`);
+      setErrorMsg(`Terjadi kesalahan: ${err.message || err.code || 'Gagal menyimpan data'}`);
     } finally {
       setIsLoading(false);
     }
