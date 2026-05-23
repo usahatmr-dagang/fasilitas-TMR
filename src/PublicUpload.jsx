@@ -100,8 +100,12 @@ export default function PublicUpload() {
       const fileName = `bukti_transfer/${bookingData.id}_${Date.now()}.${fileExt}`;
       const storageRef = ref(storage, fileName);
 
+      const metadata = {
+        contentType: uploadFile.type
+      };
+      
       // Upload file to Firebase Storage
-      await uploadBytes(storageRef, uploadFile);
+      await uploadBytes(storageRef, uploadFile, metadata);
       const downloadURL = await getDownloadURL(storageRef);
 
       const todayStr = new Date().toISOString().split('T')[0];
