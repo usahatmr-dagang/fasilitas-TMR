@@ -8,6 +8,7 @@ export default function PublicUpload() {
   const [docId, setDocId] = useState('');
   const [bookingData, setBookingData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingText, setLoadingText] = useState('Memproses...');
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   
@@ -92,6 +93,7 @@ export default function PublicUpload() {
     if (!uploadFile || !bookingData) return;
 
     setIsLoading(true);
+    setLoadingText('Mempersiapkan file...');
     setErrorMsg('');
     
     try {
@@ -104,8 +106,11 @@ export default function PublicUpload() {
         contentType: uploadFile.type
       };
       
+      setLoadingText('Mengunggah file ke server (1/2)...');
       // Upload file to Firebase Storage
       await uploadBytes(storageRef, uploadFile, metadata);
+      
+      setLoadingText('Menyimpan data transaksi (2/2)...');
       const downloadURL = await getDownloadURL(storageRef);
 
       const todayStr = new Date().toISOString().split('T')[0];
@@ -123,8 +128,8 @@ export default function PublicUpload() {
       setFilePreview(null);
       setUploadFile(null);
     } catch (err) {
-      console.error(err);
-      setErrorMsg('Terjadi kesalahan saat meng-upload file. Silakan coba lagi.');
+      console.error("Upload error: ", err);
+      setErrorMsg(`Terjadi kesalahan: ${err.message || err.code || 'Gagal terhubung ke server'}`);
     } finally {
       setIsLoading(false);
     }
@@ -197,7 +202,7 @@ export default function PublicUpload() {
           {isLoading && (
              <div className="p-12 flex flex-col items-center justify-center">
                <div className="w-12 h-12 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin mb-4"></div>
-               <p className="text-emerald-800 font-bold animate-pulse">Memproses...</p>
+               <p className="text-emerald-800 font-bold animate-pulse">{loadingText}</p>
              </div>
           )}
 
