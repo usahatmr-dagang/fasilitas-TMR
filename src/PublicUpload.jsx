@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { UploadCloud, CheckCircle2, AlertCircle, Search, ShieldCheck } from 'lucide-react';
 import { db, storage } from './firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
-import { ref, uploadString, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 export default function PublicUpload() {
   const [docId, setDocId] = useState('');
@@ -101,7 +101,7 @@ export default function PublicUpload() {
       const storageRef = ref(storage, fileName);
 
       // Upload file to Firebase Storage
-      await uploadString(storageRef, filePreview, 'data_url');
+      await uploadBytes(storageRef, uploadFile);
       const downloadURL = await getDownloadURL(storageRef);
 
       const todayStr = new Date().toISOString().split('T')[0];
