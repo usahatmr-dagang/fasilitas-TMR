@@ -38,6 +38,9 @@ export default function PublicUpload() {
         if (data.status_pembayaran === 'Lunas' || data.status_pembayaran === 'Sudah Transfer') {
           setErrorMsg('Transaksi ini sudah lunas atau sudah memiliki bukti transfer yang valid.');
           setBookingData(null);
+        } else if (data.status_pembayaran === 'Menunggu Verifikasi') {
+          setSuccessMsg('Bukti transfer Anda sudah diterima dan sedang Menunggu Verifikasi oleh Admin.');
+          setBookingData(null);
         } else {
           setBookingData({ id: docSnap.id, ...data });
         }
@@ -300,7 +303,7 @@ export default function PublicUpload() {
                   ) : (
                     <div className="relative">
                       {uploadFile?.type?.startsWith('image/') ? (
-                        <img src={filePreview} alt="Preview" className="w-full h-48 object-cover rounded-2xl border border-slate-200 shadow-sm" />
+                        <img src={filePreview} alt="Preview" className="w-full max-h-[500px] object-contain bg-slate-100 rounded-2xl border border-slate-200 shadow-sm" />
                       ) : (
                         <div className="w-full h-48 bg-slate-100 rounded-2xl border border-slate-200 flex flex-col items-center justify-center text-slate-500">
                            <CheckCircle2 size={40} className="text-emerald-500 mb-2" />

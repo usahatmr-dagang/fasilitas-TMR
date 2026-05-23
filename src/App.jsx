@@ -1421,9 +1421,12 @@ Terima kasih.`;
                          {selectedRecord.bukti_transfer && (
                              <div className="mt-2 space-y-3">
                                  <img src={selectedRecord.bukti_transfer} alt="Struk Utama" className="w-full rounded-2xl border border-slate-200 object-contain max-h-56 bg-slate-50" />
-                                 <div className={`grid ${selectedRecord.status_pembayaran === 'Lunas' ? 'grid-cols-2' : 'grid-cols-1'} gap-2`}>
+                                 <div className={`grid ${selectedRecord.status_pembayaran === 'Lunas' ? 'grid-cols-3' : 'grid-cols-2'} gap-2`}>
                                      <button type="button" onClick={handlePrintBukti} className="w-full bg-slate-100 text-slate-700 font-bold py-2.5 rounded-xl hover:bg-slate-200 transition-all duration-200 shadow-sm flex flex-col justify-center items-center text-[10px] border border-slate-200 text-center leading-tight h-14">
                                          <Printer size={16} className="mb-1 text-slate-500"/> Cetak Bukti Transfer
+                                     </button>
+                                     <button type="button" onClick={() => handleUpdateRecordInline(selectedRecord, { bukti_transfer: null, status_pembayaran: 'Belum Transfer' }, 'Struk ditolak. Pengunjung dapat mengunggah ulang.')} className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold py-2.5 rounded-xl transition-all duration-200 text-[10px] flex flex-col justify-center items-center h-14">
+                                         <X size={16} className="mb-1 text-rose-500"/> Tolak & Hapus
                                      </button>
                                      {selectedRecord.status_pembayaran === 'Lunas' && (
                                          <button type="button" onClick={() => handlePrintKwitansi(selectedRecord)} className="w-full bg-indigo-50 text-indigo-700 font-bold py-2.5 rounded-xl hover:bg-indigo-100 transition-all duration-200 shadow-sm flex flex-col justify-center items-center text-[10px] border border-indigo-200 text-center leading-tight h-14">
