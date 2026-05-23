@@ -354,7 +354,8 @@ Bank: >>Bank DKI<<, Cabang Pondok Labu
 No. Rek: 40142700918
 Atas Nama: TM Ragunan Penerimaan BLUD
 
-Setelah transfer, silakan kirim bukti pembayaran melalui link khusus pengunjung.
+Setelah transfer, silakan kirim bukti pembayaran melalui link ini:
+https://${window.location.host}/upload/${selectedRecord.docId}
 
 Terima kasih.`;
 
