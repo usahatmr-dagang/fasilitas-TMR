@@ -30,11 +30,15 @@ import {
   List,
   Printer,
   Trash2,
-  ArrowLeft
+  ArrowLeft,
+  Image,
+  Film,
+  Camera,
+  Loader2
 } from 'lucide-react';
 import { db, storage, auth } from './firebase';
-import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
-import { ref, uploadString, getDownloadURL } from 'firebase/storage';
+import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, setDoc } from 'firebase/firestore';
+import { ref, uploadString, getDownloadURL, uploadBytes } from 'firebase/storage';
 import { onAuthStateChanged, signInWithEmailAndPassword } from 'firebase/auth';
 import Login from './Login';
 import MainDashboard from './MainDashboard';
@@ -201,6 +205,99 @@ export default function App() {
   const [fullScreenImage, setFullScreenImage] = useState(null);
   const [scanError, setScanError] = useState('');
   const [tanggalUploadPortal, setTanggalUploadPortal] = useState(getTodayString());
+
+  const [mediaModalOpen, setMediaModalOpen] = useState(false);
+  const [selectedMediaLokasi, setSelectedMediaLokasi] = useState(null);
+  const [uploadingMedia, setUploadingMedia] = useState(false);
+  const [mediaUploadProgress, setMediaUploadProgress] = useState('');
+
+  const handleOpenMediaModal = (lokasi) => {
+    setSelectedMediaLokasi(lokasi);
+    setMediaModalOpen(true);
+  };
+
+  const handleUploadMedia = async (e, type, index = 0) => {
+    if (type !== 'photo') return;
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.size > 900 * 1024) {
+        showToast('Ukuran foto maksimal 900 KB agar muat di Database!', 'error');
+        return;
+    }
+    
+    setUploadingMedia(true);
+    setMediaUploadProgress('Menyimpan foto...');
+    
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+        try {
+            const rawDataUrl = event.target.result;
+            let updatedData = { ...selectedMediaLokasi };
+            const currentPhotos = updatedData.photos || [];
+            let newPhotos = [...currentPhotos];
+            newPhotos[index] = rawDataUrl;
+            updatedData.photos = newPhotos;
+            
+            const setDocPromise = setDoc(doc(db, 'masterLokasi', String(selectedMediaLokasi.id)), updatedData, { merge: true });
+            const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout: Database Firebase tidak merespon setelah 10 detik.")), 10000));
+            
+            await Promise.race([setDocPromise, timeoutPromise]);
+            
+            setSelectedMediaLokasi(updatedData);
+            showToast('Foto berhasil disimpan!');
+        } catch (error) {
+            console.error("Upload Error:", error);
+            alert(`BANTU SAYA BACA INI:\n${error.message || 'Unknown error'}`);
+            showToast(`Gagal: ${error.message || 'Terjadi kesalahan sistem'}`, 'error');
+        } finally {
+            setUploadingMedia(false);
+            setMediaUploadProgress('');
+        }
+    };
+    reader.onerror = () => {
+        setUploadingMedia(false);
+        showToast('Gagal membaca file dari komputer Anda!', 'error');
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSaveVideoLink = async (link) => {
+    if (!link) return;
+    setUploadingMedia(true);
+    setMediaUploadProgress('Menyimpan link video...');
+    try {
+        let updatedData = { ...selectedMediaLokasi };
+        updatedData.video = link;
+        await setDoc(doc(db, 'masterLokasi', String(selectedMediaLokasi.id)), updatedData, { merge: true });
+        setSelectedMediaLokasi(updatedData);
+        showToast('Link Video YouTube berhasil disimpan!');
+    } catch (error) {
+        showToast('Gagal menyimpan link video!', 'error');
+    } finally {
+        setUploadingMedia(false);
+        setMediaUploadProgress('');
+    }
+  };
+
+  const handleDeleteMedia = async (type, index = 0) => {
+    let updatedData = { ...selectedMediaLokasi };
+    if (type === 'photo') {
+        const currentPhotos = updatedData.photos || [];
+        let newPhotos = [...currentPhotos];
+        newPhotos[index] = null;
+        updatedData.photos = newPhotos;
+    } else if (type === 'video') {
+        updatedData.video = null;
+    }
+    try {
+        await setDoc(doc(db, 'masterLokasi', String(selectedMediaLokasi.id)), updatedData, { merge: true });
+        setSelectedMediaLokasi(updatedData);
+        showToast(`${type === 'photo' ? 'Foto' : 'Video'} dihapus!`);
+    } catch (error) {
+        showToast('Gagal menghapus referensi media!', 'error');
+    }
+  };
 
   const showToast = (msg, type = 'success') => {
       setToast({ msg, type });
@@ -1240,6 +1337,89 @@ Terima kasih.`;
   };
 
   // --- MODALS RENDER ---
+  const renderMediaModal = () => {
+      if (!mediaModalOpen || !selectedMediaLokasi) return null;
+      const photos = selectedMediaLokasi.photos || [null, null, null];
+      const video = selectedMediaLokasi.video || null;
+
+      return (
+          <div className="fixed inset-0 bg-[#022c22]/60 backdrop-blur-sm z-[60] flex justify-center items-center p-4 animate-fade-in" onClick={() => setMediaModalOpen(false)}>
+              <div className="bg-white rounded-3xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+                  <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-emerald-50 text-emerald-950">
+                      <div>
+                          <h3 className="font-black text-lg tracking-tight">Kelola Media Lokasi</h3>
+                          <p className="text-xs font-bold text-emerald-600 mt-0.5">{selectedMediaLokasi.nama}</p>
+                      </div>
+                      <button type="button" onClick={() => setMediaModalOpen(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-full transition-all duration-200"><X size={18} /></button>
+                  </div>
+                  
+                  <div className="p-6 overflow-y-auto space-y-6 bg-slate-50 flex-1 hide-scrollbar">
+                      {uploadingMedia && (
+                          <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-2xl flex items-center text-sm font-bold shadow-sm">
+                              <Loader2 size={18} className="animate-spin mr-3"/> {mediaUploadProgress}
+                          </div>
+                      )}
+                      
+                      <div>
+                          <h4 className="text-sm font-black text-emerald-950 flex items-center mb-4"><Image size={16} className="mr-2 text-emerald-600"/> Foto Fasilitas (Maks. 3)</h4>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                              {[0, 1, 2].map(idx => (
+                                  <div key={idx} className="bg-white border border-slate-200 rounded-2xl p-3 relative flex flex-col items-center justify-center min-h-[160px] group shadow-sm">
+                                      {photos[idx] ? (
+                                          <>
+                                              <img src={photos[idx]} alt={`Foto ${idx+1}`} className="w-full h-32 object-cover rounded-xl" />
+                                              <button type="button" onClick={() => handleDeleteMedia('photo', idx)} className="absolute top-2 right-2 p-1.5 bg-rose-500 text-white rounded-lg shadow-md hover:bg-rose-600 transition-all opacity-0 group-hover:opacity-100">
+                                                  <Trash2 size={14}/>
+                                              </button>
+                                          </>
+                                      ) : (
+                                          <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-slate-300 hover:border-emerald-400 rounded-xl cursor-pointer bg-slate-50 hover:bg-emerald-50/50 transition-colors">
+                                              <Camera size={24} className="text-slate-400 mb-2"/>
+                                              <span className="text-[10px] font-bold text-slate-500 uppercase">Upload Foto {idx+1}</span>
+                                              <input type="file" accept="image/*" className="hidden" onClick={(e) => e.target.value = null} onChange={(e) => handleUploadMedia(e, 'photo', idx)} disabled={uploadingMedia} />
+                                          </label>
+                                      )}
+                                  </div>
+                              ))}
+                          </div>
+                      </div>
+
+                      <div>
+                          <h4 className="text-sm font-black text-emerald-950 flex items-center mb-4"><Film size={16} className="mr-2 text-blue-600"/> Video Fasilitas (Link YouTube)</h4>
+                          <div className="bg-white border border-slate-200 rounded-2xl p-3 relative flex flex-col items-center justify-center min-h-[220px] shadow-sm group">
+                              {video ? (
+                                  <>
+                                      {(() => {
+                                          const ytMatch = video.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/);
+                                          const ytId = (ytMatch && ytMatch[2].length === 11) ? ytMatch[2] : null;
+                                          return ytId ? (
+                                            <iframe src={`https://www.youtube.com/embed/${ytId}`} frameBorder="0" allowFullScreen className="w-full h-48 rounded-xl object-cover bg-slate-900" />
+                                          ) : (
+                                            <a href={video} target="_blank" rel="noreferrer" className="text-blue-600 font-bold underline p-4 break-all text-center">{video}</a>
+                                          );
+                                      })()}
+                                      <button type="button" onClick={() => handleDeleteMedia('video')} className="absolute top-2 right-2 p-1.5 bg-rose-500 text-white rounded-lg shadow-md hover:bg-rose-600 transition-all opacity-0 group-hover:opacity-100 z-10">
+                                          <Trash2 size={14}/>
+                                      </button>
+                                  </>
+                              ) : (
+                                  <div className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-slate-300 hover:border-blue-400 rounded-xl bg-slate-50 hover:bg-blue-50/50 transition-colors p-4 text-center">
+                                      <Film size={32} className="text-slate-400 mb-3"/>
+                                      <span className="text-xs font-bold text-slate-500 uppercase mb-2">Tautkan Video YouTube</span>
+                                      <button type="button" onClick={() => {
+                                          const link = window.prompt("Masukkan link YouTube (contoh: https://youtube.com/watch?v=...):");
+                                          if (link) handleSaveVideoLink(link);
+                                      }} className="px-5 py-2.5 bg-blue-100 text-blue-700 text-xs font-bold rounded-full hover:bg-blue-200 transition-colors shadow-sm">Masukkan Link</button>
+                                  </div>
+                              )}
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      );
+  };
+
   const renderDetailModal = () => {
     if (!selectedRecord) return null;
 
@@ -1718,13 +1898,23 @@ Terima kasih.`;
                         <span className="text-[8px] font-medium text-slate-400 uppercase tracking-widest mt-0.5">{lokasi.tipe}</span>
                       </div>
                     </div>
-                    <button 
-                      type="button" 
-                      onClick={() => handleDeleteMasterLokasi(lokasi.id)} 
-                      className="text-slate-300 hover:text-rose-600 p-1.5 hover:bg-rose-50 rounded-xl transition-all cursor-pointer"
-                    >
-                      <Trash2 size={13}/>
-                    </button>
+                    <div className="flex space-x-1 shrink-0">
+                      <button 
+                        type="button" 
+                        onClick={() => handleOpenMediaModal(lokasi)} 
+                        className="text-slate-300 hover:text-blue-600 p-1.5 hover:bg-blue-50 rounded-xl transition-all cursor-pointer"
+                        title="Kelola Media"
+                      >
+                        <Image size={13}/>
+                      </button>
+                      <button 
+                        type="button" 
+                        onClick={() => handleDeleteMasterLokasi(lokasi.id)} 
+                        className="text-slate-300 hover:text-rose-600 p-1.5 hover:bg-rose-50 rounded-xl transition-all cursor-pointer"
+                      >
+                        <Trash2 size={13}/>
+                      </button>
+                    </div>
                   </div>
                 );
               })}
@@ -2018,6 +2208,7 @@ Terima kasih.`;
                     const isLunas = fasilitas.bookingInfo?.status_pembayaran === 'Sudah Transfer' || fasilitas.bookingInfo?.status_pembayaran === 'Sudah Lunas';
                     const isMenungguVerifikasi = fasilitas.bookingInfo?.status_pembayaran === 'Menunggu Verifikasi';
                     const hasBuktiListrik = fasilitas.bookingInfo?.bukti_transfer_listrik !== null && fasilitas.bookingInfo?.bukti_transfer_listrik !== undefined;
+                    const isLapangan = fasilitas.tipe === 'lapangan';
                     
                     return (
                       <div 
@@ -2029,14 +2220,14 @@ Terima kasih.`;
                         }}
                         className={`group relative rounded-2xl p-3 sm:p-3.5 flex flex-col justify-between min-h-[112px] sm:min-h-[115px] overflow-hidden cursor-pointer transition-all duration-300 border bg-white active:scale-[0.97] ${ 
                           isTersedia 
-                            ? 'border-slate-100/80 hover:border-emerald-500/50 hover:shadow-[0_12px_24px_-8px_rgba(16,185,129,0.15)] hover:-translate-y-0.5' 
+                            ? `border-slate-100/80 hover:-translate-y-0.5 ${isLapangan ? 'hover:border-emerald-500/50 hover:shadow-[0_12px_24px_-8px_rgba(16,185,129,0.15)]' : 'hover:border-amber-500/50 hover:shadow-[0_12px_24px_-8px_rgba(245,158,11,0.15)]'}` 
                             : isDitutup 
                               ? 'bg-slate-50/80 border-slate-200 opacity-60' 
                               : 'border-rose-100 hover:border-rose-400/50 hover:shadow-[0_12px_24px_-8px_rgba(239,68,68,0.15)] hover:-translate-y-0.5' 
                         }`}
                       >
                         {/* Decorative background gradients */}
-                        {isTersedia && <div className="absolute -bottom-8 -right-8 w-16 h-16 bg-emerald-50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10"></div>}
+                        {isTersedia && <div className={`absolute -bottom-8 -right-8 w-16 h-16 ${isLapangan ? 'bg-emerald-50' : 'bg-amber-50'} rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10`}></div>}
                         {!isTersedia && !isDitutup && <div className="absolute top-0 right-0 w-12 h-12 bg-rose-50/50 rounded-bl-full -z-10 pointer-events-none"></div>}
                         
                         {!isTersedia && !isDitutup && isLunas && (
@@ -2060,7 +2251,7 @@ Terima kasih.`;
                         <div className="flex items-start justify-between mb-2 pointer-events-none">
                           <div className={`p-1.5 sm:p-2 rounded-xl shadow-sm transition-all duration-300 ${ 
                             isTersedia 
-                              ? 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white' 
+                              ? (isLapangan ? 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white' : 'bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white')
                               : isDitutup 
                                 ? 'bg-slate-200 text-slate-500' 
                                 : 'bg-rose-50 text-rose-500' 
@@ -2073,7 +2264,7 @@ Terima kasih.`;
                             {!isDitutup && (
                               <span className={`inline-flex rounded-full ${
                                 isTersedia
-                                  ? 'w-2.5 h-2.5 bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.15)]'
+                                  ? (isLapangan ? 'w-2.5 h-2.5 bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.15)]' : 'w-2.5 h-2.5 bg-amber-500 shadow-[0_0_0_3px_rgba(245,158,11,0.15)]')
                                   : 'w-2 h-2 bg-rose-500 animate-ping opacity-75'
                               }`}></span>
                             )}
@@ -2084,7 +2275,7 @@ Terima kasih.`;
                         <div className="mt-auto mb-1 pointer-events-none">
                           <h4 className={`font-bold text-[11px] leading-tight line-clamp-2 transition-colors duration-300 ${ 
                             isTersedia 
-                              ? 'text-emerald-950 group-hover:text-emerald-900' 
+                              ? (isLapangan ? 'text-emerald-950 group-hover:text-emerald-900' : 'text-emerald-950 group-hover:text-amber-900') 
                               : isDitutup 
                                 ? 'text-slate-500' 
                                 : 'text-rose-950' 
@@ -2093,7 +2284,7 @@ Terima kasih.`;
 
                         <div className="pointer-events-none w-full">
                           {isTersedia ? (
-                              <span className="text-[8.5px] font-extrabold text-emerald-600 uppercase tracking-widest flex items-center group-hover:text-emerald-700 transition-colors">
+                              <span className={`text-[8.5px] font-extrabold ${isLapangan ? 'text-emerald-600 group-hover:text-emerald-700' : 'text-amber-600 group-hover:text-amber-700'} uppercase tracking-widest flex items-center transition-colors`}>
                                 Pesan <ChevronRight size={9} className="ml-0.5 transform group-hover:translate-x-0.5 transition-transform" />
                               </span>
                           ) : isDitutup ? (
@@ -2564,6 +2755,7 @@ Terima kasih.`;
       </main>
 
       {selectedRecord && renderDetailModal()}
+      {renderMediaModal()}
 
       {fullScreenImage && (
         <div className="fixed inset-0 z-[9999] bg-black/95 flex justify-center items-center p-4 animate-fade-in" onClick={() => setFullScreenImage(null)}>

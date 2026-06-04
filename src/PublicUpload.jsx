@@ -279,17 +279,17 @@ export default function PublicUpload() {
           {bookingData && !isLoading && (
             <div className="p-8">
               <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-5 mb-6">
-                <div className="flex justify-between items-start mb-4">
+                <div className="flex flex-col sm:flex-row justify-between items-start gap-4 sm:gap-0 mb-4">
                   <div>
                     <p className="text-[10px] uppercase font-bold text-emerald-600 tracking-wider mb-1">ID Transaksi</p>
                     <p className="font-black text-emerald-950 text-xl">{bookingData.id_sewa}</p>
                   </div>
-                  <div className="text-right">
+                  <div className="sm:text-right">
                     <p className="text-[10px] uppercase font-bold text-emerald-600 tracking-wider mb-1">Total Tagihan</p>
                     <p className="font-black text-emerald-800 text-xl">{formatRupiah(bookingData.total_biaya)}</p>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4 text-sm border-t border-emerald-200/50 pt-4 mt-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm border-t border-emerald-200/50 pt-4 mt-2">
                   <div>
                     <p className="text-slate-500 text-xs mb-0.5">Nama Penyewa</p>
                     <p className="font-bold text-slate-800">{bookingData.nama_penyewa}</p>
