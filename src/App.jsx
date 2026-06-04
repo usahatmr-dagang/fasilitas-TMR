@@ -138,8 +138,16 @@ export default function App() {
     // Firestore Listeners
     const unsubLokasi = onSnapshot(collection(db, 'masterLokasi'), (snapshot) => {
       const lokasiData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      // Fallback to default if empty on first run
-      setMasterLokasi(lokasiData.length > 0 ? lokasiData : defaultDataLokasi);
+      let finalData = lokasiData.length > 0 ? lokasiData : defaultDataLokasi;
+      
+      finalData.sort((a, b) => {
+          if (a.tipe !== b.tipe) {
+              return a.tipe === 'lapangan' ? -1 : 1;
+          }
+          return (a.nama || '').localeCompare(b.nama || '');
+      });
+
+      setMasterLokasi([...finalData]);
     });
 
     const unsubSewa = onSnapshot(collection(db, 'sewaList'), (snapshot) => {
