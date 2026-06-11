@@ -242,23 +242,6 @@ export default function PromoDashboard({ onNavigate }) {
             .title { font-size: 20pt; font-weight: bold; margin-bottom: 5px; }
             .subtitle { font-size: 12pt; }
             .content-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-            .content-table td { padding: 8px 0; vertical-align: top; }
-            .label { width: 35%; font-weight: bold; }
-            .colon { width: 5%; text-align: center; font-weight: bold; }
-            .value { width: 60%; }
-            .image-container { text-align: center; margin-top: 30px; border: 2px dashed #ccc; padding: 10px; }
-            .image-container img { max-width: 100%; max-height: 400px; object-fit: contain; }
-            .footer { margin-top: 40px; text-align: right; font-size: 10pt; }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <div class="title">BUKTI TRANSFER PROMO TMR</div>
-            <div class="subtitle">Unit Pengelola Taman Margasatwa Ragunan</div>
-          </div>
-          
-          <table class="content-table">
-            <tr>
               <td class="label">Tanggal Transfer</td>
               <td class="colon">:</td>
               <td class="value">${promo.tanggalTransfer || '-'}</td>
@@ -320,6 +303,189 @@ export default function PromoDashboard({ onNavigate }) {
         document.body.removeChild(iframe);
       }, 1000);
     }, 500);
+  };
+
+  const handleGenerateKwitansi = (promo) => {
+    // Determine sequential number from promoList index
+    const promoIndex = promoList.findIndex(p => p.id === promo.id);
+    const seqNum = String(promoIndex + 1).padStart(4, '0');
+    
+    // Parse tanggal transfer
+    const tglArr = (promo.tanggalTransfer || '').split('-');
+    const tahun = tglArr[0] || new Date().getFullYear();
+    const bulan = tglArr[1] || String(new Date().getMonth() + 1).padStart(2, '0');
+    const tanggal = tglArr[2] || String(new Date().getDate()).padStart(2, '0');
+    
+    const noRef = `KWT-TMR-${tahun}-${bulan}-${tanggal}-${seqNum}`;
+
+    // Get signature date text
+    const dateObj = promo.tanggalTransfer ? new Date(promo.tanggalTransfer) : new Date();
+    const tanggalStr = dateObj.getDate();
+    const bulanStr = monthNames[dateObj.getMonth()];
+    const tahunStr = dateObj.getFullYear();
+
+    const rpAmount = formatRupiah(promo.jumlahTransfer || 0);
+    const textTerbilang = terbilang(promo.jumlahTransfer || 0) + " Rupiah";
+
+    const printWindow = window.open('', '', 'width=900,height=600');
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Cetak Kwitansi - ${promo.namaPerusahaan}</title>
+          <style>
+            @page { size: A4 landscape; margin: 10mm; }
+            body { font-family: 'Times New Roman', serif; margin: 0; padding: 20px; box-sizing: border-box; }
+            .kwitansi-container {
+              border: 2px solid #000;
+              width: 100%;
+              max-width: 1000px;
+              height: auto;
+              min-height: 400px;
+              margin: 0 auto;
+              position: relative;
+              display: flex;
+              box-sizing: border-box;
+            }
+            .left-pane {
+              width: 120px;
+              border-right: 2px solid #000;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              position: relative;
+              padding: 10px;
+            }
+            .left-pane-text {
+              transform: rotate(-90deg);
+              white-space: nowrap;
+              text-align: center;
+              font-size: 14px;
+              font-weight: bold;
+              line-height: 1.2;
+              letter-spacing: 1px;
+            }
+            .right-pane {
+              flex: 1;
+              padding: 30px 40px;
+              display: flex;
+              flex-direction: column;
+            }
+            .row {
+              display: flex;
+              margin-bottom: 12px;
+              font-size: 16px;
+              align-items: flex-end;
+            }
+            .label {
+              width: 180px;
+              font-style: italic;
+              flex-shrink: 0;
+            }
+            .value {
+              flex: 1;
+              border-bottom: 2px dotted #000;
+              padding-bottom: 2px;
+              font-weight: bold;
+              min-height: 20px;
+            }
+            .value-multi {
+              flex: 1;
+              border-bottom: 2px dotted #000;
+              padding-bottom: 2px;
+              font-weight: bold;
+              line-height: 1.8;
+              position: relative;
+            }
+            /* Extra line to simulate empty space on multi-line text */
+            .value-multi::after {
+              content: '';
+              display: block;
+              width: 100%;
+              border-bottom: 2px dotted #000;
+              margin-top: 25px;
+            }
+            .bottom-section {
+              margin-top: 40px;
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-end;
+            }
+            .amount-box {
+              font-size: 20px;
+              font-weight: bold;
+              font-style: italic;
+              border-bottom: 4px double #000;
+              padding-bottom: 2px;
+              margin-left: 20px;
+            }
+            .signature-box {
+              text-align: center;
+              width: 300px;
+            }
+            .signature-date {
+              margin-bottom: 70px;
+              font-size: 16px;
+            }
+            .signature-line {
+              border-bottom: 1px solid #000;
+              width: 100%;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="kwitansi-container">
+            <div class="left-pane">
+              <!-- Anda bisa menyisipkan tag <img> logo TMR / Jakarta di sini jika diperlukan -->
+              <div class="left-pane-text">
+                PEMERINTAH PROVINSI<br/>
+                DAERAH KHUSUS IBUKOTA<br/>
+                JAKARTA<br/>
+                TAMAN MARGASATWA<br/>
+                RAGUNAN<br/>
+                ZOOLOGICAL PARK
+              </div>
+            </div>
+            
+            <div class="right-pane">
+              <div class="row" style="justify-content: flex-end; font-size: 14px;">
+                <strong>No. Ref: ${noRef}</strong>
+              </div>
+              <div class="row" style="margin-top: 10px;">
+                <div class="label">Sudah terima dari</div>
+                <div class="value">${properCase(promo.namaPerusahaan)}</div>
+              </div>
+              <div class="row">
+                <div class="label">Terbilang</div>
+                <div class="value" style="font-style: italic;"># ${textTerbilang} #</div>
+              </div>
+              <div class="row" style="align-items: flex-start;">
+                <div class="label" style="padding-top: 2px;">Untuk pembayaran</div>
+                <div class="value-multi">
+                  Penjualan produk / event promo ${promo.namaProduk} selama ${promo.jumlahHari} hari, pada tanggal ${promo.tanggalPromo} di UP Taman Margasatwa Ragunan melalui transfer ${rpAmount} dengan No.ref ${noRef}
+                </div>
+              </div>
+              
+              <div class="bottom-section">
+                <div class="amount-box">
+                  ${rpAmount},00
+                </div>
+                <div class="signature-box">
+                  <div class="signature-date">Jakarta, ${tanggalStr} ${bulanStr} ${tahunStr}</div>
+                  <div class="signature-line"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <script>
+            setTimeout(() => {
+              window.print();
+              window.close();
+            }, 500);
+          </script>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   const handleGenerateSurat = async (promo) => {
@@ -712,13 +878,23 @@ export default function PromoDashboard({ onNavigate }) {
                       </button>
                     )}
 
-                    <button 
-                      onClick={() => handleGenerateBuktiTransfer(p)}
-                      disabled={isGenerating}
-                      className="w-full py-2 bg-white border-2 border-emerald-600 text-emerald-700 hover:bg-emerald-50 rounded-xl font-bold flex items-center justify-center gap-2 text-sm"
-                    >
-                      <Download size={16} /> Cetak Bukti Transfer
-                    </button>
+                    <div class="grid grid-cols-2 gap-2">
+                      <button 
+                        onClick={() => handleGenerateBuktiTransfer(p)}
+                        disabled={isGenerating}
+                        className="w-full py-2 bg-white border-2 border-emerald-600 text-emerald-700 hover:bg-emerald-50 rounded-xl font-bold flex items-center justify-center gap-2 text-sm"
+                      >
+                        <Download size={16} /> Bukti Transfer
+                      </button>
+
+                      <button 
+                        onClick={() => handleGenerateKwitansi(p)}
+                        disabled={isGenerating}
+                        className="w-full py-2 bg-white border-2 border-emerald-600 text-emerald-700 hover:bg-emerald-50 rounded-xl font-bold flex items-center justify-center gap-2 text-sm"
+                      >
+                        <Download size={16} /> Kwitansi
+                      </button>
+                    </div>
 
                     <div className="grid grid-cols-2 gap-2 mt-2">
                       <button 
