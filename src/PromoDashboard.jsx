@@ -49,6 +49,8 @@ export default function PromoDashboard({ onNavigate }) {
   const [selectedPromo, setSelectedPromo] = useState(null);
   const [viewMode, setViewMode] = useState('promo'); // 'promo' or 'transfer'
   const [isGenerating, setIsGenerating] = useState(false);
+  const [googleAccessToken, setGoogleAccessToken] = useState(null);
+  const CLIENT_ID = '905355425334-tbtvuvufgvnom6vnlb5d0rka00ih03if.apps.googleusercontent.com';
 
   // Settings State
   const [showSettings, setShowSettings] = useState(false);
@@ -91,8 +93,79 @@ export default function PromoDashboard({ onNavigate }) {
     };
     fetchTarif();
 
+    // Inisialisasi Google API Client
+    if (window.gapi) {
+        window.gapi.load('client', () => {});
+    }
+
     return () => unsub();
   }, []);
+
+  const requestGoogleToken = () => {
+      return new Promise((resolve, reject) => {
+          if (googleAccessToken) {
+              resolve(googleAccessToken);
+              return;
+          }
+          if (!window.google) {
+              reject(new Error("Google Script belum dimuat. Silakan muat ulang halaman."));
+              return;
+          }
+          const client = window.google.accounts.oauth2.initTokenClient({
+              client_id: CLIENT_ID,
+              scope: 'https://www.googleapis.com/auth/drive.file',
+              callback: (response) => {
+                  if (response.error) {
+                      reject(response.error);
+                  } else {
+                      setGoogleAccessToken(response.access_token);
+                      resolve(response.access_token);
+                  }
+              },
+          });
+          client.requestAccessToken();
+      });
+  };
+
+  const uploadToGoogleDrive = async (blob, fileName, promoId) => {
+      try {
+          const token = await requestGoogleToken();
+          
+          const metadata = {
+              name: fileName,
+              mimeType: 'application/vnd.google-apps.document', // Auto convert to Google Docs
+          };
+
+          const form = new FormData();
+          form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+          form.append('file', blob);
+
+          const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+              method: 'POST',
+              headers: new Headers({ 'Authorization': 'Bearer ' + token }),
+              body: form,
+          });
+
+          if (!response.ok) {
+              throw new Error("Gagal mengunggah ke Google Drive");
+          }
+          const result = await response.json();
+          const fileId = result.id;
+          
+          // Get webViewLink (bisa juga kita generate langsung linknya)
+          const docUrl = `https://docs.google.com/document/d/${fileId}/edit`;
+          
+          // Simpan link ke firebase
+          await updateDoc(doc(db, 'promoList', promoId), {
+              pksDriveUrl: docUrl
+          });
+
+          return docUrl;
+      } catch (error) {
+          console.error("Drive Error:", error);
+          throw error;
+      }
+  };
 
   const handleSaveTarif = async () => {
     setIsSavingTarif(true);
@@ -326,7 +399,15 @@ export default function PromoDashboard({ onNavigate }) {
       });
 
       const safeName = (promo.namaPerusahaan || 'TMR').replace(/[^a-zA-Z0-9]/g, '_');
-      saveAs(outBuffer, `SPK_Promo_${safeName}.docx`);
+      const finalFileName = `SPK_Promo_${safeName}`;
+      
+      // Upload ke Google Drive
+      const url = await uploadToGoogleDrive(outBuffer, finalFileName, promo.id);
+      
+      // Tutup loading form, lalu buka link
+      setIsGenerating(false);
+      window.open(url, '_blank');
+      
       
     } catch (error) {
       console.error(error);
@@ -590,14 +671,33 @@ export default function PromoDashboard({ onNavigate }) {
                 
                 {viewMode === 'transfer' && (
                   <>
-                    <button 
-                      onClick={() => handleGenerateSurat(p)}
-                      disabled={isGenerating}
-                      className="w-full py-2 bg-white border-2 border-emerald-600 text-emerald-700 hover:bg-emerald-50 rounded-xl font-bold flex items-center justify-center gap-2 text-sm"
-                    >
-                      {isGenerating ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-                      Cetak PKS
-                    </button>
+                    {p.pksDriveUrl ? (
+                      <div className="grid grid-cols-2 gap-2">
+                        <button 
+                          onClick={() => window.open(p.pksDriveUrl, '_blank')}
+                          className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 text-sm"
+                        >
+                          Buka Google Doc
+                        </button>
+                        <button 
+                          onClick={() => handleGenerateSurat(p)}
+                          disabled={isGenerating}
+                          className="w-full py-2 bg-white border-2 border-emerald-600 text-emerald-700 hover:bg-emerald-50 rounded-xl font-bold flex items-center justify-center gap-2 text-sm"
+                        >
+                          {isGenerating ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                          Buat Ulang PKS
+                        </button>
+                      </div>
+                    ) : (
+                      <button 
+                        onClick={() => handleGenerateSurat(p)}
+                        disabled={isGenerating}
+                        className="w-full py-2 bg-white border-2 border-emerald-600 text-emerald-700 hover:bg-emerald-50 rounded-xl font-bold flex items-center justify-center gap-2 text-sm"
+                      >
+                        {isGenerating ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                        Buat & Simpan ke Drive
+                      </button>
+                    )}
 
                     <button 
                       onClick={() => handleGenerateBuktiTransfer(p)}
