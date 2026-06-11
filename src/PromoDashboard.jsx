@@ -242,6 +242,23 @@ export default function PromoDashboard({ onNavigate }) {
             .title { font-size: 20pt; font-weight: bold; margin-bottom: 5px; }
             .subtitle { font-size: 12pt; }
             .content-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+            .content-table td { padding: 8px 0; vertical-align: top; }
+            .label { width: 35%; font-weight: bold; }
+            .colon { width: 5%; text-align: center; font-weight: bold; }
+            .value { width: 60%; }
+            .image-container { text-align: center; margin-top: 30px; border: 2px dashed #ccc; padding: 10px; }
+            .image-container img { max-width: 100%; max-height: 400px; object-fit: contain; }
+            .footer { margin-top: 40px; text-align: right; font-size: 10pt; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="title">BUKTI TRANSFER PROMO TMR</div>
+            <div class="subtitle">Unit Pengelola Taman Margasatwa Ragunan</div>
+          </div>
+          
+          <table class="content-table">
+            <tr>
               <td class="label">Tanggal Transfer</td>
               <td class="colon">:</td>
               <td class="value">${promo.tanggalTransfer || '-'}</td>
@@ -278,31 +295,19 @@ export default function PromoDashboard({ onNavigate }) {
           <div class="footer">
             <p>Dicetak pada: ${new Date().toLocaleDateString('id-ID')} ${new Date().toLocaleTimeString('id-ID')}</p>
           </div>
+          <script>
+            setTimeout(() => {
+              window.print();
+              window.close();
+            }, 500);
+          </script>
         </body>
       </html>
     `;
 
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = '0';
-    document.body.appendChild(iframe);
-
-    const docPrint = iframe.contentWindow.document;
-    docPrint.open();
-    docPrint.write(htmlContent);
-    docPrint.close();
-
-    setTimeout(() => {
-      iframe.contentWindow.focus();
-      iframe.contentWindow.print();
-      setTimeout(() => {
-        document.body.removeChild(iframe);
-      }, 1000);
-    }, 500);
+    const printWindow = window.open('', '', 'width=900,height=800');
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
   };
 
   const handleGenerateKwitansi = (promo) => {
