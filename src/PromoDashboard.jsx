@@ -329,8 +329,11 @@ export default function PromoDashboard({ onNavigate }) {
     const bulanStr = monthNames[dateObj.getMonth()];
     const tahunStr = dateObj.getFullYear();
 
-    const rpAmount = formatRupiah(promo.jumlahTransfer || 0);
-    const textTerbilang = terbilang(promo.jumlahTransfer || 0) + " Rupiah";
+    // Parse nominal transfer
+    const nominalNumeric = promo.jumlahTransferNumeric || parseInt(String(promo.jumlahTransfer).replace(/\D/g, ''), 10) || 0;
+    
+    const rpAmount = formatRupiah(nominalNumeric);
+    const textTerbilang = terbilang(nominalNumeric) + " Rupiah";
 
     const printWindow = window.open('', '', 'width=900,height=600');
     printWindow.document.write(`
