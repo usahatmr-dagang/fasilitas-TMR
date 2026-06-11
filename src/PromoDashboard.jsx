@@ -152,6 +152,19 @@ export default function PromoDashboard({ onNavigate }) {
           const result = await response.json();
           const fileId = result.id;
           
+          // Ubah izin akses file agar siapa saja yang memiliki link bisa mengeditnya
+          await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/permissions`, {
+              method: 'POST',
+              headers: {
+                  'Authorization': 'Bearer ' + token,
+                  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                  role: 'writer',
+                  type: 'anyone'
+              })
+          });
+
           // Get webViewLink (bisa juga kita generate langsung linknya)
           const docUrl = `https://docs.google.com/document/d/${fileId}/edit`;
           
