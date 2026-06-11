@@ -17,24 +17,38 @@ service cloud.firestore {
     
     // Aturan untuk semua koleksi secara umum
     match /{document=**} {
-      // Jika user sudah login (Admin), mereka bebas membaca & menulis semua data.
       allow read, write: if request.auth != null;
     }
     
-    // Aturan khusus untuk koleksi sewaList (Penyewaan)
+    // Aturan untuk masterLokasi (Bebas dibaca publik)
+    match /masterLokasi/{docId} {
+      allow read: if true;
+    }
+
+    // Aturan untuk masterTarif (Bebas dibaca publik untuk form pendaftaran promo)
+    match /masterTarif/{docId} {
+      allow read: if true;
+    }
+
+    // Aturan untuk publicSewaList (Tabel bayangan yang baru, bebas dibaca publik)
+    match /publicSewaList/{docId} {
+      allow read: if true;
+    }
+    
+    // Aturan khusus untuk koleksi sewaList utama (DIKUNCI KETAT)
     match /sewaList/{docId} {
-      // Mengizinkan pengunjung (publik) untuk MEMBACA HANYA 1 DOKUMEN tertentu.
-      // Mereka harus tahu ID dokumen yang panjang & acak (tidak bisa 'list' semua).
+      // Publik HANYA BISA GET via ID saat upload bukti (tidak bisa membongkar/list semua data)
       allow get: if true;
-      
-      // Mengizinkan pengunjung (publik) untuk MENGUPDATE (mengirim bukti).
-      // Syaratnya sangat ketat:
-      // 1. Status saat ini masih "Belum Transfer" (tidak bisa menimpa yang sudah lunas).
-      // 2. Hanya field 'status_pembayaran', 'bukti_transfer', dan 'tanggal_transfer' yang boleh berubah.
       allow update: if 
           resource.data.status_pembayaran == "Belum Transfer" &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status_pembayaran', 'bukti_transfer', 'tanggal_transfer']) &&
           request.resource.data.status_pembayaran == "Menunggu Verifikasi";
+    }
+
+    // Aturan untuk promoList (Form pendaftaran Promo)
+    match /promoList/{docId} {
+      // Publik HANYA BISA MENGIRIM data form (create), tidak bisa membaca data orang lain
+      allow create: if true;
     }
   }
 }

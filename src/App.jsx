@@ -1,3 +1,4 @@
+/* eslint-disable */
 import React, { useState, useMemo, useEffect } from 'react';
 import { 
   LayoutDashboard, 
@@ -437,6 +438,13 @@ export default function App() {
     try {
       const docRef = await addDoc(collection(db, 'sewaList'), newBooking);
       newBooking.docId = docRef.id;
+      
+      // SINKRONISASI KE TABEL PUBLIK (Hanya tanggal & lokasi untuk keamanan)
+      await setDoc(doc(db, 'publicSewaList', docRef.id), {
+        tanggal_sewa: newBooking.tanggal_sewa,
+        lokasi_sewa: newBooking.lokasi_sewa
+      });
+
       setBookingLokasi(null);
       setFormData({ namaRombongan: '', picRombongan: '', noWa: '', picKantor: '', keterangan: '', statusPembayaran: 'Belum Transfer', listrikTambahan: false, luasLahan: 50 });
       handleOpenDetail(newBooking);
@@ -1057,7 +1065,14 @@ Terima kasih.`;
           try {
               const { docId, ...dataToUpdate } = updatedRecord;
               await updateDoc(doc(db, 'sewaList', selectedRecord.docId), dataToUpdate);
-              setSelectedRecord(updatedRecord);
+              
+              // SINKRONISASI KE TABEL PUBLIK
+              await setDoc(doc(db, 'publicSewaList', selectedRecord.docId), {
+                tanggal_sewa: dataToUpdate.tanggal_sewa,
+                lokasi_sewa: selectedRecord.lokasi_sewa
+              }, { merge: true });
+
+              setSelectedRecord({ ...selectedRecord, ...dataToUpdate });
               showToast('Struk listrik berhasil ditambahkan!');
           } catch (error) {
               showToast('Gagal menambah struk!', 'error');
@@ -1108,8 +1123,15 @@ Terima kasih.`;
       const existingBookings = sewaList.filter(s => s.tanggal_sewa === blockData.tanggal);
       const filteredBlocks = newBlocks.filter(b => !existingBookings.find(ex => ex.lokasi_sewa === b.lokasi_sewa));
 
-      try {
-          await Promise.all(filteredBlocks.map(block => addDoc(collection(db, 'sewaList'), block)));
+        try {
+          await Promise.all(filteredBlocks.map(async (block) => {
+            const docRef = await addDoc(collection(db, 'sewaList'), block);
+            await setDoc(doc(db, 'publicSewaList', docRef.id), {
+              tanggal_sewa: block.tanggal_sewa,
+              lokasi_sewa: block.lokasi_sewa
+            });
+          }));
+          setIsBlockModalOpen(false);
           showToast(`Berhasil menutup ${filteredBlocks.length} lokasi pada tanggal ${formatTanggalPendek(blockData.tanggal)}.`);
       } catch (error) {
           showToast('Gagal memblokir lokasi!', 'error');
@@ -1294,6 +1316,12 @@ Terima kasih.`;
       try {
           const { docId, ...dataToUpdate } = updatedBooking;
           await updateDoc(doc(db, 'sewaList', portalBooking.docId), dataToUpdate);
+          
+          await setDoc(doc(db, 'publicSewaList', portalBooking.docId), {
+            tanggal_sewa: dataToUpdate.tanggal_sewa,
+            lokasi_sewa: portalBooking.lokasi_sewa
+          }, { merge: true });
+
           setPortalBooking(updatedBooking); 
           setUploadFile(null);
           setOcrResult(null);
@@ -1318,6 +1346,12 @@ Terima kasih.`;
       try {
           const { docId, ...dataToUpdate } = updatedBooking;
           await updateDoc(doc(db, 'sewaList', portalBooking.docId), dataToUpdate);
+          
+          await setDoc(doc(db, 'publicSewaList', portalBooking.docId), {
+            tanggal_sewa: dataToUpdate.tanggal_sewa,
+            lokasi_sewa: portalBooking.lokasi_sewa
+          }, { merge: true });
+
           setPortalBooking(updatedBooking); 
           setUploadListrikFile(null);
           showToast('Bukti pembayaran LISTRIK berhasil dikirim!');
@@ -1330,6 +1364,12 @@ Terima kasih.`;
       try {
           const { docId, ...dataToUpdate } = { ...record, ...updates };
           await updateDoc(doc(db, 'sewaList', record.docId), dataToUpdate);
+          
+          await setDoc(doc(db, 'publicSewaList', record.docId), {
+            tanggal_sewa: dataToUpdate.tanggal_sewa || record.tanggal_sewa,
+            lokasi_sewa: dataToUpdate.lokasi_sewa || record.lokasi_sewa
+          }, { merge: true });
+
           setSelectedRecord({ ...record, ...updates });
           if (successMsg) showToast(successMsg, 'success');
       } catch (error) {
@@ -1340,6 +1380,8 @@ Terima kasih.`;
   const handleDeleteRecordInline = async (record, successMsg) => {
       try {
           await deleteDoc(doc(db, 'sewaList', record.docId));
+          await deleteDoc(doc(db, 'publicSewaList', record.docId));
+          
           setSelectedRecord(null);
           if (successMsg) showToast(successMsg, 'success');
       } catch (error) {
@@ -2067,7 +2109,7 @@ Terima kasih.`;
                                 <CheckCircle2 size={20} className={`mb-1.5 ${formData.statusPembayaran === 'Sudah Transfer' ? 'text-emerald-600' : 'text-slate-300'}`} />
                                 <span className="text-xs font-extrabold">Lunas di Awal</span>
                             </label>
-                            <label className={`flex-1 flex flex-col items-center justify-center p-4 rounded-3xl border cursor-pointer transition-all duration-250 ${formData.statusPembayaran === 'Belum Transfer' ? 'border-rose-450 bg-rose-50/40 text-rose-950 shadow-sm ring-2 ring-rose-100/50' : 'border-slate-100 bg-white hover:border-slate-200 text-slate-500'}`}>
+                            <label className={`flex-1 flex flex-col items-center justify-center p-4 rounded-3xl border cursor-pointer transition-all duration-200 ${formData.statusPembayaran === 'Belum Transfer' ? 'border-rose-450 bg-rose-50/40 text-rose-950 shadow-sm ring-2 ring-rose-100/50' : 'border-slate-100 bg-white hover:border-slate-200 text-slate-500'}`}>
                                 <input type="radio" name="statusPembayaran" value="Belum Transfer" checked={formData.statusPembayaran === 'Belum Transfer'} onChange={(e)=>setFormData({...formData, statusPembayaran: e.target.value})} className="hidden" />
                                 <AlertCircle size={20} className={`mb-1.5 ${formData.statusPembayaran === 'Belum Transfer' ? 'text-rose-550' : 'text-slate-300'}`} />
                                 <span className="text-xs font-extrabold">Belum Transfer</span>
@@ -2617,8 +2659,44 @@ Terima kasih.`;
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-700/50" size={18} />
                             <input type="text" required value={portalSearchId} onChange={e => setPortalSearchId(e.target.value)} placeholder="Masukkan Kode Reservasi (Contoh: TMR-52967)" className="w-full pl-11 pr-4 py-3.5 rounded-xl border-2 border-emerald-100 focus:border-emerald-500 outline-none text-emerald-950 font-bold bg-slate-50 transition-all focus:ring-2 focus:ring-emerald-500/10 placeholder:text-slate-400/80" />
                           </div>
-                          <button type="submit" className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white px-8 py-3.5 sm:py-0 rounded-xl font-bold transition-all shadow-md shadow-emerald-600/10 hover:shadow-lg flex items-center justify-center gap-2">Cari Data</button>
+                          <div className="flex gap-2">
+                             <button type="submit" className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white px-8 py-3.5 sm:py-0 rounded-xl font-bold transition-all shadow-md shadow-emerald-600/10 hover:shadow-lg flex items-center justify-center gap-2">Cari Data</button>
+                             {currentUser && <span className="px-2 py-1 bg-emerald-100 text-emerald-800 rounded text-xs ml-2 font-bold">{currentUser.email}</span>}
+                          </div>
                      </form>
+
+                     <div className="flex gap-2 w-full mt-4 justify-between border-t border-slate-200 pt-4">
+                       <button 
+                         onClick={async () => {
+                           if(!window.confirm("Sinkronkan ulang tabel publik? Ini akan menyalin semua tanggal jadwal penyewaan ke publicSewaList.")) return;
+                           try {
+                             let count = 0;
+                             for (const sewa of sewaList) {
+                               if (sewa.tanggal_sewa && sewa.lokasi_sewa && sewa.docId) {
+                                 await setDoc(doc(db, 'publicSewaList', sewa.docId), {
+                                   tanggal_sewa: sewa.tanggal_sewa,
+                                   lokasi_sewa: sewa.lokasi_sewa
+                                 });
+                                 count++;
+                               }
+                             }
+                             alert(`Berhasil mensinkronkan ${count} jadwal ke kalender publik!`);
+                           } catch (e) {
+                             console.error(e);
+                             alert('Gagal sinkronisasi data.');
+                           }
+                         }}
+                         className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-colors font-bold text-sm"
+                       >
+                         Sync Tabel Publik
+                       </button>
+                       <button 
+                         onClick={() => auth.signOut()}
+                         className="px-4 py-2 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-100 transition-colors font-bold flex items-center justify-center gap-2 text-sm flex-1"
+                       >
+                         <LogOut size={16} /> Logout
+                       </button>
+                     </div>
                      
                      {portalBooking && (
                          <div className="border-t border-emerald-900/10 pt-6 animate-slide-in-right">

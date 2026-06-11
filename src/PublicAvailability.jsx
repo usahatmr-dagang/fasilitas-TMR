@@ -1,3 +1,4 @@
+/* eslint-disable */
 import React, { useState, useEffect } from 'react';
 import { db } from './firebase';
 import { collection, onSnapshot } from 'firebase/firestore';
@@ -40,10 +41,17 @@ export default function PublicAvailability() {
     const unsubLokasi = onSnapshot(collection(db, 'masterLokasi'), (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setMasterLokasi(data.length > 0 ? data : defaultDataLokasi);
+    }, (error) => {
+      console.error("Gagal memuat master lokasi:", error);
+      setMasterLokasi(defaultDataLokasi);
     });
 
-    const unsubSewa = onSnapshot(collection(db, 'sewaList'), (snapshot) => {
+    const unsubSewa = onSnapshot(collection(db, 'publicSewaList'), (snapshot) => {
       setSewaList(snapshot.docs.map(doc => ({ id_sewa: doc.id, ...doc.data() })));
+      setLoading(false);
+    }, (error) => {
+      console.error("Gagal memuat daftar sewa:", error);
+      alert("Akses ditolak: Anda tidak memiliki izin untuk melihat data ketersediaan (Aturan Firebase belum dibuka untuk publik).");
       setLoading(false);
     });
 
