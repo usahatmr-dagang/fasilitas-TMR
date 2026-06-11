@@ -284,7 +284,7 @@ export default function PromoDashboard({ onNavigate }) {
       }
 
       // 1. Fetch template
-      const response = await fetch('/src/Perjanjian Kerja Sama.docx');
+      const response = await fetch('/Perjanjian Kerja Sama.docx');
       if (!response.ok) throw new Error('Gagal mengambil template Perjanjian Kerja Sama.docx');
       const blob = await response.blob();
       const arrayBuffer = await blob.arrayBuffer();
@@ -330,7 +330,7 @@ export default function PromoDashboard({ onNavigate }) {
       
     } catch (error) {
       console.error(error);
-      alert('Gagal membuat surat perjanjian. Pastikan template .docx berada di /src/Perjanjian Kerja Sama.docx dan variabel format sesuai (e.g. <<Nama proper>>)');
+      alert('Gagal membuat surat perjanjian. Pastikan template .docx berada di folder public (e.g. /Perjanjian Kerja Sama.docx) dan variabel format sesuai (e.g. <<Nama proper>>)');
     } finally {
       setIsGenerating(false);
     }
