@@ -42,6 +42,8 @@ import { ref, uploadString, getDownloadURL, uploadBytes } from 'firebase/storage
 import { onAuthStateChanged, signInWithEmailAndPassword } from 'firebase/auth';
 import Login from './Login';
 import MainDashboard from './MainDashboard';
+import PromoDashboard from './PromoDashboard';
+import PublicPromoForm from './PublicPromoForm';
 
 // --- DATA LOKASI ---
 const defaultDataLokasi = [
@@ -113,6 +115,7 @@ const formatRupiah = (angka) => {
 export default function App() {
   // Routing & Authentication State
   const isPortalRoute = window.location.pathname === '/portal';
+  const isPromoRoute = window.location.pathname === '/promo';
   const [adminUser, setAdminUser] = useState(null);
   const [activeApp, setActiveApp] = useState('dashboard'); // 'dashboard', 'fasilitas'
   
@@ -1942,6 +1945,8 @@ Terima kasih.`;
 
   if (isAuthChecking) return <div className="h-screen w-full flex items-center justify-center bg-[#F4F7F4] text-emerald-800 font-bold">Memeriksa Akses...</div>;
   
+  if (isPromoRoute) return <PublicPromoForm />;
+
   if (!adminUser && !isPortalRoute) {
     return <Login onLoginSuccess={() => {}} />;
   }
@@ -1950,6 +1955,10 @@ Terima kasih.`;
 
   if (activeApp === 'dashboard' && adminUser && !isPortalRoute) {
     return <MainDashboard onNavigate={(appId) => setActiveApp(appId)} onLogout={() => auth.signOut()} />;
+  }
+
+  if (activeApp === 'promo' && adminUser && !isPortalRoute) {
+    return <PromoDashboard onNavigate={(appId) => setActiveApp(appId)} />;
   }
 
   return (
