@@ -35,7 +35,9 @@ import {
   Image,
   Film,
   Camera,
-  Loader2
+  Loader2,
+  Pencil,
+  X
 } from 'lucide-react';
 import { db, storage, auth } from './firebase';
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, setDoc } from 'firebase/firestore';
@@ -48,23 +50,23 @@ import PublicPromoForm from './PublicPromoForm';
 
 // --- DATA LOKASI ---
 const defaultDataLokasi = [
-  { id: 1, nama: 'PENDOPO TSA 1', tipe: 'pendopo' },
-  { id: 2, nama: 'PENDOPO TSA 2', tipe: 'pendopo' },
-  { id: 3, nama: 'PENDOPO TSA 3', tipe: 'pendopo' },
-  { id: 4, nama: 'PENDOPO TSA 4', tipe: 'pendopo' },
-  { id: 5, nama: 'GAZEBO', tipe: 'pendopo' },
-  { id: 6, nama: 'TERAS INFORMASI', tipe: 'pendopo' }, 
-  { id: 7, nama: 'AULA SERBAGUNA', tipe: 'pendopo' }, 
-  { id: 8, nama: 'LAP ATM 1', tipe: 'lapangan' },
-  { id: 9, nama: 'LAP ATM 2', tipe: 'lapangan' },
-  { id: 10, nama: 'LAP ATM 3', tipe: 'lapangan' },
-  { id: 11, nama: 'LAP ATM 4', tipe: 'lapangan' },
-  { id: 12, nama: 'LAP SEBRANG TSA 1', tipe: 'lapangan' },
-  { id: 13, nama: 'LAP SEBRANG TSA 2', tipe: 'lapangan' },
-  { id: 14, nama: 'LAP SEBRANG TSA (PEL)', tipe: 'lapangan' }, 
-  { id: 15, nama: 'LAP BERINGIN', tipe: 'lapangan' },
-  { id: 16, nama: 'LAP TIMUR INF 1', tipe: 'lapangan' },
-  { id: 17, nama: 'LAP TIMUR INF 2', tipe: 'lapangan' },
+  { id: 1, nama: 'PENDOPO TSA 1', tipe: 'pendopo', harga: 500000, urutan: 1 },
+  { id: 2, nama: 'PENDOPO TSA 2', tipe: 'pendopo', harga: 250000, urutan: 2 },
+  { id: 3, nama: 'PENDOPO TSA 3', tipe: 'pendopo', harga: 250000, urutan: 3 },
+  { id: 4, nama: 'PENDOPO TSA 4', tipe: 'pendopo', harga: 250000, urutan: 4 },
+  { id: 5, nama: 'GAZEBO', tipe: 'pendopo', harga: 250000, urutan: 5 },
+  { id: 6, nama: 'TERAS INFORMASI', tipe: 'pendopo', harga: 250000, urutan: 6 }, 
+  { id: 7, nama: 'AULA SERBAGUNA', tipe: 'pendopo', harga: 2000000, urutan: 7 }, 
+  { id: 8, nama: 'LAP ATM 1', tipe: 'lapangan', harga: 2000, urutan: 8 },
+  { id: 9, nama: 'LAP ATM 2', tipe: 'lapangan', harga: 2000, urutan: 9 },
+  { id: 10, nama: 'LAP ATM 3', tipe: 'lapangan', harga: 2000, urutan: 10 },
+  { id: 11, nama: 'LAP ATM 4', tipe: 'lapangan', harga: 2000, urutan: 11 },
+  { id: 12, nama: 'LAP SEBRANG TSA 1', tipe: 'lapangan', harga: 2000, urutan: 12 },
+  { id: 13, nama: 'LAP SEBRANG TSA 2', tipe: 'lapangan', harga: 2000, urutan: 13 },
+  { id: 14, nama: 'LAP SEBRANG TSA (PEL)', tipe: 'lapangan', harga: 2000, urutan: 14 }, 
+  { id: 15, nama: 'LAP BERINGIN', tipe: 'lapangan', harga: 2000, urutan: 15 },
+  { id: 16, nama: 'LAP TIMUR INF 1', tipe: 'lapangan', harga: 2000, urutan: 16 },
+  { id: 17, nama: 'LAP TIMUR INF 2', tipe: 'lapangan', harga: 2000, urutan: 17 },
 ];
 
 // --- DATA PIC DEFAULT ---
@@ -145,8 +147,15 @@ export default function App() {
       let finalData = lokasiData.length > 0 ? lokasiData : defaultDataLokasi;
       
       finalData.sort((a, b) => {
+          const urutanA = a.urutan ?? 999;
+          const urutanB = b.urutan ?? 999;
+          
+          if (urutanA !== urutanB) {
+              return urutanA - urutanB;
+          }
+
           if (a.tipe !== b.tipe) {
-              return a.tipe === 'lapangan' ? -1 : 1;
+              return a.tipe === 'pendopo' ? -1 : 1;
           }
           return (a.nama || '').localeCompare(b.nama || '');
       });
@@ -169,20 +178,27 @@ export default function App() {
 
   const getBiayaLokasi = (namaLokasi, luasLahan = 50) => {
     if (!namaLokasi) return 0;
-    if (namaLokasi === 'PENDOPO TSA 1') return 500000;
-    if (['PENDOPO TSA 2', 'PENDOPO TSA 3', 'PENDOPO TSA 4', 'TERAS INFORMASI', 'GAZEBO'].includes(namaLokasi)) return 250000;
-    if (namaLokasi === 'AULA SERBAGUNA') return 2000000;
+    const lokasiObj = masterLokasi.find(l => l.nama === namaLokasi);
     
-    const isLapanganData = masterLokasi.find(l => l.nama === namaLokasi)?.tipe === 'lapangan';
-    if (isLapanganData || namaLokasi.startsWith('LAP ')) {
+    let baseHarga = 250000;
+    if (namaLokasi === 'PENDOPO TSA 1') baseHarga = 500000;
+    if (namaLokasi === 'AULA SERBAGUNA') baseHarga = 2000000;
+    if (lokasiObj?.tipe === 'lapangan' || (!lokasiObj && namaLokasi.startsWith('LAP '))) baseHarga = 2000;
+    
+    const hargaSewa = (lokasiObj && lokasiObj.harga) ? Number(lokasiObj.harga) : baseHarga;
+
+    if (lokasiObj?.tipe === 'lapangan' || (!lokasiObj && namaLokasi.startsWith('LAP '))) {
         const luasValid = Math.max(Number(luasLahan) || 50, 50);
-        return luasValid * 2000;
+        return luasValid * hargaSewa;
     }
-    return 0; 
+    
+    return hargaSewa;
   };
 
   const [newMasterLokasiNama, setNewMasterLokasiNama] = useState('');
   const [newMasterLokasiTipe, setNewMasterLokasiTipe] = useState('pendopo');
+  const [editingLokasiId, setEditingLokasiId] = useState(null);
+  const [editingLokasiData, setEditingLokasiData] = useState({ nama: '', tipe: 'pendopo', harga: 0, urutan: 0 });
   const [activeTab, setActiveTab] = useState(isPortalRoute ? 'portal' : 'reservasi');
   const [toast, setToast] = useState(null); 
 
@@ -1697,7 +1713,7 @@ Terima kasih.`;
                           <div>
                              <label className="block text-[10px] font-extrabold text-emerald-950 uppercase tracking-wider mb-1">Luas Lahan Aktual (m²)</label>
                              <input required type="number" min="50" value={editFormData.luas_lahan || 50} onChange={e => setEditFormData({...editFormData, luas_lahan: e.target.value})} className="w-full px-4 py-2.5 border border-slate-200 rounded-2xl text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 outline-none font-semibold text-emerald-950 bg-white" />
-                             <p className="text-[10px] font-bold text-emerald-700 mt-1">Estimasi biaya sewa: {formatRupiah(Math.max(editFormData.luas_lahan || 50, 50) * 2000)}</p>
+                             <p className="text-[10px] font-bold text-emerald-700 mt-1">Estimasi biaya sewa: {formatRupiah(getBiayaLokasi(editFormData.lokasi_sewa, editFormData.luas_lahan))}</p>
                           </div>
                       )}
                       <div><label className="block text-[10px] font-extrabold text-emerald-950 uppercase tracking-wider mb-1">Nama Rombongan</label><input required type="text" value={editFormData.nama_penyewa || ''} onChange={e => setEditFormData({...editFormData, nama_penyewa: e.target.value})} className="w-full px-4 py-2.5 border border-slate-200 rounded-2xl text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 outline-none font-semibold text-emerald-950 bg-white" /></div>
@@ -1791,6 +1807,13 @@ Terima kasih.`;
     );
   };
 
+  const getDefaultHarga = (nama, tipe) => {
+    if (tipe === 'lapangan') return 2000;
+    if (nama === 'AULA SERBAGUNA') return 2000000;
+    if (nama === 'PENDOPO TSA 1') return 500000;
+    return 250000;
+  };
+
   const handleAddMasterLokasi = async (e) => {
     e.preventDefault();
     if (!newMasterLokasiNama.trim()) return;
@@ -1801,7 +1824,9 @@ Terima kasih.`;
     }
     const newLok = {
       nama: nameUpper,
-      tipe: newMasterLokasiTipe
+      tipe: newMasterLokasiTipe,
+      harga: getDefaultHarga(nameUpper, newMasterLokasiTipe),
+      urutan: masterLokasi.length + 1
     };
     try {
       await addDoc(collection(db, 'masterLokasi'), newLok);
@@ -1818,6 +1843,24 @@ Terima kasih.`;
       setToast({ show: true, msg: 'Lokasi fasilitas berhasil dihapus.', type: 'success' });
     } catch (error) {
       setToast({ show: true, msg: 'Gagal menghapus lokasi!', type: 'error' });
+    }
+  };
+
+  const handleUpdateMasterLokasi = async (e) => {
+    e.preventDefault();
+    if (!editingLokasiId || !editingLokasiData.nama.trim()) return;
+    
+    try {
+      await updateDoc(doc(db, 'masterLokasi', editingLokasiId), {
+        nama: editingLokasiData.nama.toUpperCase(),
+        tipe: editingLokasiData.tipe,
+        harga: Number(editingLokasiData.harga) || 0,
+        urutan: Number(editingLokasiData.urutan) || 0
+      });
+      setEditingLokasiId(null);
+      setToast({ show: true, msg: 'Data fasilitas berhasil diperbarui!', type: 'success' });
+    } catch (error) {
+      setToast({ show: true, msg: 'Gagal memperbarui lokasi!', type: 'error' });
     }
   };
 
@@ -1941,6 +1984,29 @@ Terima kasih.`;
                 const isLapangan = lokasi.tipe === 'lapangan';
                 const Icon = isLapangan ? TreePine : Tent;
                 return (
+                  editingLokasiId === lokasi.id ? (
+                    <div key={lokasi.id} className="bg-blue-50/50 p-3 rounded-2xl border border-blue-200 col-span-full md:col-span-2 lg:col-span-3">
+                      <form onSubmit={handleUpdateMasterLokasi} className="flex flex-wrap gap-2 items-center">
+                        <input type="text" required value={editingLokasiData.nama} onChange={e => setEditingLokasiData({...editingLokasiData, nama: e.target.value})} className="flex-1 min-w-[120px] px-3 py-2 text-xs border border-slate-200 rounded-xl font-bold" placeholder="Nama Fasilitas" />
+                        <select value={editingLokasiData.tipe} onChange={e => setEditingLokasiData({...editingLokasiData, tipe: e.target.value})} className="px-3 py-2 text-xs border border-slate-200 rounded-xl cursor-pointer">
+                          <option value="pendopo">Pendopo</option>
+                          <option value="lapangan">Lapangan</option>
+                        </select>
+                        <div className="flex items-center space-x-1">
+                          <span className="text-xs font-semibold text-slate-500">Rp</span>
+                          <input type="number" required value={editingLokasiData.harga} onChange={e => setEditingLokasiData({...editingLokasiData, harga: e.target.value})} className="w-24 px-3 py-2 text-xs border border-slate-200 rounded-xl" placeholder="Harga" />
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          <span className="text-xs font-semibold text-slate-500">Urutan:</span>
+                          <input type="number" required value={editingLokasiData.urutan} onChange={e => setEditingLokasiData({...editingLokasiData, urutan: e.target.value})} className="w-16 px-3 py-2 text-xs border border-slate-200 rounded-xl" placeholder="1" />
+                        </div>
+                        <div className="flex space-x-1 shrink-0 ml-auto">
+                          <button type="button" onClick={() => setEditingLokasiId(null)} className="bg-slate-200 hover:bg-slate-300 text-slate-700 p-2 rounded-xl transition-all"><X size={14}/></button>
+                          <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-xl transition-all"><Save size={14}/></button>
+                        </div>
+                      </form>
+                    </div>
+                  ) : (
                   <div key={lokasi.id} className="bg-white p-3 rounded-2xl border border-slate-100 text-xs font-bold text-emerald-950 flex justify-between items-center shadow-sm hover:shadow-md hover:border-blue-200 transition-all duration-200 group">
                     <div className="flex items-center space-x-2.5 overflow-hidden">
                       <div className={`p-2 rounded-xl shrink-0 ${isLapangan ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50/70 text-amber-600'}`}>
@@ -1948,10 +2014,21 @@ Terima kasih.`;
                       </div>
                       <div className="flex flex-col overflow-hidden">
                         <span className="truncate text-[11px] font-black tracking-tight" title={lokasi.nama}>{lokasi.nama}</span>
-                        <span className="text-[8px] font-medium text-slate-400 uppercase tracking-widest mt-0.5">{lokasi.tipe}</span>
+                        <span className="text-[8px] font-medium text-slate-400 uppercase tracking-widest mt-0.5">{lokasi.tipe} &bull; Rp {lokasi.harga?.toLocaleString('id-ID') || '0'}</span>
                       </div>
                     </div>
                     <div className="flex space-x-1 shrink-0">
+                      <button 
+                        type="button" 
+                        onClick={() => {
+                          setEditingLokasiId(lokasi.id);
+                          setEditingLokasiData({ nama: lokasi.nama, tipe: lokasi.tipe, harga: lokasi.harga || 0, urutan: lokasi.urutan || 0 });
+                        }} 
+                        className="text-slate-300 hover:text-emerald-600 p-1.5 hover:bg-emerald-50 rounded-xl transition-all cursor-pointer"
+                        title="Edit Lokasi"
+                      >
+                        <Pencil size={13}/>
+                      </button>
                       <button 
                         type="button" 
                         onClick={() => handleOpenMediaModal(lokasi)} 
@@ -1969,6 +2046,7 @@ Terima kasih.`;
                       </button>
                     </div>
                   </div>
+                  )
                 );
               })}
               {masterLokasi.length === 0 && (
@@ -2259,106 +2337,132 @@ Terima kasih.`;
                     </div>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 gap-3 sm:gap-3.5 relative z-10">
-                  {fasilitasHarian.map(fasilitas => {
-                    const { icon: IconComponent, color, bg } = getIconData(fasilitas.tipe);
-                    const isTersedia = fasilitas.status === 'Tersedia';
-                    const isDitutup = fasilitas.bookingInfo?.status_pembayaran === 'Ditutup';
-                    const isLunas = fasilitas.bookingInfo?.status_pembayaran === 'Sudah Transfer' || fasilitas.bookingInfo?.status_pembayaran === 'Sudah Lunas';
-                    const isMenungguVerifikasi = fasilitas.bookingInfo?.status_pembayaran === 'Menunggu Verifikasi';
-                    const hasBuktiListrik = fasilitas.bookingInfo?.bukti_transfer_listrik !== null && fasilitas.bookingInfo?.bukti_transfer_listrik !== undefined;
-                    const isLapangan = fasilitas.tipe === 'lapangan';
-                    
-                    return (
-                      <div 
-                        key={fasilitas.id} 
-                        onClick={(e) => { 
-                            e.stopPropagation(); 
-                            if (fasilitas.status === 'Tersedia') setBookingLokasi(fasilitas);
-                            else if (fasilitas.bookingInfo) handleOpenDetail(fasilitas.bookingInfo);
-                        }}
-                        className={`group relative rounded-2xl p-3 sm:p-3.5 flex flex-col justify-between min-h-[112px] sm:min-h-[115px] overflow-hidden cursor-pointer transition-all duration-300 border bg-white active:scale-[0.97] ${ 
-                          isTersedia 
-                            ? `border-slate-100/80 hover:-translate-y-0.5 ${isLapangan ? 'hover:border-emerald-500/50 hover:shadow-[0_12px_24px_-8px_rgba(16,185,129,0.15)]' : 'hover:border-amber-500/50 hover:shadow-[0_12px_24px_-8px_rgba(245,158,11,0.15)]'}` 
-                            : isDitutup 
-                              ? 'bg-slate-50/80 border-slate-200 opacity-60' 
-                              : 'border-rose-100 hover:border-rose-400/50 hover:shadow-[0_12px_24px_-8px_rgba(239,68,68,0.15)] hover:-translate-y-0.5' 
-                        }`}
-                      >
-                        {/* Decorative background gradients */}
-                        {isTersedia && <div className={`absolute -bottom-8 -right-8 w-16 h-16 ${isLapangan ? 'bg-emerald-50' : 'bg-amber-50'} rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10`}></div>}
-                        {!isTersedia && !isDitutup && <div className="absolute top-0 right-0 w-12 h-12 bg-rose-50/50 rounded-bl-full -z-10 pointer-events-none"></div>}
+                  {/* Tersedia Section */}
+                  <div className="mb-8">
+                    <h3 className="text-sm font-extrabold text-emerald-950 mb-3 flex items-center">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 mr-2"></span> Fasilitas Tersedia
+                    </h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 gap-3 sm:gap-3.5 relative z-10">
+                      {fasilitasHarian.filter(f => f.status === 'Tersedia').map(fasilitas => {
+                        const { icon: IconComponent, color, bg } = getIconData(fasilitas.tipe);
+                        const isTersedia = true;
+                        const isDitutup = false;
+                        const isLunas = false;
+                        const isMenungguVerifikasi = false;
+                        const hasBuktiListrik = false;
+                        const isLapangan = fasilitas.tipe === 'lapangan';
                         
-                        {!isTersedia && !isDitutup && isLunas && (
-                            <div className="absolute top-0 right-0 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white text-[7px] font-black px-2 py-0.5 rounded-bl-lg shadow-sm z-20 flex items-center pointer-events-none tracking-wide">
-                                <CheckCircle2 size={8} className="mr-0.5"/> LUNAS
-                            </div>
-                        )}
-                        
-                        {!isTersedia && !isDitutup && isMenungguVerifikasi && (
-                            <div className="absolute top-0 right-0 bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-[7px] font-black px-2 py-0.5 rounded-bl-lg shadow-sm z-20 flex items-center animate-pulse pointer-events-none tracking-wide">
-                                <AlertCircle size={8} className="mr-0.5 animate-bounce"/> VERIFIKASI
-                            </div>
-                        )}
-
-                        {!isTersedia && !isDitutup && hasBuktiListrik && (
-                            <div className="absolute top-0 left-0 bg-gradient-to-r from-amber-400 to-amber-500 text-white text-[7px] font-black px-2 py-0.5 rounded-br-lg shadow-sm z-20 flex items-center pointer-events-none tracking-wide">
-                                <Zap size={8} className="mr-0.5"/> LISTRIK
-                            </div>
-                        )}
-
-                        <div className="flex items-start justify-between mb-2 pointer-events-none">
-                          <div className={`p-1.5 sm:p-2 rounded-xl shadow-sm transition-all duration-300 ${ 
-                            isTersedia 
-                              ? (isLapangan ? 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white' : 'bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white')
-                              : isDitutup 
-                                ? 'bg-slate-200 text-slate-500' 
-                                : 'bg-rose-50 text-rose-500' 
-                          }`}>
-                            <IconComponent size={15} strokeWidth={2.5} />
-                          </div>
-                          
-                          {/* Status dot — static only for available (no ping to save resources) */}
-                          <div className="flex items-center justify-center w-4 h-4">
-                            {!isDitutup && (
-                              <span className={`inline-flex rounded-full ${
-                                isTersedia
-                                  ? (isLapangan ? 'w-2.5 h-2.5 bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.15)]' : 'w-2.5 h-2.5 bg-amber-500 shadow-[0_0_0_3px_rgba(245,158,11,0.15)]')
-                                  : 'w-2 h-2 bg-rose-500 animate-ping opacity-75'
-                              }`}></span>
-                            )}
-                            {isDitutup && <span className="inline-flex rounded-full w-2 h-2 bg-slate-300"></span>}
-                          </div>
-                        </div>
-
-                        <div className="mt-auto mb-1 pointer-events-none">
-                          <h4 className={`font-bold text-[11px] leading-tight line-clamp-2 transition-colors duration-300 ${ 
-                            isTersedia 
-                              ? (isLapangan ? 'text-emerald-950 group-hover:text-emerald-900' : 'text-emerald-950 group-hover:text-amber-900') 
-                              : isDitutup 
-                                ? 'text-slate-500' 
-                                : 'text-rose-950' 
-                          }`}>{fasilitas.nama}</h4>
-                        </div>
-
-                        <div className="pointer-events-none w-full">
-                          {isTersedia ? (
-                              <span className={`text-[8.5px] font-extrabold ${isLapangan ? 'text-emerald-600 group-hover:text-emerald-700' : 'text-amber-600 group-hover:text-amber-700'} uppercase tracking-widest flex items-center transition-colors`}>
-                                Pesan <ChevronRight size={9} className="ml-0.5 transform group-hover:translate-x-0.5 transition-transform" />
-                              </span>
-                          ) : isDitutup ? (
-                              <span className="text-[8px] font-extrabold text-slate-400 uppercase tracking-widest flex items-center"><Lock size={8} className="mr-0.5"/> Maintenance</span>
-                          ) : (
-                              <div className="bg-rose-50/40 border border-rose-100/50 rounded-xl p-1.5 mt-0.5 w-full overflow-hidden">
-                                  <span className="text-[8.5px] font-extrabold text-rose-900 block truncate">{fasilitas.bookingInfo?.nama_penyewa}</span>
-                                  <span className="text-[8px] font-medium text-rose-600/80 block truncate">PIC: {fasilitas.bookingInfo?.pic_rombongan}</span>
+                        return (
+                          <div 
+                            key={fasilitas.id} 
+                            onClick={(e) => { 
+                                e.stopPropagation(); 
+                                setBookingLokasi(fasilitas);
+                            }}
+                            className={`group relative rounded-2xl p-3 sm:p-3.5 flex flex-col justify-between min-h-[112px] sm:min-h-[115px] overflow-hidden cursor-pointer transition-all duration-300 border bg-white active:scale-[0.97] border-slate-100/80 hover:-translate-y-0.5 ${isLapangan ? 'hover:border-emerald-500/50 hover:shadow-[0_12px_24px_-8px_rgba(16,185,129,0.15)]' : 'hover:border-amber-500/50 hover:shadow-[0_12px_24px_-8px_rgba(245,158,11,0.15)]'}`}
+                          >
+                            {/* Decorative background gradients */}
+                            <div className={`absolute -bottom-8 -right-8 w-16 h-16 ${isLapangan ? 'bg-emerald-50' : 'bg-amber-50'} rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10`}></div>
+                            
+                            <div className="flex items-start justify-between mb-2 pointer-events-none">
+                              <div className={`p-1.5 sm:p-2 rounded-xl shadow-sm transition-all duration-300 ${isLapangan ? 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white' : 'bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white'}`}>
+                                <IconComponent size={15} strokeWidth={2.5} />
                               </div>
-                          )}
-                        </div>
+                              <div className="flex items-center justify-center w-4 h-4">
+                                <span className={`inline-flex rounded-full ${isLapangan ? 'w-2.5 h-2.5 bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.15)]' : 'w-2.5 h-2.5 bg-amber-500 shadow-[0_0_0_3px_rgba(245,158,11,0.15)]'}`}></span>
+                              </div>
+                            </div>
+    
+                            <div className="mt-auto mb-1 pointer-events-none">
+                              <h4 className={`font-bold text-[11px] leading-tight line-clamp-2 transition-colors duration-300 ${isLapangan ? 'text-emerald-950 group-hover:text-emerald-900' : 'text-emerald-950 group-hover:text-amber-900'}`}>{fasilitas.nama}</h4>
+                            </div>
+    
+                            <div className="pointer-events-none w-full">
+                                <span className={`text-[8.5px] font-extrabold ${isLapangan ? 'text-emerald-600 group-hover:text-emerald-700' : 'text-amber-600 group-hover:text-amber-700'} uppercase tracking-widest flex items-center transition-colors`}>
+                                  Pesan <ChevronRight size={9} className="ml-0.5 transform group-hover:translate-x-0.5 transition-transform" />
+                                </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Tersewa Section */}
+                  {fasilitasHarian.filter(f => f.status !== 'Tersedia').length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-extrabold text-emerald-950 mb-3 flex items-center">
+                        <span className="w-2 h-2 rounded-full bg-rose-500 mr-2"></span> Fasilitas Tersewa / Ditutup
+                      </h3>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 gap-3 sm:gap-3.5 relative z-10 opacity-90">
+                        {fasilitasHarian.filter(f => f.status !== 'Tersedia').map(fasilitas => {
+                          const { icon: IconComponent, color, bg } = getIconData(fasilitas.tipe);
+                          const isDitutup = fasilitas.bookingInfo?.status_pembayaran === 'Ditutup';
+                          const isLunas = fasilitas.bookingInfo?.status_pembayaran === 'Sudah Transfer' || fasilitas.bookingInfo?.status_pembayaran === 'Sudah Lunas';
+                          const isMenungguVerifikasi = fasilitas.bookingInfo?.status_pembayaran === 'Menunggu Verifikasi';
+                          const hasBuktiListrik = fasilitas.bookingInfo?.bukti_transfer_listrik !== null && fasilitas.bookingInfo?.bukti_transfer_listrik !== undefined;
+                          const isLapangan = fasilitas.tipe === 'lapangan';
+                          
+                          return (
+                            <div 
+                              key={fasilitas.id} 
+                              onClick={(e) => { 
+                                  e.stopPropagation(); 
+                                  if (fasilitas.bookingInfo) handleOpenDetail(fasilitas.bookingInfo);
+                              }}
+                              className={`group relative rounded-2xl p-3 sm:p-3.5 flex flex-col justify-between min-h-[112px] sm:min-h-[115px] overflow-hidden cursor-pointer transition-all duration-300 border bg-white active:scale-[0.97] ${isDitutup ? 'bg-slate-50/80 border-slate-200 opacity-60' : 'border-rose-100 hover:border-rose-400/50 hover:shadow-[0_12px_24px_-8px_rgba(239,68,68,0.15)] hover:-translate-y-0.5'}`}
+                            >
+                              {!isDitutup && <div className="absolute top-0 right-0 w-12 h-12 bg-rose-50/50 rounded-bl-full -z-10 pointer-events-none"></div>}
+                              
+                              {!isDitutup && isLunas && (
+                                  <div className="absolute top-0 right-0 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white text-[7px] font-black px-2 py-0.5 rounded-bl-lg shadow-sm z-20 flex items-center pointer-events-none tracking-wide">
+                                      <CheckCircle2 size={8} className="mr-0.5"/> LUNAS
+                                  </div>
+                              )}
+                              
+                              {!isDitutup && isMenungguVerifikasi && (
+                                  <div className="absolute top-0 right-0 bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-[7px] font-black px-2 py-0.5 rounded-bl-lg shadow-sm z-20 flex items-center animate-pulse pointer-events-none tracking-wide">
+                                      <AlertCircle size={8} className="mr-0.5 animate-bounce"/> VERIFIKASI
+                                  </div>
+                              )}
+      
+                              {!isDitutup && hasBuktiListrik && (
+                                  <div className="absolute top-0 left-0 bg-gradient-to-r from-amber-400 to-amber-500 text-white text-[7px] font-black px-2 py-0.5 rounded-br-lg shadow-sm z-20 flex items-center pointer-events-none tracking-wide">
+                                      <Zap size={8} className="mr-0.5"/> LISTRIK
+                                  </div>
+                              )}
+      
+                              <div className="flex items-start justify-between mb-2 pointer-events-none">
+                                <div className={`p-1.5 sm:p-2 rounded-xl shadow-sm transition-all duration-300 ${isDitutup ? 'bg-slate-200 text-slate-500' : 'bg-rose-50 text-rose-500'}`}>
+                                  <IconComponent size={15} strokeWidth={2.5} />
+                                </div>
+                                
+                                <div className="flex items-center justify-center w-4 h-4">
+                                  {!isDitutup && <span className="inline-flex rounded-full w-2 h-2 bg-rose-500 animate-ping opacity-75"></span>}
+                                  {isDitutup && <span className="inline-flex rounded-full w-2 h-2 bg-slate-300"></span>}
+                                </div>
+                              </div>
+      
+                              <div className="mt-auto mb-1 pointer-events-none">
+                                <h4 className={`font-bold text-[11px] leading-tight line-clamp-2 transition-colors duration-300 ${isDitutup ? 'text-slate-500' : 'text-rose-950'}`}>{fasilitas.nama}</h4>
+                              </div>
+      
+                              <div className="pointer-events-none w-full">
+                                {isDitutup ? (
+                                    <span className="text-[8px] font-extrabold text-slate-400 uppercase tracking-widest flex items-center"><Lock size={8} className="mr-0.5"/> Maintenance</span>
+                                ) : (
+                                    <div className="bg-rose-50/40 border border-rose-100/50 rounded-xl p-1.5 mt-0.5 w-full overflow-hidden">
+                                        <span className="text-[8.5px] font-extrabold text-rose-900 block truncate">{fasilitas.bookingInfo?.nama_penyewa}</span>
+                                        <span className="text-[8px] font-medium text-rose-600/80 block truncate">PIC: {fasilitas.bookingInfo?.pic_rombongan}</span>
+                                    </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-                    );
-                  })}
-                </div>
+                    </div>
+                  )}
               </div>
             )}
             
