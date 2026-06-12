@@ -13,6 +13,7 @@ export default function PublicUpload() {
   
   const [uploadFile, setUploadFile] = useState(null);
   const [filePreview, setFilePreview] = useState(null);
+  const [paymentDate, setPaymentDate] = useState('');
 
   // Parse URL on load
   useEffect(() => {
@@ -162,7 +163,7 @@ export default function PublicUpload() {
       }
       
       setLoadingText('Menyimpan data transaksi (2/2)...');
-      const todayStr = new Date().toISOString().split('T')[0];
+      const inputDateStr = paymentDate || new Date().toISOString().split('T')[0];
 
       const isListrikUpload = bookingData.listrik_tambahan && bookingData.akses_upload_listrik && (bookingData.status_pembayaran === 'Lunas' || bookingData.status_pembayaran === 'Sudah Transfer');
 
@@ -172,14 +173,14 @@ export default function PublicUpload() {
       if (isListrikUpload) {
         await updateDoc(docRef, {
           bukti_transfer_listrik: finalDataUrl,
-          tanggal_transfer_listrik: todayStr
+          tanggal_transfer_listrik: inputDateStr
         });
         setSuccessMsg('Bukti pembayaran listrik tambahan berhasil di-upload! Mohon tunggu verifikasi.');
       } else {
         await updateDoc(docRef, {
           status_pembayaran: 'Menunggu Verifikasi',
           bukti_transfer: finalDataUrl,
-          tanggal_transfer: todayStr
+          tanggal_transfer: inputDateStr
         });
         setSuccessMsg('Bukti transfer berhasil di-upload! Mohon tunggu verifikasi dari Admin.');
       }
@@ -312,6 +313,17 @@ export default function PublicUpload() {
                     <p className="text-sm font-bold text-slate-700 mb-2">Pilih File Bukti Pembayaran</p>
                   )}
                   
+                  <div className="mb-4">
+                    <label className="block text-sm font-bold text-slate-700 mb-2">Tanggal Pembayaran <span className="text-rose-500">*</span></label>
+                    <input 
+                      type="date" 
+                      required
+                      value={paymentDate}
+                      onChange={(e) => setPaymentDate(e.target.value)}
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all"
+                    />
+                  </div>
+
                   {!filePreview ? (
                     <label className="w-full border-2 border-dashed border-slate-300 bg-slate-50 hover:bg-emerald-50 hover:border-emerald-300 text-slate-500 hover:text-emerald-600 transition-colors py-10 rounded-2xl flex flex-col items-center justify-center cursor-pointer group">
                       <input type="file" accept="image/jpeg, image/png, application/pdf" className="hidden" onChange={handleFileChange} />
@@ -345,7 +357,7 @@ export default function PublicUpload() {
 
                 <button 
                   type="submit" 
-                  disabled={!filePreview || isLoading}
+                  disabled={!filePreview || !paymentDate || isLoading}
                   className="w-full bg-emerald-600 text-white font-bold py-4 rounded-xl shadow-lg shadow-emerald-600/30 hover:bg-emerald-700 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:shadow-none"
                 >
                   Kirim Bukti Pembayaran
