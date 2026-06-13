@@ -54,17 +54,6 @@ export default function MigrateData() {
     return result.map(s => s.trim().replace(/^"|"$/g, ''));
   };
 
-  const handleMigrate = async () => {
-    setLoading(true);
-    setLog(['Mulai proses migrasi... Membaca Google Sheet...']);
-    
-    try {
-      const targetUrl = 'https://docs.google.com/spreadsheets/d/1vp2CK15g_ZCSBF29JB_w9kSg8DAZGLTu9Xbgt0jwBfU/export?format=csv&gid=0';
-      const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(targetUrl)}`);
-      
-      if (!res.ok) throw new Error('Gagal mengunduh CSV dari Google Sheet via Proxy');
-      
-      const csvText = await res.text();
   const processCsvLines = async (lines) => {
       const dataRows = lines.slice(1); // skip header
       let countSuccess = 0;
