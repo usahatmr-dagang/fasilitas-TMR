@@ -41,13 +41,15 @@ export default function MigrateData() {
   };
 
   const parseRow = (str) => {
+    // Deteksi pemisah: jika ada tab (dari paste Google Sheet), gunakan tab. Jika tidak, gunakan koma.
+    const delimiter = str.includes('\t') ? '\t' : ',';
     let result = [];
     let inQuotes = false;
     let current = '';
     for(let i=0; i<str.length; i++) {
         let char = str[i];
         if (char === '"') { inQuotes = !inQuotes; }
-        else if (char === ',' && !inQuotes) { result.push(current); current = ''; }
+        else if (char === delimiter && !inQuotes) { result.push(current); current = ''; }
         else { current += char; }
     }
     result.push(current);
