@@ -212,9 +212,10 @@ export default function App() {
   const [pembayaranViewMode, setPembayaranViewMode] = useState('list');
   const [calendarMonth, setCalendarMonth] = useState(new Date()); 
   
-  const [bookingLokasi, setBookingLokasi] = useState(null);
+  const [cartLokasi, setCartLokasi] = useState([]);
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [formData, setFormData] = useState({
-    namaRombongan: '', picRombongan: '', noWa: '', picKantor: '', keterangan: '', catatan: '', statusPembayaran: 'Belum Transfer', listrikTambahan: false, luasLahan: 50
+    namaRombongan: '', picRombongan: '', noWa: '', picKantor: '', keterangan: '', catatan: '', statusPembayaran: 'Belum Transfer', listrikTambahan: false, luasLahan: 50, isGazeboPackage: false
   });
 
   const [selectedRecord, setSelectedRecord] = useState(null); 
@@ -336,7 +337,10 @@ export default function App() {
     let filteredLokasi = masterLokasi;
     if (filterTipe !== 'semua') filteredLokasi = masterLokasi.filter(lokasi => lokasi.tipe === filterTipe);
     return filteredLokasi.map(lokasi => {
-      const booking = sewaHariIni.find(sewa => sewa.lokasi_sewa === lokasi.nama);
+      const booking = sewaHariIni.find(sewa => {
+          if (sewa.detail_lokasi && Array.isArray(sewa.detail_lokasi)) return sewa.detail_lokasi.some(l => l.nama === lokasi.nama);
+          return sewa.lokasi_sewa === lokasi.nama || (sewa.lokasi_sewa && sewa.lokasi_sewa.split(', ').includes(lokasi.nama));
+      });
       return { ...lokasi, status: booking ? 'Disewa' : 'Tersedia', bookingInfo: booking || null };
     });
   }, [selectedDate, filterTipe, sewaList]);
@@ -344,7 +348,10 @@ export default function App() {
   const availableLokasiForReschedule = useMemo(() => {
     if (!rescheduleData.tanggal || !selectedRecord) return [];
     const sewaHariItu = sewaList.filter(s => s.tanggal_sewa === rescheduleData.tanggal && s.id_sewa !== selectedRecord.id_sewa && s.status_pembayaran !== 'Ditutup');
-    return masterLokasi.filter(l => !sewaHariItu.find(s => s.lokasi_sewa === l.nama));
+    return masterLokasi.filter(l => !sewaHariItu.find(s => {
+        if (s.detail_lokasi && Array.isArray(s.detail_lokasi)) return s.detail_lokasi.some(det => det.nama === l.nama);
+        return s.lokasi_sewa === l.nama || (s.lokasi_sewa && s.lokasi_sewa.split(', ').includes(l.nama));
+    }));
   }, [rescheduleData.tanggal, sewaList, selectedRecord, masterLokasi]);
 
   const groupedSewa = useMemo(() => {
@@ -419,19 +426,43 @@ export default function App() {
 
   const handleSubmitBooking = async (e) => {
     e.preventDefault();
+    if (cartLokasi.length === 0) return;
+
     const currentDateTime = new Date().toLocaleString('id-ID', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
     const generatedId = `TMR-${Math.floor(10000 + Math.random() * 90000)}`;
-    const isLapangan = bookingLokasi.tipe === 'lapangan';
-    const luas_lahan_val = isLapangan ? Math.max(Number(formData.luasLahan), 50) : null;
-    const biayaLokasi = getBiayaLokasi(bookingLokasi.nama, luas_lahan_val);
+    
+    const jumlahLapangan = cartLokasi.filter(l => l.tipe === 'lapangan').length;
+    const isLapangan = jumlahLapangan > 0;
+    const luas_lahan_total = isLapangan ? Math.max(Number(formData.luasLahan), 50) : null;
+    const luas_per_lapangan = isLapangan ? (luas_lahan_total / jumlahLapangan) : null;
+
+    let totalBiayaLokasi = 0;
+    const detail_lokasi = cartLokasi.map(lokasi => {
+        let biaya = 0;
+        let luas = null;
+        if (lokasi.tipe === 'lapangan') {
+            luas = luas_per_lapangan;
+            biaya = luas * (Number(lokasi.harga) || 2000);
+        } else if (lokasi.nama === 'GAZEBO' && formData.isGazeboPackage) {
+            biaya = 650000;
+        } else {
+            biaya = getBiayaLokasi(lokasi.nama);
+        }
+        totalBiayaLokasi += biaya;
+        return { nama: lokasi.nama, luas: luas, biaya: biaya };
+    });
+
     const biayaListrik = formData.listrikTambahan ? 100000 : 0;
-    const totalBiaya = biayaLokasi + biayaListrik;
+    const totalBiaya = totalBiayaLokasi + biayaListrik;
     const isLunas = formData.statusPembayaran === 'Sudah Transfer';
+    const lokasiSewaString = cartLokasi.map(l => l.nama).join(', ');
 
     const newBooking = {
       id_sewa: generatedId,
       tanggal_sewa: selectedDate, 
-      lokasi_sewa: bookingLokasi.nama,
+      lokasi_sewa: lokasiSewaString,
+      detail_lokasi: detail_lokasi,
+      is_gazebo_package: formData.isGazeboPackage || false,
       nama_penyewa: formData.namaRombongan || '-',
       pic_rombongan: formData.picRombongan || '-',
       no_hp_penyewa: formData.noWa || '-',
@@ -441,7 +472,7 @@ export default function App() {
       status_pembayaran: formData.statusPembayaran || 'Belum Transfer',
       listrik_tambahan: formData.listrikTambahan || false,
       akses_upload_listrik: formData.listrikTambahan ? true : false, 
-      luas_lahan: luas_lahan_val,
+      luas_lahan: luas_lahan_total,
       total_biaya: totalBiaya,
       tanggal_booking: currentDateTime,
       tanggal_transfer: isLunas ? getTodayString() : null,
@@ -461,8 +492,9 @@ export default function App() {
         lokasi_sewa: newBooking.lokasi_sewa
       });
 
-      setBookingLokasi(null);
-      setFormData({ namaRombongan: '', picRombongan: '', noWa: '', picKantor: '', keterangan: '', catatan: '', statusPembayaran: 'Belum Transfer', listrikTambahan: false, luasLahan: 50 });
+      setCartLokasi([]);
+      setIsCheckoutOpen(false);
+      setFormData({ namaRombongan: '', picRombongan: '', noWa: '', picKantor: '', keterangan: '', catatan: '', statusPembayaran: 'Belum Transfer', listrikTambahan: false, luasLahan: 50, isGazeboPackage: false });
       handleOpenDetail(newBooking);
       showToast('Reservasi baru berhasil ditambahkan!');
     } catch (error) {
@@ -515,11 +547,34 @@ Terima kasih.`;
 
   const handleSaveEdit = async (e) => {
     e.preventDefault();
-    const biayaLokasi = getBiayaLokasi(selectedRecord.lokasi_sewa, editFormData.luas_lahan);
+    let detailLokasiUpdate = selectedRecord.detail_lokasi || null;
+    let biayaLokasi = 0;
+
+    if (selectedRecord.detail_lokasi && Array.isArray(selectedRecord.detail_lokasi)) {
+        const jumlahLapangan = selectedRecord.detail_lokasi.filter(l => l.luas !== null).length;
+        const luas_lahan_total = Math.max(Number(editFormData.luas_lahan || 50), 50);
+        const luas_per_lapangan = jumlahLapangan > 0 ? (luas_lahan_total / jumlahLapangan) : null;
+        
+        detailLokasiUpdate = selectedRecord.detail_lokasi.map(loc => {
+            if (loc.luas !== null) {
+                const updatedLuas = luas_per_lapangan;
+                const updatedBiaya = updatedLuas * 2000;
+                biayaLokasi += updatedBiaya;
+                return { ...loc, luas: updatedLuas, biaya: updatedBiaya };
+            } else {
+                biayaLokasi += loc.biaya;
+                return loc;
+            }
+        });
+    } else {
+        biayaLokasi = getBiayaLokasi(selectedRecord.lokasi_sewa, editFormData.luas_lahan);
+    }
+
     const biayaListrik = editFormData.listrik_tambahan ? 100000 : 0;
     const updatedRecord = { 
         ...selectedRecord, 
         ...editFormData,
+        detail_lokasi: detailLokasiUpdate,
         akses_upload_listrik: editFormData.listrik_tambahan ? true : false,
         total_biaya: biayaLokasi + biayaListrik 
     };
@@ -1565,16 +1620,31 @@ Terima kasih.`;
                       </div>
 
                       <div className="bg-white rounded-3xl p-5 shadow-[0_4px_20px_rgba(4,120,87,0.03)] border border-slate-100 space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div><p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider mb-1">Lokasi</p><p className="font-bold text-emerald-950 text-sm">{selectedRecord.lokasi_sewa}</p></div>
-                            <div><p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider mb-1">Tanggal Sewa</p><p className="font-bold text-emerald-950 text-sm">{formatTanggalPendek(selectedRecord.tanggal_sewa)}</p></div>
+                        <div className="bg-slate-50 border border-slate-100 rounded-2xl p-3">
+                            <p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider mb-2">Fasilitas & Lokasi Disewa</p>
+                            <div className="space-y-2">
+                                {selectedRecord.detail_lokasi && selectedRecord.detail_lokasi.length > 0 ? (
+                                    selectedRecord.detail_lokasi.map((loc, i) => (
+                                        <div key={i} className="flex justify-between items-center text-xs font-bold">
+                                            <span className="text-emerald-950">{loc.nama} {loc.luas ? `(${loc.luas} m²)` : ''}</span>
+                                            <span className="text-slate-500">{formatRupiah(loc.biaya)}</span>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="flex justify-between items-center text-xs font-bold">
+                                        <span className="text-emerald-950">{selectedRecord.lokasi_sewa} {selectedRecord.luas_lahan ? `(${selectedRecord.luas_lahan} m²)` : ''}</span>
+                                        <span className="text-slate-500">{formatRupiah(viewBiayaLokasi)}</span>
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                        {isLapangan && (
-                            <>
-                              <hr className="border-slate-100" />
-                              <div><p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider mb-1">Luas Lahan Dipakai</p><p className="font-bold text-emerald-950 text-sm">{selectedRecord.luas_lahan} m²</p></div>
-                            </>
-                        )}
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div><p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider mb-1">Tanggal Sewa</p><p className="font-bold text-emerald-950 text-sm">{formatTanggalPendek(selectedRecord.tanggal_sewa)}</p></div>
+                            {selectedRecord.is_gazebo_package && (
+                                <div><p className="text-[10px] text-amber-500 font-extrabold uppercase tracking-wider mb-1">Paket Khusus</p><p className="font-bold text-emerald-950 text-xs">Termasuk Lahan Depan Gazebo</p></div>
+                            )}
+                        </div>
                         <hr className="border-slate-100" />
                         <div className="grid grid-cols-2 gap-4">
                             <div><p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider mb-1">Nama Rombongan</p><p className="font-bold text-emerald-950 text-sm">{selectedRecord.nama_penyewa || '-'}</p></div>
@@ -1592,7 +1662,7 @@ Terima kasih.`;
                         <hr className="border-slate-100" />
                         
                         <div className="grid grid-cols-2 gap-4 pt-1">
-                            <div><p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider mb-1">Biaya Lokasi</p><p className="font-bold text-emerald-950 text-xs">{formatRupiah(viewBiayaLokasi)}</p></div>
+                            <div><p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider mb-1">Total Biaya Lokasi</p><p className="font-bold text-emerald-950 text-xs">{formatRupiah(selectedRecord.detail_lokasi && selectedRecord.detail_lokasi.length > 0 ? selectedRecord.detail_lokasi.reduce((a,b)=>a+b.biaya,0) : viewBiayaLokasi)}</p></div>
                             <div><p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider mb-1">Status Listrik</p><p className="font-bold text-emerald-950 text-xs flex items-center">{selectedRecord.listrik_tambahan ? <><Zap size={12} className="text-amber-500 mr-1"/> Aktif (+Rp 100rb)</> : <><X size={14} strokeWidth={3} className="text-rose-500 mr-1"/> Tidak Ada</>}</p></div>
                         </div>
                         <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/30 border border-emerald-100 rounded-2xl p-4 mt-2 flex justify-between items-center">
@@ -2127,26 +2197,43 @@ Terima kasih.`;
           </div>
       )}
 
-      {/* Form Reservasi Baru */}
-      {bookingLokasi && (
+      {/* Form Reservasi Baru (Checkout) */}
+      {isCheckoutOpen && cartLokasi.length > 0 && (
         <div className="fixed inset-0 bg-[#022c22]/60 backdrop-blur-sm z-[50] flex justify-center items-end sm:items-center p-0 sm:p-4 pb-14 sm:pb-0 animate-fade-in">
             <div className="bg-white rounded-t-3xl sm:rounded-3xl shadow-[0_-8px_40px_-4px_rgba(4,120,87,0.18)] sm:shadow-[0_25px_50px_-12px_rgba(4,120,87,0.15)] w-full sm:max-w-lg overflow-hidden flex flex-col max-h-[calc(94vh-3.5rem)] sm:max-h-[92vh] border border-emerald-100/50 transition-all duration-300 animate-slide-up-sheet sm:animate-none">
                 <div className="px-6 py-5 border-b border-emerald-800/10 flex items-center justify-between bg-gradient-to-r from-[#022c22] via-[#043e30] to-[#01140f] text-white shadow-md">
                     <div>
-                        <h3 className="font-black text-lg tracking-tight bg-gradient-to-r from-white to-emerald-100 bg-clip-text text-transparent">Formulir Reservasi</h3>
-                        <p className="text-[10px] text-amber-400 font-extrabold tracking-widest uppercase mt-0.5">{bookingLokasi.nama} • {formatTanggalIndo(selectedDate)}</p>
+                        <h3 className="font-black text-lg tracking-tight bg-gradient-to-r from-white to-emerald-100 bg-clip-text text-transparent">Formulir Checkout</h3>
+                        <p className="text-[10px] text-amber-400 font-extrabold tracking-widest uppercase mt-0.5">{cartLokasi.length} Fasilitas Terpilih • {formatTanggalIndo(selectedDate)}</p>
                     </div>
-                    <button type="button" onClick={() => setBookingLokasi(null)} className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all duration-200 hover:scale-105"><X size={18} /></button>
+                    <button type="button" onClick={() => setIsCheckoutOpen(false)} className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all duration-200 hover:scale-105"><X size={18} /></button>
                 </div>
                 {/* Scrollable form fields */}
                 <div className="overflow-y-auto flex-1 hide-scrollbar bg-slate-50/50">
                 <form id="booking-form" onSubmit={handleSubmitBooking} className="p-4 sm:p-6 space-y-4 relative z-10">
                     
-                    {/* KHUSUS LAPANGAN: Input Luas Lahan */}
-                    {bookingLokasi.tipe === 'lapangan' && (
+                    {/* Ringkasan Fasilitas */}
+                    <div className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm">
+                        <label className="block text-xs font-extrabold text-emerald-950 uppercase tracking-wider mb-2">Fasilitas yang Dipesan</label>
+                        <div className="space-y-1.5 max-h-32 overflow-y-auto pr-2">
+                            {cartLokasi.map((item, idx) => (
+                                <div key={idx} className="flex justify-between items-center text-xs font-bold bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                    <span className="text-emerald-800 flex items-center">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mr-2"></span>
+                                        {item.nama}
+                                    </span>
+                                    <span className="text-slate-500">{item.tipe === 'lapangan' ? 'TBD' : formatRupiah(getBiayaLokasi(item.nama))}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* KHUSUS LAPANGAN: Input Luas Lahan (Berlaku untuk semua lapangan) */}
+                    {cartLokasi.some(l => l.tipe === 'lapangan') && (
                         <div className="bg-emerald-50/60 border border-emerald-100 rounded-3xl p-5 shadow-sm relative overflow-hidden">
                             <div className="absolute right-0 bottom-0 opacity-[0.04] text-emerald-850"><TreePine size={96}/></div>
-                            <label className="block text-xs font-extrabold text-emerald-950 uppercase tracking-wider mb-2">Luas Lahan (Minimal 50 m²)</label>
+                            <label className="block text-xs font-extrabold text-emerald-950 uppercase tracking-wider mb-2">Total Luas Lahan Digunakan (Minimal 50 m²)</label>
+                            <p className="text-[10px] text-emerald-700 font-bold mb-3">Jika menyewa lebih dari 1 lapangan, luas lahan ini akan dibagi rata ke semua lapangan.</p>
                             <div className="flex items-center space-x-3">
                                 <input required type="number" min="50" value={formData.luasLahan} onChange={(e)=>setFormData({...formData, luasLahan: e.target.value})} className="w-28 px-4 py-3 rounded-2xl border border-slate-200 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 outline-none text-base bg-white font-extrabold text-center shadow-inner" />
                                 <span className="font-bold text-emerald-800 text-sm">m² × Rp 2.000 / m²</span>
@@ -2154,22 +2241,52 @@ Terima kasih.`;
                         </div>
                     )}
 
+                    {/* PAKET GAZEBO SPESIAL */}
+                    {cartLokasi.some(l => l.nama === 'GAZEBO') && (
+                        <div className={`border rounded-3xl p-4 shadow-sm transition-all duration-300 cursor-pointer ${formData.isGazeboPackage ? 'border-amber-300 bg-amber-50/40 shadow-md ring-2 ring-amber-500/20' : 'border-emerald-200 bg-emerald-50/30 hover:border-emerald-300'}`}>
+                            <label className="flex items-start cursor-pointer select-none">
+                                <input type="checkbox" checked={formData.isGazeboPackage} onChange={(e)=>setFormData({...formData, isGazeboPackage: e.target.checked})} className="mt-1 w-5 h-5 text-amber-500 rounded border-slate-350 focus:ring-amber-500 cursor-pointer shrink-0" />
+                                <div className="ml-3 flex-1">
+                                    <span className="text-sm font-extrabold text-emerald-950 flex items-center">Ambil Paket Lahan Depan Gazebo</span>
+                                    <p className="text-[10px] font-bold text-slate-500 mt-1">Biaya Gazebo menjadi Total <strong className="text-amber-600">Rp 650.000</strong> (Sudah termasuk sewa lahan bagian depan gazebo)</p>
+                                </div>
+                            </label>
+                        </div>
+                    )}
+
                     {/* Ringkasan Biaya Realtime */}
                     <div className="bg-white border border-slate-100 rounded-3xl p-5 shadow-[0_4px_20px_rgba(4,120,87,0.02)] space-y-3">
-                        <div className="flex justify-between items-center text-xs text-slate-500 font-bold uppercase tracking-wider">
-                            <span>Tarif Sewa Lokasi:</span>
-                            <span className="font-extrabold text-emerald-950">{formatRupiah(getBiayaLokasi(bookingLokasi.nama, bookingLokasi.tipe === 'lapangan' ? formData.luasLahan : null))}</span>
-                        </div>
-                        {formData.listrikTambahan && (
-                            <div className="flex justify-between items-center text-xs text-slate-500 font-bold uppercase tracking-wider">
-                                <span className="flex items-center"><Zap size={14} className="mr-1 text-amber-500" /> Listrik Tambahan:</span>
-                                <span className="font-extrabold text-amber-600">{formatRupiah(100000)}</span>
-                            </div>
-                        )}
-                        <div className="flex justify-between items-center text-sm pt-3 border-t border-slate-100">
-                            <span className="font-extrabold text-emerald-950 uppercase tracking-wider">Total Tagihan:</span>
-                            <span className="font-black text-emerald-700 text-xl">{formatRupiah(getBiayaLokasi(bookingLokasi.nama, bookingLokasi.tipe === 'lapangan' ? formData.luasLahan : null) + (formData.listrikTambahan ? 100000 : 0))}</span>
-                        </div>
+                        {(() => {
+                            const jumlahLapangan = cartLokasi.filter(l => l.tipe === 'lapangan').length;
+                            const isLapangan = jumlahLapangan > 0;
+                            const luas_lahan_total = isLapangan ? Math.max(Number(formData.luasLahan), 50) : null;
+                            const luas_per_lapangan = isLapangan ? (luas_lahan_total / jumlahLapangan) : null;
+                            let totalBiayaLokasi = 0;
+                            cartLokasi.forEach(lokasi => {
+                                if (lokasi.tipe === 'lapangan') totalBiayaLokasi += luas_per_lapangan * (Number(lokasi.harga) || 2000);
+                                else if (lokasi.nama === 'GAZEBO' && formData.isGazeboPackage) totalBiayaLokasi += 650000;
+                                else totalBiayaLokasi += getBiayaLokasi(lokasi.nama);
+                            });
+                            
+                            return (
+                                <>
+                                    <div className="flex justify-between items-center text-xs text-slate-500 font-bold uppercase tracking-wider">
+                                        <span>Tarif Sewa Lokasi:</span>
+                                        <span className="font-extrabold text-emerald-950">{formatRupiah(totalBiayaLokasi)}</span>
+                                    </div>
+                                    {formData.listrikTambahan && (
+                                        <div className="flex justify-between items-center text-xs text-slate-500 font-bold uppercase tracking-wider">
+                                            <span className="flex items-center"><Zap size={14} className="mr-1 text-amber-500" /> Listrik Tambahan:</span>
+                                            <span className="font-extrabold text-amber-600">{formatRupiah(100000)}</span>
+                                        </div>
+                                    )}
+                                    <div className="flex justify-between items-center text-sm pt-3 border-t border-slate-100">
+                                        <span className="font-extrabold text-emerald-950 uppercase tracking-wider">Total Tagihan:</span>
+                                        <span className="font-black text-emerald-700 text-xl">{formatRupiah(totalBiayaLokasi + (formData.listrikTambahan ? 100000 : 0))}</span>
+                                    </div>
+                                </>
+                            );
+                        })()}
                     </div>
 
                     <div>
@@ -2240,14 +2357,14 @@ Terima kasih.`;
                     <button
                       type="button"
                       form="booking-form"
-                      onClick={() => setBookingLokasi(null)}
+                      onClick={() => setIsCheckoutOpen(false)}
                       className="w-1/3 py-4 sm:py-3.5 text-sm font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-all duration-200 active:scale-95"
                     >Batal</button>
                     <button
                       type="submit"
                       form="booking-form"
                       className="w-2/3 py-4 sm:py-3.5 text-sm font-black text-white bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 rounded-2xl shadow-[0_8px_20px_-4px_rgba(16,185,129,0.3)] hover:shadow-[0_10px_25px_-4px_rgba(16,185,129,0.4)] transition-all duration-200 flex justify-center items-center active:scale-95"
-                    ><Save size={18} className="mr-2"/> Simpan Reservasi</button>
+                    ><Save size={18} className="mr-2"/> Proses {cartLokasi.length} Fasilitas</button>
                 </div>
             </div>
         </div>
@@ -2392,19 +2509,25 @@ Terima kasih.`;
                             key={fasilitas.id} 
                             onClick={(e) => { 
                                 e.stopPropagation(); 
-                                setBookingLokasi(fasilitas);
+                                const isSelected = cartLokasi.some(c => c.id === fasilitas.id);
+                                if (isSelected) setCartLokasi(cartLokasi.filter(c => c.id !== fasilitas.id));
+                                else setCartLokasi([...cartLokasi, fasilitas]);
                             }}
-                            className={`group relative rounded-2xl p-3 sm:p-3.5 flex flex-col justify-between min-h-[112px] sm:min-h-[115px] overflow-hidden cursor-pointer transition-all duration-300 border bg-white active:scale-[0.97] border-slate-100/80 hover:-translate-y-0.5 ${isLapangan ? 'hover:border-emerald-500/50 hover:shadow-[0_12px_24px_-8px_rgba(16,185,129,0.15)]' : 'hover:border-amber-500/50 hover:shadow-[0_12px_24px_-8px_rgba(245,158,11,0.15)]'}`}
+                            className={`group relative rounded-2xl p-3 sm:p-3.5 flex flex-col justify-between min-h-[112px] sm:min-h-[115px] overflow-hidden cursor-pointer transition-all duration-300 border active:scale-[0.97] ${cartLokasi.some(c => c.id === fasilitas.id) ? 'bg-emerald-50 border-emerald-500 shadow-md ring-2 ring-emerald-500/20' : 'bg-white border-slate-100/80 hover:-translate-y-0.5'} ${!cartLokasi.some(c => c.id === fasilitas.id) && isLapangan ? 'hover:border-emerald-500/50 hover:shadow-[0_12px_24px_-8px_rgba(16,185,129,0.15)]' : ''} ${!cartLokasi.some(c => c.id === fasilitas.id) && !isLapangan ? 'hover:border-amber-500/50 hover:shadow-[0_12px_24px_-8px_rgba(245,158,11,0.15)]' : ''}`}
                           >
                             {/* Decorative background gradients */}
                             <div className={`absolute -bottom-8 -right-8 w-16 h-16 ${isLapangan ? 'bg-emerald-50' : 'bg-amber-50'} rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 -z-10`}></div>
                             
                             <div className="flex items-start justify-between mb-2 pointer-events-none">
-                              <div className={`p-1.5 sm:p-2 rounded-xl shadow-sm transition-all duration-300 ${isLapangan ? 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white' : 'bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white'}`}>
+                              <div className={`p-1.5 sm:p-2 rounded-xl shadow-sm transition-all duration-300 ${cartLokasi.some(c => c.id === fasilitas.id) ? 'bg-emerald-500 text-white' : (isLapangan ? 'bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white' : 'bg-amber-50 text-amber-600 group-hover:bg-amber-600 group-hover:text-white')}`}>
                                 <IconComponent size={15} strokeWidth={2.5} />
                               </div>
-                              <div className="flex items-center justify-center w-4 h-4">
-                                <span className={`inline-flex rounded-full ${isLapangan ? 'w-2.5 h-2.5 bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.15)]' : 'w-2.5 h-2.5 bg-amber-500 shadow-[0_0_0_3px_rgba(245,158,11,0.15)]'}`}></span>
+                              <div className="flex items-center justify-center w-5 h-5">
+                                {cartLokasi.some(c => c.id === fasilitas.id) ? (
+                                    <CheckCircle2 className="text-emerald-500" size={18} />
+                                ) : (
+                                    <span className={`inline-flex rounded-full ${isLapangan ? 'w-2.5 h-2.5 bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.15)]' : 'w-2.5 h-2.5 bg-amber-500 shadow-[0_0_0_3px_rgba(245,158,11,0.15)]'}`}></span>
+                                )}
                               </div>
                             </div>
     
@@ -2413,8 +2536,8 @@ Terima kasih.`;
                             </div>
     
                             <div className="pointer-events-none w-full">
-                                <span className={`text-[8.5px] font-extrabold ${isLapangan ? 'text-emerald-600 group-hover:text-emerald-700' : 'text-amber-600 group-hover:text-amber-700'} uppercase tracking-widest flex items-center transition-colors`}>
-                                  Pesan <ChevronRight size={9} className="ml-0.5 transform group-hover:translate-x-0.5 transition-transform" />
+                                <span className={`text-[8.5px] font-extrabold ${cartLokasi.some(c => c.id === fasilitas.id) ? 'text-emerald-600' : (isLapangan ? 'text-emerald-600 group-hover:text-emerald-700' : 'text-amber-600 group-hover:text-amber-700')} uppercase tracking-widest flex items-center transition-colors`}>
+                                  {cartLokasi.some(c => c.id === fasilitas.id) ? 'Terpilih' : 'Pilih'} <ChevronRight size={9} className="ml-0.5 transform group-hover:translate-x-0.5 transition-transform" />
                                 </span>
                             </div>
                           </div>
@@ -2499,6 +2622,27 @@ Terima kasih.`;
                     </div>
                   )}
               </div>
+            )}
+            
+            {/* FLOATING CART BUTTON */}
+            {cartLokasi.length > 0 && !isCheckoutOpen && activeTab === 'reservasi' && (
+                <div className="fixed bottom-6 right-6 lg:bottom-10 lg:right-10 z-[49] animate-fade-in-up">
+                    <button 
+                        onClick={() => setIsCheckoutOpen(true)}
+                        className="bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white px-6 py-4 rounded-full shadow-[0_10px_25px_-5px_rgba(16,185,129,0.5)] flex items-center space-x-4 transition-all duration-300 hover:scale-105 active:scale-95 border-2 border-white/20 hover:border-white/40 group"
+                    >
+                        <div className="relative">
+                            <ShoppingCart size={24} className="group-hover:animate-bounce" />
+                            <span className="absolute -top-3 -right-3 bg-amber-500 text-white text-[11px] font-black w-6 h-6 flex items-center justify-center rounded-full border-2 border-white shadow-sm ring-2 ring-emerald-600">
+                                {cartLokasi.length}
+                            </span>
+                        </div>
+                        <div className="flex flex-col items-start border-l border-white/20 pl-4">
+                            <span className="text-[10px] font-bold text-emerald-100 uppercase tracking-widest mb-0.5 opacity-80">Checkout Sekarang</span>
+                            <span className="text-sm font-black leading-none">{cartLokasi.length} Fasilitas Terpilih</span>
+                        </div>
+                    </button>
+                </div>
             )}
             
             {activeTab === 'sewa' && (
