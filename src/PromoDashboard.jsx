@@ -1064,8 +1064,8 @@ export default function PromoDashboard({ onNavigate }) {
       )}
 
       {/* Header */}
-      <div className="bg-white px-8 py-5 border-b border-emerald-100 flex items-center justify-between shadow-sm z-10">
-        <div className="flex items-center gap-4">
+      <div className="bg-white px-4 lg:px-8 py-4 lg:py-5 border-b border-emerald-100 flex flex-col lg:flex-row items-start lg:items-center justify-between shadow-sm z-10 gap-4">
+        <div className="flex items-center gap-3 lg:gap-4">
           <button 
             onClick={() => onNavigate && onNavigate('dashboard')} 
             className="p-2 text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 rounded-xl transition-all"
@@ -1089,16 +1089,16 @@ export default function PromoDashboard({ onNavigate }) {
         </button>
       </div>
 
-      <div className="flex-1 overflow-auto p-8 relative">
+      <div className="flex-1 overflow-auto p-4 lg:p-8 relative">
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
             <Loader2 className="animate-spin text-emerald-500" size={40} />
           </div>
         ) : (
-          <div className="flex gap-8 max-w-7xl mx-auto h-full items-start">
+          <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 max-w-7xl mx-auto lg:h-full items-start w-full">
             
             {/* Calendar Section */}
-            <div className="flex-1 bg-white rounded-3xl shadow-lg border border-emerald-100 p-6 flex flex-col h-full overflow-hidden">
+            <div className="flex-1 w-full bg-white rounded-3xl shadow-lg border border-emerald-100 p-4 lg:p-6 flex flex-col min-h-[600px] lg:h-full lg:overflow-hidden">
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <h2 className="text-xl font-bold text-emerald-900">Jadwal TMR</h2>
@@ -1204,7 +1204,7 @@ export default function PromoDashboard({ onNavigate }) {
             </div>
 
             {/* Sidebar Details */}
-            <div className="w-[400px] h-full flex flex-col">
+            <div className="w-full lg:w-[400px] h-auto lg:h-full flex flex-col shrink-0 min-h-[400px] pb-10 lg:pb-0">
               {renderSidebar()}
             </div>
           </div>
