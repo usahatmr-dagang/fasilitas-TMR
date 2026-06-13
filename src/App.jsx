@@ -36,7 +36,8 @@ import {
   Film,
   Camera,
   Loader2,
-  Pencil
+  Pencil,
+  ShoppingCart
 } from 'lucide-react';
 import { db, storage, auth } from './firebase';
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, setDoc } from 'firebase/firestore';
