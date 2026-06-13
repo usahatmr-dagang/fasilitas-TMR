@@ -40,10 +40,26 @@ export default function PublicAvailability() {
   useEffect(() => {
     const unsubLokasi = onSnapshot(collection(db, 'masterLokasi'), (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setMasterLokasi(data.length > 0 ? data : defaultDataLokasi);
+      let finalData = data.length > 0 ? data : defaultDataLokasi;
+      
+      finalData.sort((a, b) => {
+          const urutanA = a.urutan ?? 999;
+          const urutanB = b.urutan ?? 999;
+          
+          if (urutanA !== urutanB) {
+              return urutanA - urutanB;
+          }
+
+          if (a.tipe !== b.tipe) {
+              return a.tipe === 'pendopo' ? -1 : 1;
+          }
+          return (a.nama || '').localeCompare(b.nama || '');
+      });
+
+      setMasterLokasi([...finalData]);
     }, (error) => {
       console.error("Gagal memuat master lokasi:", error);
-      setMasterLokasi(defaultDataLokasi);
+      setMasterLokasi([...defaultDataLokasi]);
     });
 
     const unsubSewa = onSnapshot(collection(db, 'publicSewaList'), (snapshot) => {
