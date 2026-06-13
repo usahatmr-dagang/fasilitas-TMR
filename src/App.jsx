@@ -47,6 +47,7 @@ import Login from './Login';
 import MainDashboard from './MainDashboard';
 import PromoDashboard from './PromoDashboard';
 import PublicPromoForm from './PublicPromoForm';
+import MigrateData from './MigrateData';
 
 // --- DATA LOKASI ---
 const defaultDataLokasi = [
@@ -119,6 +120,7 @@ export default function App() {
   // Routing & Authentication State
   const isPortalRoute = window.location.pathname === '/portal';
   const isPromoRoute = window.location.pathname === '/promo';
+  const isMigrateRoute = window.location.pathname === '/migrate';
   const [adminUser, setAdminUser] = useState(null);
   const [activeApp, setActiveApp] = useState('dashboard'); // 'dashboard', 'fasilitas'
   
@@ -2170,6 +2172,8 @@ Terima kasih.`;
 
   if (isAuthChecking) return <div className="h-screen w-full flex items-center justify-center bg-[#F4F7F4] text-emerald-800 font-bold">Memeriksa Akses...</div>;
   
+  if (isMigrateRoute) return <MigrateData />;
+
   if (isPromoRoute) return <PublicPromoForm />;
 
   if (!adminUser && !isPortalRoute) {
