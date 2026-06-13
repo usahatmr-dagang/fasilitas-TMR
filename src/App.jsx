@@ -214,7 +214,7 @@ export default function App() {
   
   const [bookingLokasi, setBookingLokasi] = useState(null);
   const [formData, setFormData] = useState({
-    namaRombongan: '', picRombongan: '', noWa: '', picKantor: '', keterangan: '', statusPembayaran: 'Belum Transfer', listrikTambahan: false, luasLahan: 50
+    namaRombongan: '', picRombongan: '', noWa: '', picKantor: '', keterangan: '', catatan: '', statusPembayaran: 'Belum Transfer', listrikTambahan: false, luasLahan: 50
   });
 
   const [selectedRecord, setSelectedRecord] = useState(null); 
@@ -437,6 +437,7 @@ export default function App() {
       no_hp_penyewa: formData.noWa || '-',
       pic_kantor: formData.picKantor || '-',
       keterangan: formData.keterangan || '-',
+      catatan: formData.catatan || '-',
       status_pembayaran: formData.statusPembayaran || 'Belum Transfer',
       listrik_tambahan: formData.listrikTambahan || false,
       akses_upload_listrik: formData.listrikTambahan ? true : false, 
@@ -461,7 +462,7 @@ export default function App() {
       });
 
       setBookingLokasi(null);
-      setFormData({ namaRombongan: '', picRombongan: '', noWa: '', picKantor: '', keterangan: '', statusPembayaran: 'Belum Transfer', listrikTambahan: false, luasLahan: 50 });
+      setFormData({ namaRombongan: '', picRombongan: '', noWa: '', picKantor: '', keterangan: '', catatan: '', statusPembayaran: 'Belum Transfer', listrikTambahan: false, luasLahan: 50 });
       handleOpenDetail(newBooking);
       showToast('Reservasi baru berhasil ditambahkan!');
     } catch (error) {
@@ -1587,6 +1588,8 @@ Terima kasih.`;
                         <hr className="border-slate-100" />
                         <div><p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider mb-1">Keterangan Tambahan</p><p className="font-medium text-slate-600 text-xs bg-slate-50 p-2.5 rounded-xl border border-slate-100">{selectedRecord.keterangan || '-'}</p></div>
                         <hr className="border-slate-100" />
+                        <div><p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider mb-1">Catatan Tambahan Sewa (Tenda, Kursi, dll)</p><p className="font-medium text-slate-600 text-xs bg-slate-50 p-2.5 rounded-xl border border-slate-100">{selectedRecord.catatan || '-'}</p></div>
+                        <hr className="border-slate-100" />
                         
                         <div className="grid grid-cols-2 gap-4 pt-1">
                             <div><p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider mb-1">Biaya Lokasi</p><p className="font-bold text-emerald-950 text-xs">{formatRupiah(viewBiayaLokasi)}</p></div>
@@ -1727,7 +1730,8 @@ Terima kasih.`;
                              {picList.map((pic, idx) => <option key={pic.id || idx} value={pic.nama}>{pic.nama}</option>)}
                          </select>
                       </div>
-                      <div><label className="block text-[10px] font-extrabold text-emerald-950 uppercase tracking-wider mb-1">Keterangan</label><textarea value={editFormData.keterangan || ''} onChange={e => setEditFormData({...editFormData, keterangan: e.target.value})} rows="3" className="w-full px-4 py-2.5 border border-slate-200 rounded-2xl text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 outline-none font-semibold text-emerald-950 bg-white" /></div>
+                      <div><label className="block text-[10px] font-extrabold text-emerald-950 uppercase tracking-wider mb-1">Keterangan</label><textarea value={editFormData.keterangan || ''} onChange={e => setEditFormData({...editFormData, keterangan: e.target.value})} rows="2" className="w-full px-4 py-2.5 border border-slate-200 rounded-2xl text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 outline-none font-semibold text-emerald-950 bg-white" /></div>
+                      <div><label className="block text-[10px] font-extrabold text-emerald-950 uppercase tracking-wider mb-1">Catatan Tambahan Sewa (Tenda, Kursi, dll)</label><textarea value={editFormData.catatan || ''} onChange={e => setEditFormData({...editFormData, catatan: e.target.value})} rows="2" className="w-full px-4 py-2.5 border border-slate-200 rounded-2xl text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 outline-none font-semibold text-emerald-950 bg-white" placeholder="Contoh: Bawa tenda 3x3..." /></div>
                       <div className="flex space-x-2 pt-4 border-t border-slate-100">
                           <button type="button" onClick={() => handleOpenDetail(selectedRecord)} className="flex-1 px-4 py-3 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-all duration-200">Batal</button>
                           <button type="submit" className="flex-1 px-4 py-3 text-sm font-black text-white bg-amber-500 hover:bg-amber-600 rounded-2xl shadow-[0_4px_12px_rgba(245,158,11,0.2)] hover:shadow-[0_6px_16px_rgba(245,158,11,0.3)] transition-all duration-200">Simpan Perubahan</button>
@@ -2198,6 +2202,11 @@ Terima kasih.`;
                         </div>
                     </div>
                     
+                    <div>
+                        <label className="block text-[10px] font-extrabold text-emerald-950 uppercase tracking-wider mb-1.5">Catatan Tambahan (Bawa Tenda, Kursi, dll)</label>
+                        <textarea value={formData.catatan} onChange={(e)=>setFormData({...formData, catatan: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-2xl text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 outline-none font-semibold text-emerald-950 bg-white shadow-sm placeholder:text-slate-400" rows="2" placeholder="Catat jika rombongan bawa tenda / kursi..." />
+                    </div>
+
                     <div className={`border rounded-3xl p-4 shadow-sm transition-all duration-300 cursor-pointer ${formData.listrikTambahan ? 'border-amber-300 bg-amber-50/20' : 'border-slate-100 bg-white hover:border-emerald-100'}`}>
                         <label className="flex items-center cursor-pointer select-none">
                             <input type="checkbox" checked={formData.listrikTambahan} onChange={(e)=>setFormData({...formData, listrikTambahan: e.target.checked})} className="w-5 h-5 text-amber-500 rounded border-slate-350 focus:ring-amber-500 cursor-pointer" />
