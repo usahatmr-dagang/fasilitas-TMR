@@ -2598,80 +2598,117 @@ Terima kasih.`;
                   </div>
 
                   {/* Tersewa Section */}
-                  {fasilitasHarian.filter(f => f.status !== 'Tersedia').length > 0 && (
-                    <div>
-                      <h3 className="text-sm font-extrabold text-emerald-950 mb-3 flex items-center">
-                        <span className="w-2 h-2 rounded-full bg-rose-500 mr-2"></span> Fasilitas Tersewa / Ditutup
-                      </h3>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 gap-3 sm:gap-3.5 relative z-10 opacity-90">
-                        {fasilitasHarian.filter(f => f.status !== 'Tersedia').map(fasilitas => {
-                          const { icon: IconComponent, color, bg } = getIconData(fasilitas.tipe);
-                          const isDitutup = fasilitas.bookingInfo?.status_pembayaran === 'Ditutup';
-                          const isLunas = fasilitas.bookingInfo?.status_pembayaran === 'Sudah Transfer' || fasilitas.bookingInfo?.status_pembayaran === 'Sudah Lunas';
-                          const isMenungguVerifikasi = fasilitas.bookingInfo?.status_pembayaran === 'Menunggu Verifikasi';
-                          const hasBuktiListrik = fasilitas.bookingInfo?.bukti_transfer_listrik !== null && fasilitas.bookingInfo?.bukti_transfer_listrik !== undefined;
-                          const isLapangan = fasilitas.tipe === 'lapangan';
+                  {(() => {
+                    const unavailable = fasilitasHarian.filter(f => f.status !== 'Tersedia');
+                    if (unavailable.length === 0) return null;
+                    
+                    const listSudahBayar = unavailable.filter(f => f.bookingInfo?.status_pembayaran === 'Sudah Transfer' || f.bookingInfo?.status_pembayaran === 'Sudah Lunas' || f.bookingInfo?.status_pembayaran === 'Menunggu Verifikasi');
+                    const listBelumBayar = unavailable.filter(f => !f.bookingInfo || f.bookingInfo?.status_pembayaran === 'Belum Transfer');
+                    const listDitutup = unavailable.filter(f => f.bookingInfo?.status_pembayaran === 'Ditutup');
+
+                    const renderCard = (fasilitas) => {
+                      const { icon: IconComponent, color, bg } = getIconData(fasilitas.tipe);
+                      const isDitutup = fasilitas.bookingInfo?.status_pembayaran === 'Ditutup';
+                      const isLunas = fasilitas.bookingInfo?.status_pembayaran === 'Sudah Transfer' || fasilitas.bookingInfo?.status_pembayaran === 'Sudah Lunas';
+                      const isMenungguVerifikasi = fasilitas.bookingInfo?.status_pembayaran === 'Menunggu Verifikasi';
+                      const hasBuktiListrik = fasilitas.bookingInfo?.bukti_transfer_listrik !== null && fasilitas.bookingInfo?.bukti_transfer_listrik !== undefined;
+                      const isLapangan = fasilitas.tipe === 'lapangan';
+                      
+                      return (
+                        <div 
+                          key={fasilitas.id} 
+                          onClick={(e) => { 
+                              e.stopPropagation(); 
+                              if (fasilitas.bookingInfo) handleOpenDetail(fasilitas.bookingInfo);
+                          }}
+                          className={`group relative rounded-2xl p-3 sm:p-3.5 flex flex-col justify-between min-h-[112px] sm:min-h-[115px] overflow-hidden cursor-pointer transition-all duration-300 border bg-white active:scale-[0.97] ${isDitutup ? 'bg-slate-50/80 border-slate-200 opacity-60' : 'border-rose-100 hover:border-rose-400/50 hover:shadow-[0_12px_24px_-8px_rgba(239,68,68,0.15)] hover:-translate-y-0.5'}`}
+                        >
+                          {!isDitutup && <div className="absolute top-0 right-0 w-12 h-12 bg-rose-50/50 rounded-bl-full -z-10 pointer-events-none"></div>}
                           
-                          return (
-                            <div 
-                              key={fasilitas.id} 
-                              onClick={(e) => { 
-                                  e.stopPropagation(); 
-                                  if (fasilitas.bookingInfo) handleOpenDetail(fasilitas.bookingInfo);
-                              }}
-                              className={`group relative rounded-2xl p-3 sm:p-3.5 flex flex-col justify-between min-h-[112px] sm:min-h-[115px] overflow-hidden cursor-pointer transition-all duration-300 border bg-white active:scale-[0.97] ${isDitutup ? 'bg-slate-50/80 border-slate-200 opacity-60' : 'border-rose-100 hover:border-rose-400/50 hover:shadow-[0_12px_24px_-8px_rgba(239,68,68,0.15)] hover:-translate-y-0.5'}`}
-                            >
-                              {!isDitutup && <div className="absolute top-0 right-0 w-12 h-12 bg-rose-50/50 rounded-bl-full -z-10 pointer-events-none"></div>}
-                              
-                              {!isDitutup && isLunas && (
-                                  <div className="absolute top-0 right-0 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white text-[7px] font-black px-2 py-0.5 rounded-bl-lg shadow-sm z-20 flex items-center pointer-events-none tracking-wide">
-                                      <CheckCircle2 size={8} className="mr-0.5"/> LUNAS
-                                  </div>
-                              )}
-                              
-                              {!isDitutup && isMenungguVerifikasi && (
-                                  <div className="absolute top-0 right-0 bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-[7px] font-black px-2 py-0.5 rounded-bl-lg shadow-sm z-20 flex items-center animate-pulse pointer-events-none tracking-wide">
-                                      <AlertCircle size={8} className="mr-0.5 animate-bounce"/> VERIFIKASI
-                                  </div>
-                              )}
-      
-                              {!isDitutup && hasBuktiListrik && (
-                                  <div className="absolute top-0 left-0 bg-gradient-to-r from-amber-400 to-amber-500 text-white text-[7px] font-black px-2 py-0.5 rounded-br-lg shadow-sm z-20 flex items-center pointer-events-none tracking-wide">
-                                      <Zap size={8} className="mr-0.5"/> LISTRIK
-                                  </div>
-                              )}
-      
-                              <div className="flex items-start justify-between mb-2 pointer-events-none">
-                                <div className={`p-1.5 sm:p-2 rounded-xl shadow-sm transition-all duration-300 ${isDitutup ? 'bg-slate-200 text-slate-500' : 'bg-rose-50 text-rose-500'}`}>
-                                  <IconComponent size={15} strokeWidth={2.5} />
-                                </div>
-                                
-                                <div className="flex items-center justify-center w-4 h-4">
-                                  {!isDitutup && <span className="inline-flex rounded-full w-2 h-2 bg-rose-500 animate-ping opacity-75"></span>}
-                                  {isDitutup && <span className="inline-flex rounded-full w-2 h-2 bg-slate-300"></span>}
-                                </div>
+                          {!isDitutup && isLunas && (
+                              <div className="absolute top-0 right-0 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white text-[7px] font-black px-2 py-0.5 rounded-bl-lg shadow-sm z-20 flex items-center pointer-events-none tracking-wide">
+                                  <CheckCircle2 size={8} className="mr-0.5"/> LUNAS
                               </div>
-      
-                              <div className="mt-auto mb-1 pointer-events-none">
-                                <h4 className={`font-bold text-[11px] leading-tight line-clamp-2 transition-colors duration-300 ${isDitutup ? 'text-slate-500' : 'text-rose-950'}`}>{fasilitas.nama}</h4>
+                          )}
+                          
+                          {!isDitutup && isMenungguVerifikasi && (
+                              <div className="absolute top-0 right-0 bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-[7px] font-black px-2 py-0.5 rounded-bl-lg shadow-sm z-20 flex items-center animate-pulse pointer-events-none tracking-wide">
+                                  <AlertCircle size={8} className="mr-0.5 animate-bounce"/> VERIFIKASI
                               </div>
-      
-                              <div className="pointer-events-none w-full">
-                                {isDitutup ? (
-                                    <span className="text-[8px] font-extrabold text-slate-400 uppercase tracking-widest flex items-center"><Lock size={8} className="mr-0.5"/> Maintenance</span>
-                                ) : (
-                                    <div className="bg-rose-50/40 border border-rose-100/50 rounded-xl p-1.5 mt-0.5 w-full overflow-hidden">
-                                        <span className="text-[8.5px] font-extrabold text-rose-900 block truncate">{fasilitas.bookingInfo?.nama_penyewa}</span>
-                                        <span className="text-[8px] font-medium text-rose-600/80 block truncate">PIC: {fasilitas.bookingInfo?.pic_rombongan}</span>
-                                    </div>
-                                )}
+                          )}
+
+                          {!isDitutup && hasBuktiListrik && (
+                              <div className="absolute top-0 left-0 bg-gradient-to-r from-amber-400 to-amber-500 text-white text-[7px] font-black px-2 py-0.5 rounded-br-lg shadow-sm z-20 flex items-center pointer-events-none tracking-wide">
+                                  <Zap size={8} className="mr-0.5"/> LISTRIK
                               </div>
+                          )}
+
+                          <div className="flex items-start justify-between mb-2 pointer-events-none">
+                            <div className={`p-1.5 sm:p-2 rounded-xl shadow-sm transition-all duration-300 ${isDitutup ? 'bg-slate-200 text-slate-500' : 'bg-rose-50 text-rose-500'}`}>
+                              <IconComponent size={15} strokeWidth={2.5} />
                             </div>
-                          );
-                        })}
+                            
+                            <div className="flex items-center justify-center w-4 h-4">
+                              {!isDitutup && <span className="inline-flex rounded-full w-2 h-2 bg-rose-500 animate-ping opacity-75"></span>}
+                              {isDitutup && <span className="inline-flex rounded-full w-2 h-2 bg-slate-300"></span>}
+                            </div>
+                          </div>
+
+                          <div className="mt-auto mb-1 pointer-events-none">
+                            <h4 className={`font-bold text-[11px] leading-tight line-clamp-2 transition-colors duration-300 ${isDitutup ? 'text-slate-500' : 'text-rose-950'}`}>{fasilitas.nama}</h4>
+                          </div>
+
+                          <div className="pointer-events-none w-full">
+                            {isDitutup ? (
+                                <span className="text-[8px] font-extrabold text-slate-400 uppercase tracking-widest flex items-center"><Lock size={8} className="mr-0.5"/> Maintenance</span>
+                            ) : (
+                                <div className="bg-rose-50/40 border border-rose-100/50 rounded-xl p-1.5 mt-0.5 w-full overflow-hidden">
+                                    <span className="text-[8.5px] font-extrabold text-rose-900 block truncate">{fasilitas.bookingInfo?.nama_penyewa}</span>
+                                    <span className="text-[8px] font-medium text-rose-600/80 block truncate">PIC: {fasilitas.bookingInfo?.pic_rombongan}</span>
+                                </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    };
+
+                    return (
+                      <div className="space-y-6">
+                        {listSudahBayar.length > 0 && (
+                          <div>
+                            <h3 className="text-sm font-extrabold text-emerald-950 mb-3 flex items-center">
+                              <span className="w-2 h-2 rounded-full bg-emerald-500 mr-2"></span> Fasilitas Tersewa (Sudah Bayar / Verifikasi)
+                            </h3>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 gap-3 sm:gap-3.5 relative z-10 opacity-90">
+                              {listSudahBayar.map(renderCard)}
+                            </div>
+                          </div>
+                        )}
+
+                        {listBelumBayar.length > 0 && (
+                          <div>
+                            <h3 className="text-sm font-extrabold text-emerald-950 mb-3 flex items-center">
+                              <span className="w-2 h-2 rounded-full bg-rose-500 mr-2"></span> Fasilitas Tersewa (Belum Bayar)
+                            </h3>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 gap-3 sm:gap-3.5 relative z-10 opacity-90">
+                              {listBelumBayar.map(renderCard)}
+                            </div>
+                          </div>
+                        )}
+
+                        {listDitutup.length > 0 && (
+                          <div>
+                            <h3 className="text-sm font-extrabold text-emerald-950 mb-3 flex items-center">
+                              <span className="w-2 h-2 rounded-full bg-slate-500 mr-2"></span> Fasilitas Ditutup (Maintenance)
+                            </h3>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 gap-3 sm:gap-3.5 relative z-10 opacity-60">
+                              {listDitutup.map(renderCard)}
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
               </div>
             )}
             
