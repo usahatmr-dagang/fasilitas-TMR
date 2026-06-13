@@ -180,14 +180,17 @@ export default function App() {
     if (!namaLokasi) return 0;
     const lokasiObj = masterLokasi.find(l => l.nama === namaLokasi);
     
+    const isLapangan = lokasiObj?.tipe === 'lapangan' || (!lokasiObj && namaLokasi.startsWith('LAP '));
+
     let baseHarga = 250000;
     if (namaLokasi === 'PENDOPO TSA 1') baseHarga = 500000;
     if (namaLokasi === 'AULA SERBAGUNA') baseHarga = 2000000;
-    if (lokasiObj?.tipe === 'lapangan' || (!lokasiObj && namaLokasi.startsWith('LAP '))) baseHarga = 2000;
+    if (isLapangan) baseHarga = 2000;
     
-    const hargaSewa = (lokasiObj && lokasiObj.harga) ? Number(lokasiObj.harga) : baseHarga;
+    let hargaSewa = (lokasiObj && lokasiObj.harga) ? Number(lokasiObj.harga) : baseHarga;
+    if (isLapangan && hargaSewa > 50000) hargaSewa = 2000; // Force 2000 per meter jika data master kotor
 
-    if (lokasiObj?.tipe === 'lapangan' || (!lokasiObj && namaLokasi.startsWith('LAP '))) {
+    if (isLapangan) {
         const luasValid = Math.max(Number(luasLahan) || 50, 50);
         return luasValid * hargaSewa;
     }
@@ -443,7 +446,8 @@ export default function App() {
         let luas = null;
         if (lokasi.tipe === 'lapangan') {
             luas = luas_per_lapangan;
-            biaya = luas * (Number(lokasi.harga) || 2000);
+            const hargaM2 = (Number(lokasi.harga) > 0 && Number(lokasi.harga) <= 50000) ? Number(lokasi.harga) : 2000;
+            biaya = luas * hargaM2;
         } else if (lokasi.nama === 'GAZEBO' && formData.isGazeboPackage) {
             biaya = 650000;
         } else {
@@ -2264,7 +2268,10 @@ Terima kasih.`;
                             const luas_per_lapangan = isLapangan ? (luas_lahan_total / jumlahLapangan) : null;
                             let totalBiayaLokasi = 0;
                             cartLokasi.forEach(lokasi => {
-                                if (lokasi.tipe === 'lapangan') totalBiayaLokasi += luas_per_lapangan * (Number(lokasi.harga) || 2000);
+                                if (lokasi.tipe === 'lapangan') {
+                                    const hargaM2 = (Number(lokasi.harga) > 0 && Number(lokasi.harga) <= 50000) ? Number(lokasi.harga) : 2000;
+                                    totalBiayaLokasi += luas_per_lapangan * hargaM2;
+                                }
                                 else if (lokasi.nama === 'GAZEBO' && formData.isGazeboPackage) totalBiayaLokasi += 650000;
                                 else totalBiayaLokasi += getBiayaLokasi(lokasi.nama);
                             });
