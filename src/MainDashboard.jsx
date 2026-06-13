@@ -2,6 +2,7 @@ import React from 'react';
 import { Tent, Tag, FileText, LogOut } from 'lucide-react';
 import { auth } from './firebase';
 import { signOut } from 'firebase/auth';
+import MigrateData from './MigrateData';
 
 export default function MainDashboard({ onNavigate }) {
   const handleLogout = () => {
@@ -60,6 +61,10 @@ export default function MainDashboard({ onNavigate }) {
           <h2 className="text-xl font-black text-slate-800 mb-2">Dispensasi TMR</h2>
           <p className="text-slate-500/80 text-sm font-semibold">Pengelolaan surat permohonan keringanan dan dispensasi.</p>
         </div>
+      </div>
+
+      <div className="w-full max-w-5xl mt-12">
+        <MigrateData />
       </div>
     </div>
   );
