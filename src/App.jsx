@@ -2222,12 +2222,26 @@ Terima kasih.`;
                         <label className="block text-xs font-extrabold text-emerald-950 uppercase tracking-wider mb-2">Fasilitas yang Dipesan</label>
                         <div className="space-y-1.5 max-h-32 overflow-y-auto pr-2">
                             {cartLokasi.map((item, idx) => (
-                                <div key={idx} className="flex justify-between items-center text-xs font-bold bg-slate-50 p-2 rounded-lg border border-slate-100">
-                                    <span className="text-emerald-800 flex items-center">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mr-2"></span>
-                                        {item.nama}
+                                <div key={idx} className="flex justify-between items-center text-xs font-bold bg-slate-50 p-2 rounded-lg border border-slate-100 group">
+                                    <span className="text-emerald-800 flex items-center flex-1">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mr-2 shrink-0"></span>
+                                        <span className="truncate pr-2">{item.nama}</span>
                                     </span>
-                                    <span className="text-slate-500">{item.tipe === 'lapangan' ? 'TBD' : formatRupiah(getBiayaLokasi(item.nama))}</span>
+                                    <div className="flex items-center shrink-0">
+                                        <span className="text-slate-500">{item.tipe === 'lapangan' ? 'TBD' : formatRupiah(getBiayaLokasi(item.nama))}</span>
+                                        <button 
+                                            type="button" 
+                                            onClick={() => {
+                                                const newCart = cartLokasi.filter(l => l.nama !== item.nama);
+                                                setCartLokasi(newCart);
+                                                if(newCart.length === 0) setIsCheckoutOpen(false);
+                                            }}
+                                            className="ml-2.5 p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 bg-white border border-slate-200 rounded-lg transition-all shadow-[0_2px_4px_rgba(0,0,0,0.02)] active:scale-95"
+                                            title="Hapus fasilitas"
+                                        >
+                                            <Trash2 size={12} className="stroke-[2.5]" />
+                                        </button>
+                                    </div>
                                 </div>
                             ))}
                         </div>
@@ -2359,19 +2373,30 @@ Terima kasih.`;
 
                 {/* Sticky action footer — always visible, never behind bottom nav */}
                 <div
-                  className="shrink-0 bg-white border-t border-slate-100 px-4 sm:px-6 pt-4 flex space-x-3"
+                  className="shrink-0 bg-white border-t border-slate-100 px-4 sm:px-6 pt-4 flex space-x-2 sm:space-x-3"
                   style={{ paddingBottom: 'max(1rem, calc(0.75rem + env(safe-area-inset-bottom, 0px)))' }}
                 >
                     <button
                       type="button"
-                      form="booking-form"
+                      onClick={() => {
+                          setCartLokasi([]);
+                          setIsCheckoutOpen(false);
+                          setFormData({ namaRombongan: '', picRombongan: '', noWa: '', picKantor: '', keterangan: '', catatan: '', statusPembayaran: 'Belum Transfer', listrikTambahan: false, luasLahan: 50, isGazeboPackage: false });
+                      }}
+                      className="w-1/5 sm:w-auto px-0 sm:px-4 py-4 sm:py-3.5 text-xs sm:text-sm font-bold text-rose-500 bg-rose-50 hover:bg-rose-100 rounded-2xl transition-all duration-200 active:scale-95 flex items-center justify-center flex-col sm:flex-row gap-1"
+                      title="Bersihkan Formulir & Keranjang"
+                    >
+                        <Trash2 size={16} /> <span className="hidden sm:inline">Clear</span>
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => setIsCheckoutOpen(false)}
-                      className="w-1/3 py-4 sm:py-3.5 text-sm font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-all duration-200 active:scale-95"
+                      className="w-auto flex-1 py-4 sm:py-3.5 text-sm font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-all duration-200 active:scale-95"
                     >Batal</button>
                     <button
                       type="submit"
                       form="booking-form"
-                      className="w-2/3 py-4 sm:py-3.5 text-sm font-black text-white bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 rounded-2xl shadow-[0_8px_20px_-4px_rgba(16,185,129,0.3)] hover:shadow-[0_10px_25px_-4px_rgba(16,185,129,0.4)] transition-all duration-200 flex justify-center items-center active:scale-95"
+                      className="w-auto flex-[2] py-4 sm:py-3.5 text-sm font-black text-white bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 rounded-2xl shadow-[0_8px_20px_-4px_rgba(16,185,129,0.3)] hover:shadow-[0_10px_25px_-4px_rgba(16,185,129,0.4)] transition-all duration-200 flex justify-center items-center active:scale-95"
                     ><Save size={18} className="mr-2"/> Proses {cartLokasi.length} Fasilitas</button>
                 </div>
             </div>
