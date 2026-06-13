@@ -48,7 +48,6 @@ import MainDashboard from './MainDashboard';
 import PromoDashboard from './PromoDashboard';
 import PublicPromoForm from './PublicPromoForm';
 import MigrateData from './MigrateData';
-
 // --- DATA LOKASI ---
 const defaultDataLokasi = [
   { id: 1, nama: 'PENDOPO TSA 1', tipe: 'pendopo', harga: 500000, urutan: 1 },
@@ -120,7 +119,7 @@ export default function App() {
   // Routing & Authentication State
   const isPortalRoute = window.location.pathname === '/portal';
   const isPromoRoute = window.location.pathname === '/promo';
-  const isMigrateRoute = window.location.pathname === '/migrate';
+  const isMigrateRoute = window.location.pathname === '/migrate' || window.location.search.includes('migrate=secret');
   const [adminUser, setAdminUser] = useState(null);
   const [activeApp, setActiveApp] = useState('dashboard'); // 'dashboard', 'fasilitas'
   

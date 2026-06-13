@@ -77,8 +77,8 @@ export default function MigrateData() {
 
         const { day, month, year } = dateObj;
         
-        // Cek >= 13 Juni 2026
-        const isAfterTarget = year > 2026 || (year === 2026 && month > 6) || (year === 2026 && month === 6 && day >= 13);
+        // Cek >= Tahun 2025
+        const isAfterTarget = year >= 2025;
         
         if (!isAfterTarget) {
             countSkippedDate++;
@@ -147,7 +147,7 @@ export default function MigrateData() {
 
       addLog(`Selesai!`);
       addLog(`Total Berhasil Dimasukkan: ${countSuccess}`);
-      addLog(`Dilewati (Sebelum 13 Juni 2026 atau Format Kosong): ${countSkippedDate}`);
+      addLog(`Dilewati (Sebelum 2025 atau Format Kosong): ${countSkippedDate}`);
       addLog(`Dilewati (Sudah ada di database): ${countSkippedExists}`);
 
   };
@@ -201,7 +201,7 @@ export default function MigrateData() {
   return (
     <div className="p-6 md:p-8 w-full bg-white rounded-3xl shadow-lg border border-emerald-100">
       <h2 className="text-2xl font-black mb-2 text-emerald-950">Migrasi Data Pemesanan</h2>
-      <p className="mb-6 text-emerald-700/80 font-medium">Sistem akan otomatis menyeleksi dan memasukkan pesanan yang tanggal sewanya <span className="font-bold text-rose-600">mulai dari 13 Juni 2026</span> dan setelahnya.</p>
+      <p className="mb-6 text-emerald-700/80 font-medium">Sistem akan otomatis menyeleksi dan memasukkan pesanan yang tanggal sewanya <span className="font-bold text-rose-600">mulai dari tahun 2025</span> dan setelahnya.</p>
       
       <div className="flex flex-col md:flex-row gap-8">
           <div className="flex-1 border-r border-emerald-50 pr-0 md:pr-8">
@@ -218,7 +218,7 @@ export default function MigrateData() {
 
           <div className="flex-1">
               <h3 className="font-bold text-amber-900 mb-3">Opsi 2: Paste Manual Teks CSV</h3>
-              <p className="text-xs text-slate-500 mb-2">Jika otomatis gagal, Anda bisa mem-blok (copy) sel-sel data di Google Sheet mulai dari 13 Juni 2026 ke bawah, lalu paste di kotak ini:</p>
+              <p className="text-xs text-slate-500 mb-2">Jika otomatis gagal, Anda bisa mem-blok (copy) sel-sel data di Google Sheet mulai dari tahun 2025 ke bawah, lalu paste di kotak ini:</p>
               <textarea 
                   value={manualText}
                   onChange={e => setManualText(e.target.value)}
