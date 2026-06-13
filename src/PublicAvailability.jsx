@@ -112,13 +112,15 @@ export default function PublicAvailability() {
                       {fas.isBooked ? <><AlertCircle size={12} className="mr-1.5"/> DISEWA</> : <><CheckCircle2 size={12} className="mr-1.5"/> TERSEDIA</>}
                   </div>
                   
-                  <button 
-                    onClick={() => handleOpenMedia(fas)}
-                    className="p-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center bg-blue-50 hover:bg-blue-100 text-blue-700"
-                    title="Lihat Foto & Video"
-                  >
-                      <Image size={16} />
-                  </button>
+                  {hasMedia && (
+                      <button 
+                        onClick={() => handleOpenMedia(fas)}
+                        className="px-3 py-1.5 rounded-xl text-[10px] font-black transition-all flex items-center justify-center bg-blue-50 hover:bg-blue-100 text-blue-700 uppercase tracking-wider"
+                        title="Lihat Foto & Video"
+                      >
+                          <Image size={12} className="mr-1.5" /> FOTO/VIDEO
+                      </button>
+                  )}
               </div>
           </div>
       );
