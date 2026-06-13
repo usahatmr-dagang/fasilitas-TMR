@@ -48,6 +48,7 @@ import MainDashboard from './MainDashboard';
 import PromoDashboard from './PromoDashboard';
 import PublicPromoForm from './PublicPromoForm';
 import MigrateData from './MigrateData';
+import SyncPembayaran from './SyncPembayaran';
 // --- DATA LOKASI ---
 const defaultDataLokasi = [
   { id: 1, nama: 'PENDOPO TSA 1', tipe: 'pendopo', harga: 500000, urutan: 1 },
@@ -120,6 +121,7 @@ export default function App() {
   const isPortalRoute = window.location.pathname === '/portal';
   const isPromoRoute = window.location.pathname === '/promo';
   const isMigrateRoute = window.location.pathname === '/migrate' || window.location.search.includes('migrate=secret');
+  const isSyncRoute = window.location.search.includes('sync=secret');
   const [adminUser, setAdminUser] = useState(null);
   const [activeApp, setActiveApp] = useState('dashboard'); // 'dashboard', 'fasilitas'
   
@@ -131,6 +133,11 @@ export default function App() {
   const [isAuthChecking, setIsAuthChecking] = useState(true);
 
   useEffect(() => {
+    // Secret Route
+    if (window.location.search.includes('migrate=secret') || window.location.search.includes('sync=secret')) {
+      return;
+    }
+
     // Auth Listener
     const unsubAuth = onAuthStateChanged(auth, (user) => {
       setAdminUser(user);
@@ -212,6 +219,7 @@ export default function App() {
   const [selectedDate, setSelectedDate] = useState(getTodayString());
   const [filterTipe, setFilterTipe] = useState('semua');
   const [filterDateSewa, setFilterDateSewa] = useState('');
+  const [filterStatusSewa, setFilterStatusSewa] = useState('Semua');
   const [filterDatePembayaran, setFilterDatePembayaran] = useState('');
   
   const [pembayaranViewMode, setPembayaranViewMode] = useState('list');
@@ -365,13 +373,19 @@ export default function App() {
     if (filterDateSewa !== '') dataYangDitampilkan = dataYangDitampilkan.filter(sewa => sewa.tanggal_sewa === filterDateSewa);
     else dataYangDitampilkan = dataYangDitampilkan.filter(sewa => sewa.tanggal_sewa >= todayStr);
     
+    if (filterStatusSewa === 'Sudah Bayar') {
+       dataYangDitampilkan = dataYangDitampilkan.filter(sewa => sewa.status_pembayaran === 'Sudah Transfer' || sewa.status_pembayaran === 'Menunggu Verifikasi');
+    } else if (filterStatusSewa === 'Belum Bayar') {
+       dataYangDitampilkan = dataYangDitampilkan.filter(sewa => sewa.status_pembayaran === 'Belum Transfer');
+    }
+
     const groups = dataYangDitampilkan.reduce((acc, curr) => {
       if (!acc[curr.tanggal_sewa]) acc[curr.tanggal_sewa] = [];
       acc[curr.tanggal_sewa].push(curr);
       return acc;
     }, {});
     return Object.keys(groups).sort((a, b) => new Date(a) - new Date(b)).map(date => ({ date, data: groups[date] }));
-  }, [sewaList, filterDateSewa]);
+  }, [sewaList, filterDateSewa, filterStatusSewa]);
 
   const groupedPembayaran = useMemo(() => {
     let dataBayar = sewaList.filter(sewa => sewa.bukti_transfer || sewa.status_pembayaran === 'Sudah Transfer' || sewa.status_pembayaran === 'Menunggu Verifikasi');
@@ -2174,6 +2188,7 @@ Terima kasih.`;
   if (isMigrateRoute) return <MigrateData />;
 
   if (isPromoRoute) return <PublicPromoForm />;
+  if (isSyncRoute) return <SyncPembayaran />;
 
   if (!adminUser && !isPortalRoute) {
     return <Login onLoginSuccess={() => {}} />;
@@ -2427,7 +2442,6 @@ Terima kasih.`;
           {[
             { id: 'reservasi', label: 'Reservasi Lokasi', icon: LayoutDashboard },
             { id: 'sewa', label: 'Data Pengunjung', icon: Users },
-            { id: 'pembayaran', label: 'Keuangan', icon: CreditCard },
             { id: 'master', label: 'Master Data', icon: Settings },
             { id: 'portal', label: 'Portal Bukti', icon: Wallet }
           ].map(item => (
@@ -2694,6 +2708,15 @@ Terima kasih.`;
                           <span className="text-emerald-950 font-bold text-xs w-full text-left whitespace-nowrap">{filterDateSewa ? formatTanggalPendek(filterDateSewa) : 'Semua Jadwal Ke Depan'}</span>
                           <input type="date" value={filterDateSewa} onChange={(e) => setFilterDateSewa(e.target.value)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-[60] custom-date-picker pointer-events-auto" />
                       </div>
+                      <select 
+                          value={filterStatusSewa} 
+                          onChange={e => setFilterStatusSewa(e.target.value)}
+                          className="bg-white border border-slate-200 text-emerald-950 text-xs font-bold rounded-2xl px-4 py-2.5 shadow-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-400 outline-none appearance-none cursor-pointer z-[60] pointer-events-auto"
+                      >
+                          <option value="Semua">Semua Status</option>
+                          <option value="Sudah Bayar">Sudah Bayar / Verifikasi</option>
+                          <option value="Belum Bayar">Belum Bayar</option>
+                      </select>
                       {filterDateSewa && (
                         <button 
                           type="button" 
@@ -3152,7 +3175,6 @@ Terima kasih.`;
             {[
               { id: 'reservasi', label: 'Reservasi', icon: LayoutDashboard },
               { id: 'sewa', label: 'Tamu', icon: Users },
-              { id: 'pembayaran', label: 'Keuangan', icon: CreditCard },
               { id: 'master', label: 'Master', icon: Settings },
               { id: 'portal', label: 'Upload', icon: UploadCloud }
             ].map(item => (
