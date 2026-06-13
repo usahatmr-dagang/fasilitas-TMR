@@ -1983,29 +1983,6 @@ Terima kasih.`;
                 const isLapangan = lokasi.tipe === 'lapangan';
                 const Icon = isLapangan ? TreePine : Tent;
                 return (
-                  editingLokasiId === lokasi.id ? (
-                    <div key={lokasi.id} className="bg-blue-50/50 p-3 rounded-2xl border border-blue-200 col-span-full md:col-span-2 lg:col-span-3">
-                      <form onSubmit={handleUpdateMasterLokasi} className="flex flex-wrap gap-2 items-center">
-                        <input type="text" required value={editingLokasiData.nama} onChange={e => setEditingLokasiData({...editingLokasiData, nama: e.target.value})} className="flex-1 min-w-[120px] px-3 py-2 text-xs border border-slate-200 rounded-xl font-bold" placeholder="Nama Fasilitas" />
-                        <select value={editingLokasiData.tipe} onChange={e => setEditingLokasiData({...editingLokasiData, tipe: e.target.value})} className="px-3 py-2 text-xs border border-slate-200 rounded-xl cursor-pointer">
-                          <option value="pendopo">Pendopo</option>
-                          <option value="lapangan">Lapangan</option>
-                        </select>
-                        <div className="flex items-center space-x-1">
-                          <span className="text-xs font-semibold text-slate-500">Rp</span>
-                          <input type="number" required value={editingLokasiData.harga} onChange={e => setEditingLokasiData({...editingLokasiData, harga: e.target.value})} className="w-24 px-3 py-2 text-xs border border-slate-200 rounded-xl" placeholder="Harga" />
-                        </div>
-                        <div className="flex items-center space-x-1">
-                          <span className="text-xs font-semibold text-slate-500">Urutan:</span>
-                          <input type="number" required value={editingLokasiData.urutan} onChange={e => setEditingLokasiData({...editingLokasiData, urutan: e.target.value})} className="w-16 px-3 py-2 text-xs border border-slate-200 rounded-xl" placeholder="1" />
-                        </div>
-                        <div className="flex space-x-1 shrink-0 ml-auto">
-                          <button type="button" onClick={() => setEditingLokasiId(null)} className="bg-slate-200 hover:bg-slate-300 text-slate-700 p-2 rounded-xl transition-all"><X size={14}/></button>
-                          <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-xl transition-all"><Save size={14}/></button>
-                        </div>
-                      </form>
-                    </div>
-                  ) : (
                   <div key={lokasi.id} className="bg-white p-3 rounded-2xl border border-slate-100 text-xs font-bold text-emerald-950 flex justify-between items-center shadow-sm hover:shadow-md hover:border-blue-200 transition-all duration-200 group">
                     <div className="flex items-center space-x-2.5 overflow-hidden">
                       <div className={`p-2 rounded-xl shrink-0 ${isLapangan ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50/70 text-amber-600'}`}>
@@ -2045,7 +2022,6 @@ Terima kasih.`;
                       </button>
                     </div>
                   </div>
-                  )
                 );
               })}
               {masterLokasi.length === 0 && (
@@ -2056,6 +2032,57 @@ Terima kasih.`;
               )}
             </div>
           </div>
+
+          {/* Modal Edit Fasilitas */}
+          {editingLokasiId && (
+            <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-in fade-in duration-200">
+              <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden border border-slate-100 animate-in zoom-in-95 duration-200">
+                <div className="bg-blue-600 px-5 py-4 flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Edit size={16} className="text-blue-200" />
+                    <h3 className="text-white font-bold text-sm">Edit Fasilitas</h3>
+                  </div>
+                  <button type="button" onClick={() => setEditingLokasiId(null)} className="text-blue-200 hover:text-white transition-colors p-1 hover:bg-blue-700 rounded-lg">
+                    <X size={18}/>
+                  </button>
+                </div>
+                <div className="p-5">
+                  <form onSubmit={handleUpdateMasterLokasi} className="space-y-4">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Nama Fasilitas</label>
+                      <input type="text" required value={editingLokasiData.nama} onChange={e => setEditingLokasiData({...editingLokasiData, nama: e.target.value})} className="w-full px-4 py-3 text-sm border border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl font-bold transition-all outline-none" placeholder="Contoh: Pendopo TSA 1" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Tipe</label>
+                        <select value={editingLokasiData.tipe} onChange={e => setEditingLokasiData({...editingLokasiData, tipe: e.target.value})} className="w-full px-4 py-3 text-sm border border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl outline-none bg-white font-medium transition-all">
+                          <option value="pendopo">Pendopo / Ruangan</option>
+                          <option value="lapangan">Lahan / Lapangan</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Urutan Tampil</label>
+                        <input type="number" required value={editingLokasiData.urutan} onChange={e => setEditingLokasiData({...editingLokasiData, urutan: e.target.value})} className="w-full px-4 py-3 text-sm border border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl font-medium outline-none transition-all" placeholder="1" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1.5 uppercase tracking-wider">Harga Sewa Standar</label>
+                      <div className="flex items-center space-x-2">
+                        <span className="text-sm font-bold text-slate-400 bg-slate-50 px-4 py-3 rounded-xl border border-slate-200">Rp</span>
+                        <input type="number" required value={editingLokasiData.harga} onChange={e => setEditingLokasiData({...editingLokasiData, harga: e.target.value})} className="w-full px-4 py-3 text-sm border border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 rounded-xl font-bold outline-none transition-all" placeholder="Contoh: 250000" />
+                      </div>
+                    </div>
+                    <div className="pt-3">
+                      <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl transition-all shadow-md hover:shadow-lg shadow-blue-200/50 flex items-center justify-center space-x-2 active:scale-[0.98]">
+                        <Save size={16}/>
+                        <span>Simpan Perubahan</span>
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </div>
+          )}
 
         </div>
       </div>
