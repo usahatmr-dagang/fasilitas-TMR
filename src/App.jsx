@@ -135,6 +135,7 @@ export default function App() {
   useEffect(() => {
     // Secret Route
     if (window.location.search.includes('migrate=secret') || window.location.search.includes('sync=secret')) {
+      setIsAuthChecking(false);
       return;
     }
 
