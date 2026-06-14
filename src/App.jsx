@@ -94,21 +94,44 @@ const getTodayString = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
+const normalizeDateString = (dateStr) => {
+  if (!dateStr) return '';
+  if (dateStr.includes('/')) {
+    const parts = dateStr.split('/');
+    if (parts.length === 3 && parts[2].length === 4) {
+      return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+    }
+  }
+  return dateStr;
+};
+
 const formatTanggalIndo = (dateStr) => {
   if (!dateStr) return '-';
-  const [year, month, day] = dateStr.split('-');
-  const date = new Date(year, month - 1, day);
-  return new Intl.DateTimeFormat('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(date);
+  try {
+    const norm = normalizeDateString(dateStr);
+    const [year, month, day] = norm.split('-');
+    const date = new Date(year, month - 1, day);
+    if (isNaN(date.getTime())) return dateStr;
+    return new Intl.DateTimeFormat('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(date);
+  } catch(e) {
+    return dateStr;
+  }
 };
 
 const formatTanggalPendek = (dateStr) => {
   if (!dateStr) return '';
-  const [year, month, day] = dateStr.split('-');
-  const date = new Date(year, month - 1, day);
-  const hari = new Intl.DateTimeFormat('id-ID', { weekday: 'long' }).format(date);
-  const tgl = String(date.getDate()).padStart(2, '0');
-  const bln = new Intl.DateTimeFormat('id-ID', { month: 'long' }).format(date);
-  return `${hari}, ${tgl} - ${bln}-${date.getFullYear()}`;
+  try {
+    const norm = normalizeDateString(dateStr);
+    const [year, month, day] = norm.split('-');
+    const date = new Date(year, month - 1, day);
+    if (isNaN(date.getTime())) return dateStr;
+    const hari = new Intl.DateTimeFormat('id-ID', { weekday: 'long' }).format(date);
+    const tgl = String(date.getDate()).padStart(2, '0');
+    const bln = new Intl.DateTimeFormat('id-ID', { month: 'long' }).format(date);
+    return `${hari}, ${tgl} - ${bln}-${date.getFullYear()}`;
+  } catch(e) {
+    return dateStr;
+  }
 };
 
 const formatRupiah = (angka) => {
@@ -408,11 +431,16 @@ export default function App() {
 
   const groupedPembayaran = useMemo(() => {
     const todayStr = getTodayString();
-    let dataBayar = sewaList.filter(sewa => ['Sudah Transfer', 'Lunas', 'Sudah Lunas', 'Menunggu Verifikasi'].includes(sewa.status_pembayaran) && sewa.tanggal_sewa >= todayStr);
-    if (filterDatePembayaran !== '') dataBayar = dataBayar.filter(sewa => (sewa.tanggal_transfer || sewa.tanggal_sewa) === filterDatePembayaran);
+    let dataBayar = sewaList.filter(sewa => {
+      const isPaidStatus = ['Sudah Transfer', 'Lunas', 'Sudah Lunas', 'Menunggu Verifikasi'].includes(sewa.status_pembayaran);
+      const normalizedDateSewa = normalizeDateString(sewa.tanggal_sewa);
+      return isPaidStatus && normalizedDateSewa >= todayStr;
+    });
+    if (filterDatePembayaran !== '') dataBayar = dataBayar.filter(sewa => normalizeDateString(sewa.tanggal_transfer) === filterDatePembayaran);
     
     const groups = dataBayar.reduce((acc, curr) => {
-      const date = curr.tanggal_transfer || curr.tanggal_sewa; 
+      const date = normalizeDateString(curr.tanggal_transfer); 
+      if (!date) return acc; // Lewati jika tidak ada tanggal transfer
       if (!acc[date]) acc[date] = [];
       acc[date].push(curr);
       return acc;
