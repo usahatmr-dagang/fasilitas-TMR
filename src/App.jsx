@@ -2461,6 +2461,7 @@ Terima kasih.`;
           {[
             { id: 'reservasi', label: 'Reservasi Lokasi', icon: LayoutDashboard },
             { id: 'sewa', label: 'Data Pengunjung', icon: Users },
+            { id: 'pembayaran', label: 'Keuangan / Pembayaran', icon: CreditCard },
             { id: 'master', label: 'Master Data', icon: Settings },
             { id: 'portal', label: 'Portal Bukti', icon: Wallet }
           ].map(item => (
