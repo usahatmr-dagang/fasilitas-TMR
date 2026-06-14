@@ -407,7 +407,7 @@ export default function App() {
   }, [sewaList]);
 
   const groupedPembayaran = useMemo(() => {
-    let dataBayar = sewaList.filter(sewa => sewa.bukti_transfer || sewa.status_pembayaran === 'Sudah Transfer' || sewa.status_pembayaran === 'Menunggu Verifikasi');
+    let dataBayar = sewaList.filter(sewa => ['Sudah Transfer', 'Lunas', 'Sudah Lunas', 'Menunggu Verifikasi'].includes(sewa.status_pembayaran));
     if (filterDatePembayaran !== '') dataBayar = dataBayar.filter(sewa => (sewa.tanggal_transfer || sewa.tanggal_sewa) === filterDatePembayaran);
     
     const groups = dataBayar.reduce((acc, curr) => {
