@@ -3268,6 +3268,7 @@ Terima kasih.`;
             {[
               { id: 'reservasi', label: 'Reservasi', icon: LayoutDashboard },
               { id: 'sewa', label: 'Tamu', icon: Users },
+              { id: 'pembayaran', label: 'Keuangan', icon: CreditCard },
               { id: 'master', label: 'Master', icon: Settings },
               { id: 'portal', label: 'Upload', icon: UploadCloud }
             ].map(item => (
