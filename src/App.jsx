@@ -134,6 +134,33 @@ const formatTanggalPendek = (dateStr) => {
   }
 };
 
+const getMonthColorClass = (dateStr) => {
+  if (!dateStr) return 'text-slate-600';
+  try {
+    const norm = normalizeDateString(dateStr);
+    const [, month] = norm.split('-');
+    const monthInt = parseInt(month, 10);
+    const colors = [
+      'text-slate-600',
+      'text-blue-600',    // Jan
+      'text-rose-600',    // Feb
+      'text-amber-600',   // Mar
+      'text-emerald-600', // Apr
+      'text-violet-600',  // May
+      'text-cyan-600',    // Jun
+      'text-fuchsia-600', // Jul
+      'text-orange-600',  // Aug
+      'text-teal-600',    // Sep
+      'text-pink-600',    // Oct
+      'text-indigo-600',  // Nov
+      'text-sky-600'      // Dec
+    ];
+    return colors[monthInt] || 'text-slate-600';
+  } catch(e) {
+    return 'text-slate-600';
+  }
+};
+
 const formatRupiah = (angka) => {
     if (angka === undefined || angka === null || isNaN(angka)) return '-';
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
@@ -2797,16 +2824,20 @@ Terima kasih.`;
                          </button>
                       </div>
                       <div className="overflow-y-auto flex-1 p-2 space-y-1 custom-scrollbar">
-                         {availableDatesList.dates.map(d => (
-                            <button
-                               key={d.date}
-                               onClick={() => setFilterDateSewa(d.date)}
-                               className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-between ${filterDateSewa === d.date ? 'bg-emerald-50 text-emerald-700 shadow-sm border border-emerald-100' : 'text-slate-600 hover:bg-slate-50 hover:text-emerald-700'}`}
-                            >
-                               <span className="truncate">{formatTanggalPendek(d.date)}</span>
-                               <span className={`px-2 py-0.5 rounded-full text-[10px] ${filterDateSewa === d.date ? 'bg-emerald-200 text-emerald-800' : 'bg-slate-100 text-slate-500'}`}>{d.count}</span>
-                            </button>
-                         ))}
+                         {availableDatesList.dates.map(d => {
+                            const isSelected = filterDateSewa === d.date;
+                            const monthColor = getMonthColorClass(d.date);
+                            return (
+                               <button
+                                  key={d.date}
+                                  onClick={() => setFilterDateSewa(d.date)}
+                                  className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-between ${isSelected ? 'bg-emerald-50 text-emerald-700 shadow-sm border border-emerald-100' : `hover:bg-slate-50 hover:text-emerald-700 ${monthColor}`}`}
+                               >
+                                  <span className="truncate">{formatTanggalPendek(d.date)}</span>
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] ${isSelected ? 'bg-emerald-200 text-emerald-800' : 'bg-slate-100 text-slate-500'}`}>{d.count}</span>
+                               </button>
+                            );
+                         })}
                       </div>
                    </div>
 
