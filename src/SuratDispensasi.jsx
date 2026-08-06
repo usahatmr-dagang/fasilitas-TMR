@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { FileText, Printer, Search, Building, Users, Car, CheckCircle2, ChevronLeft } from 'lucide-react';
+import { FileText, Printer, Search, Building, Users, Car, CheckCircle2, ChevronLeft, Clock, X } from 'lucide-react';
 import { db } from './firebase';
-import { collection, getDocs, doc, getDoc, setDoc, runTransaction } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, setDoc, updateDoc, addDoc } from 'firebase/firestore';
 
 export default function SuratDispensasi({ onNavigate }) {
   const [source, setSource] = useState('sewa'); // 'sewa' or 'promo'
@@ -18,6 +18,11 @@ export default function SuratDispensasi({ onNavigate }) {
   const [keperluan, setKeperluan] = useState('');
   const [jamLoading, setJamLoading] = useState('06.00 s/d 07.30 WIB');
   const [tglKunjungan, setTglKunjungan] = useState('');
+
+  // History state
+  const [showHistory, setShowHistory] = useState(false);
+  const [historyData, setHistoryData] = useState([]);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
 
   // Fetch Data
   useEffect(() => {
@@ -113,38 +118,9 @@ export default function SuratDispensasi({ onNavigate }) {
 
     const dateObj = new Date();
     const currentYear = dateObj.getFullYear();
-    let generatedNumber = Math.floor(Math.random() * 900) + 100; // Fallback nomor acak jika database limit
-
-    try {
-      // 1. Dapatkan dan Increment Nomor Surat dari Firebase
-      const counterRef = doc(db, 'systemCounters', 'dispensasi');
-      
-      await runTransaction(db, async (transaction) => {
-        const counterDoc = await transaction.get(counterRef);
-        let lastNumber = 50; 
-        let lastYear = currentYear;
-
-        if (counterDoc.exists()) {
-          const data = counterDoc.data();
-          lastNumber = data.lastNumber || 0;
-          lastYear = data.lastYear || currentYear;
-        }
-
-        if (currentYear > lastYear) {
-          generatedNumber = 1;
-        } else {
-          generatedNumber = lastNumber + 1;
-        }
-
-        transaction.set(counterRef, {
-          lastNumber: generatedNumber,
-          lastYear: currentYear
-        });
-      });
-    } catch (err) {
-      console.warn("Firebase Quota Limit / Error. Menggunakan nomor fallback agar tetap bisa cetak.", err);
-      // Tidak di-alert agar proses print tetap berjalan dengan nomor fallback
-    }
+    // Penomoran Acak Unik (4 digit) + Timestamp agar terhindar dari limit database transaction
+    const randomCounter = Math.floor(1000 + Math.random() * 9000); 
+    let generatedNumber = randomCounter;
 
     // Format Nomor
     const padZero = (num) => num.toString().padStart(2, '0');
@@ -265,10 +241,41 @@ export default function SuratDispensasi({ onNavigate }) {
     iframeDoc.close();
 
     // Tunggu render selesai baru panggil print
-    setTimeout(() => {
+    setTimeout(async () => {
       iframe.contentWindow.focus();
       iframe.contentWindow.print();
       
+      // Simpan riwayat dan update status cetak ke database di background
+      try {
+        const targetCollection = source === 'sewa' ? 'sewaList' : 'promoList';
+        const docRef = doc(db, targetCollection, selectedItem.id);
+        
+        // Update status dokumen utama
+        await updateDoc(docRef, {
+          isDispensasiPrinted: true,
+          tanggalCetakDispensasi: new Date().toISOString()
+        });
+        
+        // Simpan ke riwayat
+        await addDoc(collection(db, 'historyDispensasi'), {
+          nomorSurat: formatNomor,
+          idRombongan: selectedItem.id,
+          namaRombongan: namaInstansi,
+          tanggalKunjungan: tglKunjungan,
+          nopol: nopol,
+          tanggalCetak: new Date().toISOString(),
+          sumber: source
+        });
+
+        // Update local state untuk memunculkan badge secara instan
+        setFilteredData(prev => prev.map(item => item.id === selectedItem.id ? { ...item, isDispensasiPrinted: true } : item));
+        setDataList(prev => prev.map(item => item.id === selectedItem.id ? { ...item, isDispensasiPrinted: true } : item));
+        setSelectedItem(prev => ({...prev, isDispensasiPrinted: true}));
+
+      } catch (err) {
+        console.warn("Gagal menyimpan riwayat/status (Mungkin karena limit kuota Firebase).", err);
+      }
+
       // Hapus iframe setelah popup print ditutup
       setTimeout(() => {
         if (document.body.contains(iframe)) {
@@ -276,6 +283,22 @@ export default function SuratDispensasi({ onNavigate }) {
         }
       }, 2000);
     }, 500);
+  };
+
+  // Fungsi untuk membuka dan mengambil riwayat
+  const handleOpenHistory = async () => {
+    setShowHistory(true);
+    setIsHistoryLoading(true);
+    try {
+      const snap = await getDocs(collection(db, 'historyDispensasi'));
+      const histItems = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      // Urutkan dari yang terbaru
+      histItems.sort((a, b) => new Date(b.tanggalCetak || 0) - new Date(a.tanggalCetak || 0));
+      setHistoryData(histItems);
+    } catch (err) {
+      console.warn("Error fetching history:", err);
+    }
+    setIsHistoryLoading(false);
   };
 
   return (
@@ -294,6 +317,15 @@ export default function SuratDispensasi({ onNavigate }) {
             Cetak Surat Dispensasi
           </h1>
           <p className="text-slate-500 font-medium mt-1">Buat format surat dispensasi loading barang otomatis (langsung PDF).</p>
+        </div>
+        <div className="ml-auto flex gap-2">
+          <button 
+            onClick={handleOpenHistory}
+            className="px-4 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 hover:text-slate-900 rounded-xl font-bold flex items-center gap-2 transition-colors"
+          >
+            <Clock size={18} />
+            Lihat Riwayat
+          </button>
         </div>
       </div>
 
@@ -350,9 +382,17 @@ export default function SuratDispensasi({ onNavigate }) {
                           onClick={() => setSelectedItem(item)}
                           className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${selectedItem?.id === item.id ? 'bg-emerald-600 border-emerald-600 shadow-md shadow-emerald-600/20' : 'bg-white border-slate-100 hover:border-emerald-200 hover:bg-emerald-50/50'}`}
                         >
-                          <p className={`font-extrabold text-sm mb-1 ${selectedItem?.id === item.id ? 'text-white' : 'text-slate-800'}`}>
-                            {source === 'sewa' ? item.nama_penyewa : item.namaPerusahaan}
-                          </p>
+                          <div className="flex justify-between items-start mb-1">
+                            <p className={`font-extrabold text-sm ${selectedItem?.id === item.id ? 'text-white' : 'text-slate-800'}`}>
+                              {source === 'sewa' ? item.nama_penyewa : item.namaPerusahaan}
+                            </p>
+                            {item.isDispensasiPrinted && (
+                              <span title="Sudah Dicetak" className={`flex-shrink-0 flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${selectedItem?.id === item.id ? 'bg-white/20 text-white' : 'bg-emerald-100 text-emerald-700'}`}>
+                                <CheckCircle2 size={10} />
+                                DICETAK
+                              </span>
+                            )}
+                          </div>
                           <p className={`text-xs font-medium ${selectedItem?.id === item.id ? 'text-emerald-100' : 'text-slate-500'}`}>
                             {source === 'sewa' ? `Fasilitas: ${item.lokasi_sewa || '-'}` : `Produk: ${item.namaProduk || '-'}`}
                           </p>
@@ -450,26 +490,90 @@ export default function SuratDispensasi({ onNavigate }) {
                 </div>
               </div>
 
-              <button 
-                onClick={handlePrint}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-4 rounded-2xl shadow-lg shadow-emerald-600/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
-              >
-                <Printer size={20} /> Cetak Langsung (PDF)
-              </button>
-              <p className="text-center text-[10px] text-slate-400 font-medium mt-4">
-                Klik tombol cetak lalu pilih destinasi "Save as PDF" di jendela browser Anda. Nomor surat otomatis di-generate dan dilacak oleh sistem.
-              </p>
-
+              <div className="pt-6 border-t border-slate-100 flex items-center justify-between">
+                <div>
+                  {selectedItem.isDispensasiPrinted && (
+                    <span className="flex items-center gap-1.5 text-xs font-bold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-full">
+                      <CheckCircle2 size={14} /> Dokumen Pernah Dicetak
+                    </span>
+                  )}
+                </div>
+                <button 
+                  onClick={handlePrint}
+                  className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-600/30 flex items-center gap-2 transition-all"
+                >
+                  <Printer size={20} />
+                  {selectedItem.isDispensasiPrinted ? 'Cetak Ulang PDF' : 'Cetak PDF'}
+                </button>
+              </div>
             </div>
           ) : (
-            <div className="h-full min-h-[400px] bg-slate-50/50 rounded-3xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400">
-              <FileText size={64} strokeWidth={1} className="mb-4 opacity-50" />
-              <h3 className="font-bold text-slate-600 mb-1">Pilih Data Dulu</h3>
-              <p className="text-sm">Klik salah satu data penyewa atau promo di sebelah kiri.</p>
+            <div className="bg-white rounded-3xl p-12 border border-slate-200 flex flex-col items-center justify-center text-center h-[500px]">
+              <div className="w-24 h-24 bg-emerald-50 text-emerald-300 rounded-full flex items-center justify-center mb-6">
+                <Printer size={48} />
+              </div>
+              <h4 className="text-xl font-bold text-slate-800 mb-2">Pilih Data Untuk Dicetak</h4>
+              <p className="text-slate-500 max-w-sm">Silakan pilih instansi/rombongan dari daftar di sebelah kiri untuk mulai mengisi format surat dispensasi.</p>
             </div>
           )}
         </div>
       </div>
+
+      {/* Modal History */}
+      {showHistory && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowHistory(false)}></div>
+          <div className="bg-white w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] relative z-10 animate-in fade-in zoom-in duration-200">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-white">
+              <h2 className="text-xl font-black text-slate-800 flex items-center gap-2">
+                <Clock className="text-emerald-600" />
+                Riwayat Cetak Dispensasi
+              </h2>
+              <button 
+                onClick={() => setShowHistory(false)}
+                className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400 hover:text-slate-700"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto flex-1 bg-slate-50">
+              {isHistoryLoading ? (
+                <div className="text-center py-12 text-slate-500 font-medium">Memuat Riwayat...</div>
+              ) : historyData.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="w-16 h-16 bg-slate-200 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <FileText size={24} />
+                  </div>
+                  <p className="text-slate-500 font-medium">Belum ada riwayat cetak surat.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {historyData.map(hist => (
+                    <div key={hist.id} className="bg-white border border-slate-200 p-5 rounded-2xl flex items-center justify-between shadow-sm hover:border-emerald-200 transition-colors">
+                      <div>
+                        <div className="flex items-center gap-3 mb-1">
+                          <span className="text-xs font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">{hist.nomorSurat}</span>
+                          <span className="text-xs font-semibold text-slate-400">
+                            {new Date(hist.tanggalCetak).toLocaleDateString('id-ID', {day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'})}
+                          </span>
+                        </div>
+                        <h4 className="font-extrabold text-slate-800 text-base">{hist.namaRombongan}</h4>
+                        <p className="text-xs text-slate-500 mt-1">Kunjungan: <strong>{hist.tanggalKunjungan}</strong> | Nopol: <strong>{hist.nopol}</strong></p>
+                      </div>
+                      <div className="text-right">
+                        <span className="inline-block text-[10px] font-black tracking-wider text-slate-400 uppercase bg-slate-100 px-2 py-1 rounded-md">
+                          {hist.sumber === 'sewa' ? 'Sewa/Rombongan' : 'Promo'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
