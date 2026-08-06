@@ -111,25 +111,17 @@ export default function SuratDispensasi({ onNavigate }) {
       return;
     }
 
+    const dateObj = new Date();
+    const currentYear = dateObj.getFullYear();
+    let generatedNumber = Math.floor(Math.random() * 900) + 100; // Fallback nomor acak jika database limit
+
     try {
-      // 1. Dapatkan dan Increment Nomor Surat
-      const dateObj = new Date();
-      const currentYear = dateObj.getFullYear();
-      let generatedNumber = 1;
-
-      // Buka tab baru di awal untuk menghindari popup blocker dari browser karena proses async
-      const printWindow = window.open('', '_blank');
-      if (!printWindow) {
-        alert("Browser Anda memblokir Popup! Tolong izinkan Popup (Always allow pop-ups) untuk situs ini agar bisa mencetak surat.");
-        return;
-      }
-      printWindow.document.write("<html><body><h2 style='font-family:sans-serif; text-align:center; margin-top:50px;'>Memproses penomoran surat, mohon tunggu...</h2></body></html>");
-
+      // 1. Dapatkan dan Increment Nomor Surat dari Firebase
       const counterRef = doc(db, 'systemCounters', 'dispensasi');
       
       await runTransaction(db, async (transaction) => {
         const counterDoc = await transaction.get(counterRef);
-        let lastNumber = 50; // default jika belum pernah ada, karena terakhir 49 di excel
+        let lastNumber = 50; 
         let lastYear = currentYear;
 
         if (counterDoc.exists()) {
@@ -138,7 +130,6 @@ export default function SuratDispensasi({ onNavigate }) {
           lastYear = data.lastYear || currentYear;
         }
 
-        // Reset per tahun
         if (currentYear > lastYear) {
           generatedNumber = 1;
         } else {
@@ -150,126 +141,141 @@ export default function SuratDispensasi({ onNavigate }) {
           lastYear: currentYear
         });
       });
-
-      // Format Nomor: YYYY-MM-DD/P/nomor atau R/nomor
-      const padZero = (num) => num.toString().padStart(2, '0');
-      const yyyyMmDd = `${currentYear}-${padZero(dateObj.getMonth()+1)}-${padZero(dateObj.getDate())}`;
-      const kode = source === 'promo' ? 'P' : 'R';
-      const formatNomor = `${yyyyMmDd}/${kode}/${generatedNumber}`;
-
-      // 2. Format HTML untuk Print
-      const namaInstansi = source === 'sewa' ? selectedItem.nama_penyewa : selectedItem.namaPerusahaan;
-      
-      const printHtml = `
-      <html>
-        <head>
-          <title>Cetak Surat Dispensasi</title>
-          <style>
-            @page { margin: 20mm; size: A4 portrait; }
-            body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.5; color: #000; margin: 0; padding: 0; }
-            .kop-surat { text-align: center; border-bottom: 3px solid #000; padding-bottom: 15px; margin-bottom: 30px; position: relative; }
-            .kop-surat h3, .kop-surat h2, .kop-surat h1 { margin: 0; font-weight: bold; }
-            .kop-surat h3 { font-size: 14pt; font-weight: normal; }
-            .kop-surat h2 { font-size: 16pt; }
-            .kop-surat h1 { font-size: 18pt; letter-spacing: 1px; }
-            .kop-surat p { margin: 5px 0 0 0; font-size: 10pt; }
-            .title-surat { text-align: center; margin-bottom: 30px; }
-            .title-surat h3 { font-size: 14pt; font-weight: bold; text-decoration: underline; margin: 0 0 5px 0; }
-            .title-surat p { margin: 0; font-size: 12pt; }
-            .content { margin: 0 20px; }
-            .info-table { width: 100%; border-collapse: collapse; margin: 15px 0; }
-            .info-table td { padding: 5px; vertical-align: top; }
-            .info-table td:first-child { width: 30%; }
-            .info-table td:nth-child(2) { width: 2%; }
-            .ket-list { padding-left: 20px; margin-top: 10px; }
-            .ket-list li { margin-bottom: 10px; text-align: justify; }
-            .ttd-box { float: right; width: 350px; text-align: center; margin-top: 40px; }
-            .ttd-box p { margin: 2px 0; }
-            .ttd-space { height: 80px; }
-            .footer { clear: both; margin-top: 30px; font-size: 11pt; text-align: justify; }
-          </style>
-        </head>
-        <body>
-          <div class="kop-surat">
-            <h3>PEMERINTAH PROVINSI DAERAH KHUSUS IBU KOTA JAKARTA</h3>
-            <h2>DINAS PERTAMANAN DAN HUTAN KOTA</h2>
-            <h1>UNIT PENGELOLA TAMAN MARGASATWA RAGUNAN</h1>
-            <p>Jalan Harsono RM. No. 1 Ragunan, Telp (021) 7820015 fax. (021) 7805280</p>
-            <p>JAKARTA</p>
-            <p style="text-align: right; font-weight: bold;">Kode Pos : 12550</p>
-          </div>
-
-          <div class="title-surat">
-            <h3>DISPENSASI</h3>
-            <p>NOMOR : ${formatNomor}</p>
-          </div>
-
-          <div class="content">
-            <p>Kepala Unit Pengelola Taman Margasatwa Ragunan Provinsi DKI Jakarta memberikan ijin kepada :</p>
-            
-            <table class="info-table">
-              <tr>
-                <td>Nama Rombongan</td>
-                <td>:</td>
-                <td><strong>${namaInstansi || '-'}</strong></td>
-              </tr>
-              <tr>
-                <td>Tanggal Kunjungan</td>
-                <td>:</td>
-                <td><strong>${tglKunjungan}</strong></td>
-              </tr>
-              <tr>
-                <td>Keperluan</td>
-                <td>:</td>
-                <td><strong>${keperluan}</strong></td>
-              </tr>
-              <tr>
-                <td>Nomor Kendaraan</td>
-                <td>:</td>
-                <td><strong>${jmlKendaraan} (${nopol}) - ${jmlPersonel}</strong></td>
-              </tr>
-            </table>
-
-            <div style="margin-top: 20px;">
-              <strong>Ketentuan :</strong>
-              <ol class="ket-list">
-                <li>Setelah selesai menurunkan barang, kendaraan kembali ke tempat parkir TMR dan tidak diperkenankan parkir ditempat acara ataupun berkeliling didalam kawasan TMR.</li>
-                <li>Setiap pengantar barang wajib membayar tarif masuk berikut kendaraannya.</li>
-                <li>Jadwal loading dari hari selasa s/d Minggu, ${jamLoading}.</li>
-              </ol>
-            </div>
-
-            <p class="footer">Demikian Dispensasi ini diberikan untuk dipergunakan sebagaimana mestinya.</p>
-            
-            <div class="ttd-box">
-              <p>Jakarta, ${dateObj.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
-              <br/>
-              <p>Kepala Unit Pengelola</p>
-              <p>Taman Margasatwa Ragunan</p>
-              <p>Dinas Pertamanan dan Hutan Kota</p>
-              <p>Provinsi DKI Jakarta</p>
-              <div class="ttd-space"></div>
-              <p>(_________________________)</p>
-            </div>
-          </div>
-
-          <script>
-            window.onload = function() {
-              window.print();
-              setTimeout(function(){ window.close(); }, 500);
-            }
-          </script>
-        </body>
-      </html>
-      `;
-      printWindow.document.open();
-      printWindow.document.write(printHtml);
-      printWindow.document.close();
-      
     } catch (err) {
-      console.error(err);
-      alert("Terjadi kesalahan saat memproses penomoran surat: " + err.message);
+      console.warn("Firebase Quota Limit / Error. Menggunakan nomor fallback agar tetap bisa cetak.", err);
+      // Tidak di-alert agar proses print tetap berjalan dengan nomor fallback
     }
+
+    // Format Nomor
+    const padZero = (num) => num.toString().padStart(2, '0');
+    const yyyyMmDd = `${currentYear}-${padZero(dateObj.getMonth()+1)}-${padZero(dateObj.getDate())}`;
+    const kode = source === 'promo' ? 'P' : 'R';
+    const formatNomor = `${yyyyMmDd}/${kode}/${generatedNumber}`;
+
+    // 2. Format HTML untuk Print
+    const namaInstansi = source === 'sewa' ? selectedItem.nama_penyewa : selectedItem.namaPerusahaan;
+    
+    const printHtml = `
+    <html>
+      <head>
+        <title>Cetak Surat Dispensasi - ${namaInstansi}</title>
+        <style>
+          @page { margin: 20mm; size: A4 portrait; }
+          body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.5; color: #000; margin: 0; padding: 0; }
+          .kop-surat { text-align: center; border-bottom: 3px solid #000; padding-bottom: 15px; margin-bottom: 30px; position: relative; }
+          .kop-surat h3, .kop-surat h2, .kop-surat h1 { margin: 0; font-weight: bold; }
+          .kop-surat h3 { font-size: 14pt; font-weight: normal; }
+          .kop-surat h2 { font-size: 16pt; }
+          .kop-surat h1 { font-size: 18pt; letter-spacing: 1px; }
+          .kop-surat p { margin: 5px 0 0 0; font-size: 10pt; }
+          .title-surat { text-align: center; margin-bottom: 30px; }
+          .title-surat h3 { font-size: 14pt; font-weight: bold; text-decoration: underline; margin: 0 0 5px 0; }
+          .title-surat p { margin: 0; font-size: 12pt; }
+          .content { margin: 0 20px; }
+          .info-table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+          .info-table td { padding: 5px; vertical-align: top; }
+          .info-table td:first-child { width: 30%; }
+          .info-table td:nth-child(2) { width: 2%; }
+          .ket-list { padding-left: 20px; margin-top: 10px; }
+          .ket-list li { margin-bottom: 10px; text-align: justify; }
+          .ttd-box { float: right; width: 350px; text-align: center; margin-top: 40px; }
+          .ttd-box p { margin: 2px 0; }
+          .ttd-space { height: 80px; }
+          .footer { clear: both; margin-top: 30px; font-size: 11pt; text-align: justify; }
+        </style>
+      </head>
+      <body>
+        <div class="kop-surat">
+          <h3>PEMERINTAH PROVINSI DAERAH KHUSUS IBU KOTA JAKARTA</h3>
+          <h2>DINAS PERTAMANAN DAN HUTAN KOTA</h2>
+          <h1>UNIT PENGELOLA TAMAN MARGASATWA RAGUNAN</h1>
+          <p>Jalan Harsono RM. No. 1 Ragunan, Telp (021) 7820015 fax. (021) 7805280</p>
+          <p>JAKARTA</p>
+          <p style="text-align: right; font-weight: bold;">Kode Pos : 12550</p>
+        </div>
+
+        <div class="title-surat">
+          <h3>DISPENSASI</h3>
+          <p>NOMOR : ${formatNomor}</p>
+        </div>
+
+        <div class="content">
+          <p>Kepala Unit Pengelola Taman Margasatwa Ragunan Provinsi DKI Jakarta memberikan ijin kepada :</p>
+          
+          <table class="info-table">
+            <tr>
+              <td>Nama Rombongan</td>
+              <td>:</td>
+              <td><strong>${namaInstansi || '-'}</strong></td>
+            </tr>
+            <tr>
+              <td>Tanggal Kunjungan</td>
+              <td>:</td>
+              <td><strong>${tglKunjungan}</strong></td>
+            </tr>
+            <tr>
+              <td>Keperluan</td>
+              <td>:</td>
+              <td><strong>${keperluan}</strong></td>
+            </tr>
+            <tr>
+              <td>Nomor Kendaraan</td>
+              <td>:</td>
+              <td><strong>${jmlKendaraan} (${nopol}) - ${jmlPersonel}</strong></td>
+            </tr>
+          </table>
+
+          <div style="margin-top: 20px;">
+            <strong>Ketentuan :</strong>
+            <ol class="ket-list">
+              <li>Setelah selesai menurunkan barang, kendaraan kembali ke tempat parkir TMR dan tidak diperkenankan parkir ditempat acara ataupun berkeliling didalam kawasan TMR.</li>
+              <li>Setiap pengantar barang wajib membayar tarif masuk berikut kendaraannya.</li>
+              <li>Jadwal loading dari hari selasa s/d Minggu, ${jamLoading}.</li>
+            </ol>
+          </div>
+
+          <p class="footer">Demikian Dispensasi ini diberikan untuk dipergunakan sebagaimana mestinya.</p>
+          
+          <div class="ttd-box">
+            <p>Jakarta, ${dateObj.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
+            <br/>
+            <p>Kepala Unit Pengelola</p>
+            <p>Taman Margasatwa Ragunan</p>
+            <p>Dinas Pertamanan dan Hutan Kota</p>
+            <p>Provinsi DKI Jakarta</p>
+            <div class="ttd-space"></div>
+            <p>(_________________________)</p>
+          </div>
+        </div>
+      </body>
+    </html>
+    `;
+
+    // 3. Cetak menggunakan Iframe tersembunyi (Tidak Buka Tab Baru)
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'absolute';
+    iframe.style.width = '0px';
+    iframe.style.height = '0px';
+    iframe.style.border = 'none';
+    document.body.appendChild(iframe);
+
+    const iframeDoc = iframe.contentWindow.document;
+    iframeDoc.open();
+    iframeDoc.write(printHtml);
+    iframeDoc.close();
+
+    // Tunggu render selesai baru panggil print
+    setTimeout(() => {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+      
+      // Hapus iframe setelah popup print ditutup
+      setTimeout(() => {
+        if (document.body.contains(iframe)) {
+          document.body.removeChild(iframe);
+        }
+      }, 2000);
+    }, 500);
   };
 
   return (
