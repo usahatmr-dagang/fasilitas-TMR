@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { FileText, Printer, Search, Building, Users, Car, CheckCircle2, ChevronLeft } from 'lucide-react';
 import { db } from './firebase';
 import { collection, getDocs, doc, getDoc, setDoc, runTransaction } from 'firebase/firestore';
@@ -70,6 +70,27 @@ export default function SuratDispensasi({ onNavigate }) {
       }
     }
   }, [selectedItem, source]);
+
+  // Kelompokkan data berdasarkan tanggal untuk sidebar list
+  const groupedData = useMemo(() => {
+    const groups = {};
+    filteredData.forEach(item => {
+      let rawDate = source === 'sewa' ? item.tanggal_sewa : item.tanggalPromo;
+      if (!rawDate) rawDate = 'Tanpa Tanggal';
+      
+      let displayDate = rawDate;
+      if (rawDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        const d = new Date(rawDate);
+        if (!isNaN(d.getTime())) {
+          displayDate = d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+        }
+      }
+      
+      if (!groups[displayDate]) groups[displayDate] = [];
+      groups[displayDate].push(item);
+    });
+    return groups;
+  }, [filteredData, source]);
 
   const handlePrint = async () => {
     if (!selectedItem || !tglKunjungan || !nopol) {
@@ -294,20 +315,31 @@ export default function SuratDispensasi({ onNavigate }) {
               {isLoading ? (
                 <div className="text-center py-10 text-slate-400 font-medium">Memuat data...</div>
               ) : filteredData.length === 0 ? (
-                <div className="text-center py-10 text-slate-400 font-medium">Data tidak ditemukan.</div>
+                <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                  <p className="text-slate-400 font-semibold text-sm">Tidak ada data ditemukan</p>
+                </div>
               ) : (
-                filteredData.map(item => (
-                  <div 
-                    key={item.id}
-                    onClick={() => setSelectedItem(item)}
-                    className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${selectedItem?.id === item.id ? 'bg-emerald-600 border-emerald-600 shadow-md shadow-emerald-600/20' : 'bg-white border-slate-100 hover:border-emerald-200 hover:bg-emerald-50/50'}`}
-                  >
-                    <p className={`font-extrabold text-sm mb-1 ${selectedItem?.id === item.id ? 'text-white' : 'text-slate-800'}`}>
-                      {source === 'sewa' ? item.nama_penyewa : item.namaPerusahaan}
-                    </p>
-                    <p className={`text-xs font-medium ${selectedItem?.id === item.id ? 'text-emerald-100' : 'text-slate-500'}`}>
-                      {source === 'sewa' ? `Fasilitas: ${item.lokasi_sewa || '-'}` : `Produk: ${item.namaProduk || '-'}`}
-                    </p>
+                Object.keys(groupedData).map((dateKey) => (
+                  <div key={dateKey} className="mb-4">
+                    <div className="sticky top-0 bg-[#f8faf9] z-10 py-1.5 mb-2 backdrop-blur-sm">
+                      <h4 className="text-[10px] font-black text-emerald-800 uppercase tracking-wider">{dateKey}</h4>
+                    </div>
+                    <div className="space-y-3">
+                      {groupedData[dateKey].map(item => (
+                        <div 
+                          key={item.id}
+                          onClick={() => setSelectedItem(item)}
+                          className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${selectedItem?.id === item.id ? 'bg-emerald-600 border-emerald-600 shadow-md shadow-emerald-600/20' : 'bg-white border-slate-100 hover:border-emerald-200 hover:bg-emerald-50/50'}`}
+                        >
+                          <p className={`font-extrabold text-sm mb-1 ${selectedItem?.id === item.id ? 'text-white' : 'text-slate-800'}`}>
+                            {source === 'sewa' ? item.nama_penyewa : item.namaPerusahaan}
+                          </p>
+                          <p className={`text-xs font-medium ${selectedItem?.id === item.id ? 'text-emerald-100' : 'text-slate-500'}`}>
+                            {source === 'sewa' ? `Fasilitas: ${item.lokasi_sewa || '-'}` : `Produk: ${item.namaProduk || '-'}`}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 ))
               )}
