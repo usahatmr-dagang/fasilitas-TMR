@@ -200,6 +200,16 @@ export default function PublicUpload() {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
   };
 
+  const formatTanggalIndo = (dateStr) => {
+    if (!dateStr) return '-';
+    try {
+      const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+      return new Date(dateStr).toLocaleDateString('id-ID', options);
+    } catch {
+      return dateStr;
+    }
+  };
+
   if (successMsg) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans">
@@ -290,10 +300,14 @@ export default function PublicUpload() {
                     <p className="font-black text-emerald-800 text-xl">{formatRupiah(bookingData.total_biaya)}</p>
                   </div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm border-t border-emerald-200/50 pt-4 mt-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm border-t border-emerald-200/50 pt-4 mt-2">
                   <div>
                     <p className="text-slate-500 text-xs mb-0.5">Nama Penyewa</p>
                     <p className="font-bold text-slate-800">{bookingData.nama_penyewa}</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-500 text-xs mb-0.5">Tanggal Sewa</p>
+                    <p className="font-bold text-slate-800">{formatTanggalIndo(bookingData.tanggal_sewa)}</p>
                   </div>
                   <div>
                     <p className="text-slate-500 text-xs mb-0.5">Lokasi Sewa</p>
