@@ -83,6 +83,14 @@ export default function SuratDispensasi({ onNavigate }) {
       const currentYear = dateObj.getFullYear();
       let generatedNumber = 1;
 
+      // Buka tab baru di awal untuk menghindari popup blocker dari browser karena proses async
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        alert("Browser Anda memblokir Popup! Tolong izinkan Popup (Always allow pop-ups) untuk situs ini agar bisa mencetak surat.");
+        return;
+      }
+      printWindow.document.write("<html><body><h2 style='font-family:sans-serif; text-align:center; margin-top:50px;'>Memproses penomoran surat, mohon tunggu...</h2></body></html>");
+
       const counterRef = doc(db, 'systemCounters', 'dispensasi');
       
       await runTransaction(db, async (transaction) => {
@@ -118,7 +126,6 @@ export default function SuratDispensasi({ onNavigate }) {
       // 2. Format HTML untuk Print
       const namaInstansi = source === 'sewa' ? selectedItem.nama_penyewa : selectedItem.namaPerusahaan;
       
-      const printWindow = window.open('', '_blank');
       const printHtml = `
       <html>
         <head>
@@ -227,7 +234,7 @@ export default function SuratDispensasi({ onNavigate }) {
       
     } catch (err) {
       console.error(err);
-      alert("Terjadi kesalahan saat memproses penomoran surat.");
+      alert("Terjadi kesalahan saat memproses penomoran surat: " + err.message);
     }
   };
 
