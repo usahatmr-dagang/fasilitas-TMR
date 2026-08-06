@@ -26,12 +26,25 @@ export default function SuratDispensasi({ onNavigate }) {
       try {
         const targetCollection = source === 'sewa' ? 'sewaList' : 'promoList';
         const snapshot = await getDocs(collection(db, targetCollection));
-        const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        let items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         
-        // Sort by date mostly (descending)
-        if (source === 'sewa') {
-          items.sort((a, b) => new Date(b.tanggal_sewa || 0) - new Date(a.tanggal_sewa || 0));
-        }
+        // Get today string in YYYY-MM-DD (local timezone safe)
+        const d = new Date();
+        const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+        // Filter out past dates (keep today and future)
+        items = items.filter(item => {
+           const itemDate = source === 'sewa' ? item.tanggal_sewa : item.tanggalPromo;
+           if (!itemDate) return false;
+           return itemDate >= todayStr;
+        });
+        
+        // Sort by date ascending (closest to today first)
+        items.sort((a, b) => {
+           const dateA = source === 'sewa' ? a.tanggal_sewa : a.tanggalPromo;
+           const dateB = source === 'sewa' ? b.tanggal_sewa : b.tanggalPromo;
+           return new Date(dateA || 0) - new Date(dateB || 0);
+        });
         
         setDataList(items);
         setFilteredData(items);
