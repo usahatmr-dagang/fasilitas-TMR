@@ -1736,10 +1736,14 @@ Terima kasih.`;
 
                         <div className="grid grid-cols-2 gap-4">
                             <div><p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider mb-1">Tanggal Sewa</p><p className="font-bold text-emerald-950 text-sm">{formatTanggalPendek(selectedRecord.tanggal_sewa)}</p></div>
-                            {selectedRecord.is_gazebo_package && (
-                                <div><p className="text-[10px] text-amber-500 font-extrabold uppercase tracking-wider mb-1">Paket Khusus</p><p className="font-bold text-emerald-950 text-xs">Termasuk Lahan Depan Gazebo</p></div>
-                            )}
+                            <div><p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider mb-1">Waktu Pesanan Dibuat</p><p className="font-bold text-emerald-950 text-sm">{selectedRecord.tanggal_booking || '-'}</p></div>
                         </div>
+                        {selectedRecord.is_gazebo_package && (
+                            <>
+                                <hr className="border-slate-100" />
+                                <div><p className="text-[10px] text-amber-500 font-extrabold uppercase tracking-wider mb-1">Paket Khusus</p><p className="font-bold text-emerald-950 text-xs">Termasuk Lahan Depan Gazebo</p></div>
+                            </>
+                        )}
                         <hr className="border-slate-100" />
                         <div className="grid grid-cols-2 gap-4">
                             <div><p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider mb-1">Nama Rombongan</p><p className="font-bold text-emerald-950 text-sm">{selectedRecord.nama_penyewa || '-'}</p></div>
@@ -2905,7 +2909,7 @@ Terima kasih.`;
                                                        <td className="px-4 py-3.5">
                                                           <div className="flex items-center gap-2">
                                                              <Icon size={14} className={isLapangan ? 'text-emerald-600' : 'text-amber-600'} />
-                                                             <span className="font-extrabold text-emerald-950 text-xs">{item.lokasi_sewa}</span>
+                                                             <span className={`font-extrabold text-xs ${isLapangan ? 'text-emerald-700' : 'text-amber-700'}`}>{item.lokasi_sewa}</span>
                                                           </div>
                                                        </td>
                                                        <td className="px-4 py-3.5 text-slate-600 font-medium">{item.luas_lahan || '-'}</td>
@@ -3010,13 +3014,16 @@ Terima kasih.`;
                                             </tr>
                                           </thead>
                                           <tbody className="divide-y divide-emerald-900/5 text-xs">
-                                            {group.data.map((item, idx) => (
+                                            {group.data.map((item, idx) => {
+                                              const locInfo = masterLokasi.find(l => l.nama === item.lokasi_sewa);
+                                              const isLapangan = locInfo?.tipe === 'lapangan' || item.lokasi_sewa.includes('LAP');
+                                              return (
                                               <tr key={idx} className="hover:bg-slate-50/50 transition-all duration-200 group/row">
                                                 <td className="px-6 py-4.5 font-black text-emerald-950 group-hover/row:text-emerald-700 transition-colors">{item.id_sewa}</td>
                                                 <td className="px-6 py-4.5">
                                                     <p className="font-extrabold text-emerald-950 text-sm">{item.nama_penyewa}</p>
-                                                    <p className="text-[10px] text-emerald-600/80 font-bold tracking-wide mt-0.5 flex items-center gap-1">
-                                                      <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
+                                                    <p className={`text-[10px] font-bold tracking-wide mt-0.5 flex items-center gap-1 ${isLapangan ? 'text-emerald-700' : 'text-amber-700'}`}>
+                                                      <span className={`w-1.5 h-1.5 rounded-full ${isLapangan ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
                                                       {item.lokasi_sewa}
                                                     </p>
                                                 </td>
@@ -3044,7 +3051,7 @@ Terima kasih.`;
                                                     </button>
                                                 </td>
                                               </tr>
-                                            ))}
+                                            )})}
                                           </tbody>
                                         </table>
                                       </div>

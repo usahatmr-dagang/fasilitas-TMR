@@ -1,3 +1,3 @@
-git add src/App.jsx
-git commit -m "Fix duplicate X icon"
+git add src/PublicUpload.jsx
+git commit -m "feat: batasi tanggal transfer maksimal hari ini"
 git push origin main
