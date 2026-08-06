@@ -2284,6 +2284,10 @@ Terima kasih.`;
     return <PromoDashboard onNavigate={(appId) => setActiveApp(appId)} />;
   }
 
+  if (activeApp === 'dispensasi' && adminUser && !isPortalRoute) {
+    return <SuratDispensasi onNavigate={(appId) => setActiveApp(appId)} />;
+  }
+
   return (
     <div className="flex h-screen bg-[#F4F7F4] font-sans selection:bg-amber-200 selection:text-emerald-900">
       

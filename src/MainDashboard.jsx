@@ -52,14 +52,15 @@ export default function MainDashboard({ onNavigate }) {
 
         {/* Dispensasi TMR */}
         <div 
-          className="bg-white p-8 rounded-3xl shadow-lg shadow-emerald-900/5 border border-emerald-100 flex flex-col items-center text-center cursor-not-allowed opacity-80 relative overflow-hidden"
+          onClick={() => onNavigate('dispensasi')}
+          className="bg-white p-8 rounded-3xl shadow-lg shadow-emerald-900/5 border border-emerald-100 flex flex-col items-center text-center cursor-pointer hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group relative overflow-hidden"
         >
-          <div className="absolute top-4 right-4 bg-amber-100 text-amber-700 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">Coming Soon</div>
-          <div className="w-20 h-20 rounded-2xl bg-indigo-50 text-indigo-500 flex items-center justify-center mb-6">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50 rounded-bl-full -z-10 group-hover:scale-110 transition-transform"></div>
+          <div className="w-20 h-20 rounded-2xl bg-indigo-100 text-indigo-600 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
             <FileText size={40} />
           </div>
-          <h2 className="text-xl font-black text-slate-800 mb-2">Dispensasi TMR</h2>
-          <p className="text-slate-500/80 text-sm font-semibold">Pengelolaan surat permohonan keringanan dan dispensasi.</p>
+          <h2 className="text-xl font-black text-emerald-950 mb-2">Dispensasi TMR</h2>
+          <p className="text-emerald-700/60 text-sm font-semibold">Pengelolaan surat permohonan keringanan dan dispensasi.</p>
         </div>
       </div>
     </div>
