@@ -118,15 +118,21 @@ export default function SuratDispensasi({ onNavigate }) {
 
     const dateObj = new Date();
     const currentYear = dateObj.getFullYear();
-    // Penomoran Acak Unik (4 digit) + Timestamp agar terhindar dari limit database transaction
-    const randomCounter = Math.floor(1000 + Math.random() * 9000); 
-    let generatedNumber = randomCounter;
-
+    
     // Format Nomor
     const padZero = (num) => num.toString().padStart(2, '0');
     const yyyyMmDd = `${currentYear}-${padZero(dateObj.getMonth()+1)}-${padZero(dateObj.getDate())}`;
     const kode = source === 'promo' ? 'P' : 'R';
-    const formatNomor = `${yyyyMmDd}/${kode}/${generatedNumber}`;
+    
+    let formatNomor = "";
+    // Gunakan nomor surat yang sudah ada jika pernah dicetak
+    if (selectedItem.isDispensasiPrinted && selectedItem.nomorSuratDispensasi) {
+      formatNomor = selectedItem.nomorSuratDispensasi;
+    } else {
+      // Penomoran Acak Unik (4 digit) + Timestamp
+      const randomCounter = Math.floor(1000 + Math.random() * 9000); 
+      formatNomor = `${yyyyMmDd}/${kode}/${randomCounter}`;
+    }
 
     // 2. Format HTML untuk Print
     const namaInstansi = source === 'sewa' ? selectedItem.nama_penyewa : selectedItem.namaPerusahaan;
@@ -253,6 +259,7 @@ export default function SuratDispensasi({ onNavigate }) {
         // Update status dokumen utama
         await updateDoc(docRef, {
           isDispensasiPrinted: true,
+          nomorSuratDispensasi: formatNomor,
           tanggalCetakDispensasi: new Date().toISOString()
         });
         
@@ -268,9 +275,9 @@ export default function SuratDispensasi({ onNavigate }) {
         });
 
         // Update local state untuk memunculkan badge secara instan
-        setFilteredData(prev => prev.map(item => item.id === selectedItem.id ? { ...item, isDispensasiPrinted: true } : item));
-        setDataList(prev => prev.map(item => item.id === selectedItem.id ? { ...item, isDispensasiPrinted: true } : item));
-        setSelectedItem(prev => ({...prev, isDispensasiPrinted: true}));
+        setFilteredData(prev => prev.map(item => item.id === selectedItem.id ? { ...item, isDispensasiPrinted: true, nomorSuratDispensasi: formatNomor } : item));
+        setDataList(prev => prev.map(item => item.id === selectedItem.id ? { ...item, isDispensasiPrinted: true, nomorSuratDispensasi: formatNomor } : item));
+        setSelectedItem(prev => ({...prev, isDispensasiPrinted: true, nomorSuratDispensasi: formatNomor}));
 
       } catch (err) {
         console.warn("Gagal menyimpan riwayat/status (Mungkin karena limit kuota Firebase).", err);
