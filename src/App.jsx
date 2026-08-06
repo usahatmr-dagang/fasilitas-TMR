@@ -49,6 +49,7 @@ import PromoDashboard from './PromoDashboard';
 import PublicPromoForm from './PublicPromoForm';
 import MigrateData from './MigrateData';
 import SyncPembayaran from './SyncPembayaran';
+import SuratDispensasi from './SuratDispensasi';
 // --- DATA LOKASI ---
 const defaultDataLokasi = [
   { id: 1, nama: 'PENDOPO TSA 1', tipe: 'pendopo', harga: 500000, urutan: 1 },
@@ -2522,6 +2523,7 @@ Terima kasih.`;
             { id: 'reservasi', label: 'Reservasi Lokasi', icon: LayoutDashboard },
             { id: 'sewa', label: 'Data Pengunjung', icon: Users },
             { id: 'pembayaran', label: 'Keuangan / Pembayaran', icon: CreditCard },
+            { id: 'dispensasi', label: 'Surat Dispensasi', icon: FileText },
             { id: 'master', label: 'Master Data', icon: Settings },
             { id: 'portal', label: 'Portal Bukti', icon: Wallet }
           ].map(item => (
@@ -3115,6 +3117,8 @@ Terima kasih.`;
               </div>
             )}
 
+            {activeTab === 'dispensasi' && <SuratDispensasi onNavigate={setActiveTab} />}
+
             {activeTab === 'master' && renderMasterData()}
 
             {activeTab === 'portal' && (
@@ -3307,6 +3311,7 @@ Terima kasih.`;
               { id: 'reservasi', label: 'Reservasi', icon: LayoutDashboard },
               { id: 'sewa', label: 'Tamu', icon: Users },
               { id: 'pembayaran', label: 'Keuangan', icon: CreditCard },
+              { id: 'dispensasi', label: 'Surat', icon: FileText },
               { id: 'master', label: 'Master', icon: Settings },
               { id: 'portal', label: 'Upload', icon: UploadCloud }
             ].map(item => (

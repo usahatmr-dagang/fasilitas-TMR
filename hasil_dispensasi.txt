@@ -1,0 +1,255 @@
+=== DAFTAR SHEET ===
+- 2025
+- Dispensasi
+- 2026
+- Sheet12
+- Sheet15
+- Sheet3
+
+
+
+--- Sheet: 2025 ---
+
+Baris 1: No | Nomor Surat | Nama Rombongan / Instansi | NOPOL | Tanggal Kunjungan | Keperluan | Jam Loading | 226
+Baris 2: 1 | 467 | Ibu Dina Stikes | 4 Mobil : B 2090 PIE , B 9784 LS, ELF 7503-06, (B.             ) | "2025-09-13T00:00:00.000Z" | Loading Barang Ke Lapangan Timur Gajah |  07,00 s/d 07,30 WIB. | Dispensasi
+Baris 3: 2 | 468 | PT. Rentokil Indonesia | 2 Mobil : B 9523 BXB, B 9174 BCR | "2025-09-16T00:00:00.000Z" | Loading Barang Ke Taman Satwa Anak Pendopo 1 & 4  |  07,00 s/d 07,30 WIB.
+Baris 4: 3 | 469 | TK. Islam Daruttaqwa | 1 Motor : B 5603 TMG | "2025-09-17T00:00:00.000Z" | Loading Barang Ke Taman Satwa Anak Pendopo 4 |  07,00 s/d 07,30 WIB. | https://docs.google.com/spreadsheets/d/1GIYP3gKlwKD1FjOm9J1bBxcXXS3yi7xxxQRVqMkhHXI/edit?gid=677168732#gid=677168732
+Baris 5: 4 | 470 | PT. OHP / Mayora | 6 dewasa , 1 mobil | 3 Hari , 5, 6, 7 September 2025 |  |  07,00 s/d 07,30 WIB.
+Baris 6: 5 | 471 | GPIB PS. MINGGU | 1 Mobil : B 1183 DFS | "2025-09-21T00:00:00.000Z" | Loading Barang Ke Lapangan ATM Informasi |  07,00 s/d 07,30 WIB.
+Baris 7: 6 | 472 | MUHAJIR | 1 Mobil B 9514 SRU | "2025-09-17T00:00:00.000Z" | Loading barang ke LAp Gajah Timur |  07,00 s/d 07,30 WIB.
+Baris 8: 7 | 473 | RICO | 1 Mobi R 1827 FP | "2025-09-20T00:00:00.000Z" | Loading barang ke Taman Satwa Anak Pendopo 1 |  06,00 s/d 07,30 WIB.
+Baris 9: 8 | 474 | Miyarni | 1 Mobil B 2161 FYA | "2025-09-27T00:00:00.000Z" | Loading barang ke Taman Satwa Anak Pendopo 4 |  06,00 s/d 07,30 WIB.
+Baris 10: 9 | 475 | Paguyuban Haji Jagakarsa | 1 Mobil B 1869 DKF | "2025-09-20T00:00:00.000Z" | Loading barang ke Taman Satwa Anak Pendopo 4 |  06,00 s/d 07,30 WIB.
+Baris 11: 10 | 476 | Need's | 8 Dewasa, 4 Mobil | 4 Hari, 20,21, 27 dan 28 Sept 2025 | Loading barang |  06,00 s/d 07,30 WIB.
+Baris 12: 11 | 477 | BP. MADIO SUWITO GOMBONG | 1 Mobil B 1165 EYR | "2025-09-21T00:00:00.000Z" | Loading barang  LAP ATM 3 |  06,00 s/d 07,30 WIB.
+Baris 13: 12 | 478 | Frosty Ice Cream |  | 2 Hari 20, 21 September 2025 |  |  06,00 s/d 07,30 WIB.
+Baris 14: 13 | 479 | adi limitless | 3 mobil , F 1872 AAQ, B 2803 SIH, Lalamove | "2025-09-20T00:00:00.000Z" | loadiing barang aula serbaguna |  07,00 s/d 07,30 WIB.
+Baris 15: 14 | 480 | Ashar Arsyad | 1 mobil, B 1491 FYL | "2025-09-21T00:00:00.000Z" | loadiing barang aula TSA |  07,00 s/d 07,30 WIB.
+Baris 16: 15 | 481 | GPIB Markus Septi | 1 mobil, B1161 DKG | "2025-09-22T00:00:00.000Z" | loadiing barang lapaangan timur informasi |  07,00 s/d 07,30 WIB.
+Baris 17: 16 | 482 | PDGI Jakarta Selatan | 1 mobil, B 9240 WQO | "2025-09-26T00:00:00.000Z" | loading tenda |  07,00 s/d 07,30 WIB.
+Baris 18: 17 | 483 | PDGI Jakarta Selatan | 1 mobil, B 7562 JA | "2025-09-27T00:00:00.000Z" | Standby saat Hari H (Pemeriksaan Baksos) |  07,00 s/d 07,30 WIB.
+Baris 19: 18 |  | Momogi | 4 Dewasa 1 Mobil | 2 Hari,  27 dan 28 September 2025 | loading barang |  06,00 s/d 07,30 WIB.
+Baris 20: 19 | 485 | SHASI | 1 Mobil B 2265 Box | "2025-09-27T00:00:00.000Z" | Loading Barang ke Pendopo 2 DI TSA |  06,00 s/d 07,30 WIB.
+Baris 21: 20 | 486 | Pak jhony | D 1751 ES dan B 1972 EYA | "2025-09-27T00:00:00.000Z" | Loadiing barang lapangan teras informasi dan LAP TIMUR INF 2
+ |  06,00 s/d 07,30 WIB.
+Baris 22: 21 | 487 | PHD | 2 Dewasa 2 motor | 28 September 2025 dan 5 oktober 2025 | Loading barang |  06,00 s/d 07,30 WIB.
+Baris 23: 22 | 488 | Koedsi bpk budi | 1 Mobil, B 2246 SIE | "2025-09-28T00:00:00.000Z" | Loading barang lapangan atm 4 |  06,00 s/d 07,30 WIB.
+Baris 24: 23 | 489 | Arisan Vena | 1 Mobil ( B 2636 UYX ) | "2025-09-28T00:00:00.000Z" | Loading Barang ke- TSA 2 |  07,00 s/d 07,30 WIB.
+Baris 25: 24 | 490 | Gereja Pouk Citragrand Cibubur | 1 Mobil ( B 1349 SZX ) | "2025-09-28T00:00:00.000Z" | Loading Barang ke- TSA 4 |  07,00 s/d 07,30 WIB.
+Baris 26: 25 | 491 | Keluarga AE | 1 Mobil ( B  2745 KMO ) | "2025-09-28T00:00:00.000Z" | Loading Barang ke- TSA 3 |  07,00 s/d 07,30 WIB.
+Baris 27: 26 | 492 | SD Muhammadiyah jak pus | 1 mobil B 1203  PFK | "2025-09-30T00:00:00.000Z" | Loading Barang ke- TSA 1 |  07,00 s/d 07,30 WIB.
+Baris 28: 27 | 493 | PT. Sumber Karya Pakarindo | 1 Mobil (                         ), 1 Motor (                  ), 4 Dewasa | 4,5,11 dan 12 Pktober 2025 | Loading Barang Promo |  06,00 s/d 07,30 WIB.
+Baris 29: 28 | 494 | Call donat | 1 Mobil (                         ), 2 Motor (                  ), 3 Dewasa | 4,5,12,19,25,26 Oktober 2025 | Loading Barang Promo |  06,00 s/d 07,30 WIB.
+Baris 30: 29 | 495 | Need's Eskrim | 1 mobil (                          )  2 dewasa | 4,5,11,12 Oktober 2025 | Loding Barang Promo |  06,00 s/d 07,30 WIB.
+Baris 31: 30 | 496 | CFC | 1 Motor (                           ) 2 Dewasa | 4,5,11,12,18,19,25,26 oktober 2025 | Loading Barang Promo |  06,00 s/d 07,30 WIB.
+Baris 32: 31 | 497 | PT. AMAN FOOD INDUSTRI Teh Ngaso / Teh Semesta
+ | 1 Mobil (                     ),1 Motor(                       ) 3 Dewasa | 5, 12, 19 26 Oktober 2025 | Loading Barang Promo |  06,00 s/d 07,30 WIB.
+Baris 33: 32 | 498 | Temu kangen pendawa 3 | 1 Mobil B 1874 PKA | "2025-10-05T00:00:00.000Z" | Loading Barang ke Pendopo 1 DI TSA |  06,00 s/d 07,30 WIB.
+Baris 34: 33 | 499 | Oishi | 1 mobil 4 Dewasa | 4,5,11,12,18,19,25,26 Oktober 2025 | loading barang promo |  06,00 s/d 07,30 WIB.
+Baris 35: 34 | 500 | Dua Kelici | 1 monbil 5 Dewasa | 5, 12 Oktober 2025 | loading barang promo | maksimal  06 :00 WIB
+Baris 36: 35 | 501 | Two Thubmbs | 2 mobil 2 dewaa | 4.5.11.12 Oktober 2025 | loading promo | maksimal  06 :00 WIB
+Baris 37: 36 | 502 | Helmi | 1 mobil (B 2352 BIL) | "2025-10-04T00:00:00.000Z" | loading barang lapangan beringin |  06,00 s/d 07,30 WIB.
+Baris 38: 37 | 503 | Ibu Reni Aprilia | 1 mobil (B 1784 WYG) | "2025-10-05T00:00:00.000Z" | Loading Barang ke- TSA 3 |  07,00 s/d 07,30 WIB.
+Baris 39: 38 | 504 | wiwi kelurahan johar baru | 1 Mobil (B 2423 TOH) | "2025-10-12T00:00:00.000Z" | loading barang ke TSA 2 |  07,00 s/d 07,30 WIB.
+Baris 40: 39 | 505 | Ichitan | 1 mobil 3 dewasa | "2025-10-05T00:00:00.000Z" | loading promo | maksimal  06 :00 WIB
+Baris 41: 40 | 506 | SDIT ANNISA | 1 MOTOR (                   )    | "2025-10-07T00:00:00.000Z" | loading barang ke TSA 2 |  07,00 s/d 07,30 WIB.
+Baris 42: 41 | 507 | Sdit Al hikmah | 1 Mobil B 1729 DZA | "2025-10-08T00:00:00.000Z" | Loading barang ke TSA pendopo 3 |  07,00 s/d 07,30 WIB.
+Baris 43: 42 | 508 | PT. PACIFIC FOOD INDONESIA | 2 Dewasa 1 Mobil (                  ) | 12, 19, 26 Oktober dan 2 November 2025 | loading promo | maksimal  06 :00 WIB
+Baris 44: 43 | 509 | PT DOM PIZZA | 4 Dewasa 1 Mobil (             ) 1 Motor (                 ) | 12, 18,19,25,26 Okt dan 1,2,8,9,Nov 2025 | loading promo | maksimal  06 :00 WIB
+Baris 45: 44 | 510 | Nurita | 1 Mobil B 1041 DZV | "2025-10-09T00:00:00.000Z" | Loading barang Ke teras Informasi |  07,00 s/d 07,30 WIB.
+Baris 46: 45 | 511 | SD Nurul Fikri | 1 Mobi B 7072 EDA | "2025-10-09T00:00:00.000Z" | Loading barang ke Pendopo 3 TSA |  07,00 s/d 07,30 WIB.
+Baris 47: 46 | 512 | Sekolah Alam Bekasi | 1 Mobil B 2628 TZU | "2025-10-11T00:00:00.000Z" | Loadiing barang lapangan ATM 4 |  06,00 s/d 07,30 WIB.
+Baris 48: 47 | 513 | ILUNI 6084 | 1 Mobil B 7 HIS | "2025-10-18T00:00:00.000Z" | Loading barang ke Pendopo 4 TSA |  06,00 s/d 07,30 WIB.
+Baris 49: 48 | 514 | ICHITAN | 4 Dewasa 1 Mobil (                                ) | 12,19,26 Oktober 2025 | loading promo | maksimal  06 :00 WIB
+Baris 50: 49 | 515 | PAUD Imam Safi'i Jakarta | 1 Mobil (                             ) |  | loading barang TSA 2 |  07,00 s/d 07,30 WIB.
+
+--- Sheet: Dispensasi ---
+
+Baris 1:   |  | PEMERINTAH PROVINSI DAERAH KHUSUS IBU KOTA JAKARTA | PEMERINTAH PROVINSI DAERAH KHUSUS IBU KOTA JAKARTA | PEMERINTAH PROVINSI DAERAH KHUSUS IBU KOTA JAKARTA | PEMERINTAH PROVINSI DAERAH KHUSUS IBU KOTA JAKARTA | PEMERINTAH PROVINSI DAERAH KHUSUS IBU KOTA JAKARTA | PEMERINTAH PROVINSI DAERAH KHUSUS IBU KOTA JAKARTA | PEMERINTAH PROVINSI DAERAH KHUSUS IBU KOTA JAKARTA | PEMERINTAH PROVINSI DAERAH KHUSUS IBU KOTA JAKARTA
+Baris 2:  |  | DINAS PERTAMANAN DAN HUTAN KOTA | DINAS PERTAMANAN DAN HUTAN KOTA | DINAS PERTAMANAN DAN HUTAN KOTA | DINAS PERTAMANAN DAN HUTAN KOTA | DINAS PERTAMANAN DAN HUTAN KOTA | DINAS PERTAMANAN DAN HUTAN KOTA | DINAS PERTAMANAN DAN HUTAN KOTA | DINAS PERTAMANAN DAN HUTAN KOTA
+Baris 3:  |  | UNIT PENGELOLA TAMAN MARGASATWA RAGUNAN | UNIT PENGELOLA TAMAN MARGASATWA RAGUNAN | UNIT PENGELOLA TAMAN MARGASATWA RAGUNAN | UNIT PENGELOLA TAMAN MARGASATWA RAGUNAN | UNIT PENGELOLA TAMAN MARGASATWA RAGUNAN | UNIT PENGELOLA TAMAN MARGASATWA RAGUNAN | UNIT PENGELOLA TAMAN MARGASATWA RAGUNAN | UNIT PENGELOLA TAMAN MARGASATWA RAGUNAN
+Baris 4:  |  | Jalan harsono RM. No. 1 Ragunan, Telp (021) 7820015 fax. (021) 7805280 | Jalan harsono RM. No. 1 Ragunan, Telp (021) 7820015 fax. (021) 7805280 | Jalan harsono RM. No. 1 Ragunan, Telp (021) 7820015 fax. (021) 7805280 | Jalan harsono RM. No. 1 Ragunan, Telp (021) 7820015 fax. (021) 7805280 | Jalan harsono RM. No. 1 Ragunan, Telp (021) 7820015 fax. (021) 7805280 | Jalan harsono RM. No. 1 Ragunan, Telp (021) 7820015 fax. (021) 7805280 | Jalan harsono RM. No. 1 Ragunan, Telp (021) 7820015 fax. (021) 7805280 | Jalan harsono RM. No. 1 Ragunan, Telp (021) 7820015 fax. (021) 7805280
+Baris 5:  |  | [object Object] | [object Object] | [object Object] | [object Object] | [object Object] | [object Object] | [object Object] | [object Object] |  |  |  |  |  |  
+Baris 6:  |  | JAKARTA | JAKARTA | JAKARTA | JAKARTA | JAKARTA | JAKARTA | JAKARTA | JAKARTA
+Baris 7:  |  |  |  |  |  |  |  | Kode Pos : 12550 | Kode Pos : 12550
+Baris 8: DISPENSASI | DISPENSASI | DISPENSASI | DISPENSASI | DISPENSASI | DISPENSASI | DISPENSASI | DISPENSASI | DISPENSASI | DISPENSASI
+Baris 9:  |  |  |  | NOMOR : | NOMOR : | 434 | 434
+Baris 10: 
+Baris 11: Kepala Unit Pengelola Taman Margasatwa Ragunan Provinsi DKI Jakarta memberikan ijin kepada : | Kepala Unit Pengelola Taman Margasatwa Ragunan Provinsi DKI Jakarta memberikan ijin kepada : | Kepala Unit Pengelola Taman Margasatwa Ragunan Provinsi DKI Jakarta memberikan ijin kepada : | Kepala Unit Pengelola Taman Margasatwa Ragunan Provinsi DKI Jakarta memberikan ijin kepada : | Kepala Unit Pengelola Taman Margasatwa Ragunan Provinsi DKI Jakarta memberikan ijin kepada : | Kepala Unit Pengelola Taman Margasatwa Ragunan Provinsi DKI Jakarta memberikan ijin kepada : | Kepala Unit Pengelola Taman Margasatwa Ragunan Provinsi DKI Jakarta memberikan ijin kepada : | Kepala Unit Pengelola Taman Margasatwa Ragunan Provinsi DKI Jakarta memberikan ijin kepada : | Kepala Unit Pengelola Taman Margasatwa Ragunan Provinsi DKI Jakarta memberikan ijin kepada : | Kepala Unit Pengelola Taman Margasatwa Ragunan Provinsi DKI Jakarta memberikan ijin kepada :
+Baris 12: Nama Rombongan | Nama Rombongan | : | WKRI Ranting 4 | WKRI Ranting 4 | WKRI Ranting 4 | WKRI Ranting 4 | WKRI Ranting 4 | WKRI Ranting 4 | WKRI Ranting 4
+Baris 13: Tanggal Kunjungan | Tanggal Kunjungan | : | 8 aguistus 2026 | 8 aguistus 2026 | 8 aguistus 2026 | 8 aguistus 2026 | 8 aguistus 2026 | 8 aguistus 2026
+Baris 14: Keperluan | Keperluan | : | loading barang LAP TSIK 1 | loading barang LAP TSIK 1 | loading barang LAP TSIK 1 | loading barang LAP TSIK 1 | loading barang LAP TSIK 1 | loading barang LAP TSIK 1 | loading barang LAP TSIK 1
+Baris 15: Nomor Kendaraan | Nomor Kendaraan | : | B 266 ADV | B 266 ADV | B 266 ADV | B 266 ADV | B 266 ADV | B 266 ADV | B 266 ADV
+Baris 16: 
+Baris 17:  | Ketentuan : |  |  |  |  |  |  |  |  |  |    
+Baris 18: 1 | Setelah selesai menurunkan barang, kendaraan kembali ke tempat parkir TMR dan tidak diperkenankan parkir ditempat acara ataupun berkeliling didalam kawasan TMR. | Setelah selesai menurunkan barang, kendaraan kembali ke tempat parkir TMR dan tidak diperkenankan parkir ditempat acara ataupun berkeliling didalam kawasan TMR. | Setelah selesai menurunkan barang, kendaraan kembali ke tempat parkir TMR dan tidak diperkenankan parkir ditempat acara ataupun berkeliling didalam kawasan TMR. | Setelah selesai menurunkan barang, kendaraan kembali ke tempat parkir TMR dan tidak diperkenankan parkir ditempat acara ataupun berkeliling didalam kawasan TMR. | Setelah selesai menurunkan barang, kendaraan kembali ke tempat parkir TMR dan tidak diperkenankan parkir ditempat acara ataupun berkeliling didalam kawasan TMR. | Setelah selesai menurunkan barang, kendaraan kembali ke tempat parkir TMR dan tidak diperkenankan parkir ditempat acara ataupun berkeliling didalam kawasan TMR. | Setelah selesai menurunkan barang, kendaraan kembali ke tempat parkir TMR dan tidak diperkenankan parkir ditempat acara ataupun berkeliling didalam kawasan TMR. | Setelah selesai menurunkan barang, kendaraan kembali ke tempat parkir TMR dan tidak diperkenankan parkir ditempat acara ataupun berkeliling didalam kawasan TMR. | Setelah selesai menurunkan barang, kendaraan kembali ke tempat parkir TMR dan tidak diperkenankan parkir ditempat acara ataupun berkeliling didalam kawasan TMR.
+Baris 19: 2 | Setiap pengantar barang wajib membayar tarif masuk berikut kendaraannya. | Setiap pengantar barang wajib membayar tarif masuk berikut kendaraannya. | Setiap pengantar barang wajib membayar tarif masuk berikut kendaraannya. | Setiap pengantar barang wajib membayar tarif masuk berikut kendaraannya. | Setiap pengantar barang wajib membayar tarif masuk berikut kendaraannya. | Setiap pengantar barang wajib membayar tarif masuk berikut kendaraannya. | Setiap pengantar barang wajib membayar tarif masuk berikut kendaraannya. | Setiap pengantar barang wajib membayar tarif masuk berikut kendaraannya. | Setiap pengantar barang wajib membayar tarif masuk berikut kendaraannya.
+Baris 20: 3 | Jadwal loading dari hari selasa s/d Minggu,  |  |  |  | 07,00 s/d 08,00 WIB. | 07,00 s/d 08,00 WIB. | 07,00 s/d 08,00 WIB.
+Baris 21: 
+Baris 22: Demikian Dispensasi ini diberikan untuk digunakan sebagai mestinya. | Demikian Dispensasi ini diberikan untuk digunakan sebagai mestinya. | Demikian Dispensasi ini diberikan untuk digunakan sebagai mestinya. | Demikian Dispensasi ini diberikan untuk digunakan sebagai mestinya. | Demikian Dispensasi ini diberikan untuk digunakan sebagai mestinya. | Demikian Dispensasi ini diberikan untuk digunakan sebagai mestinya. | Demikian Dispensasi ini diberikan untuk digunakan sebagai mestinya. | Demikian Dispensasi ini diberikan untuk digunakan sebagai mestinya. | Demikian Dispensasi ini diberikan untuk digunakan sebagai mestinya. | Demikian Dispensasi ini diberikan untuk digunakan sebagai mestinya.
+Baris 23: Demikian Dispensasi ini diberikan untuk digunakan sebagai mestinya. | Demikian Dispensasi ini diberikan untuk digunakan sebagai mestinya. | Demikian Dispensasi ini diberikan untuk digunakan sebagai mestinya. | Demikian Dispensasi ini diberikan untuk digunakan sebagai mestinya. | Demikian Dispensasi ini diberikan untuk digunakan sebagai mestinya. | Demikian Dispensasi ini diberikan untuk digunakan sebagai mestinya. | Demikian Dispensasi ini diberikan untuk digunakan sebagai mestinya. | Demikian Dispensasi ini diberikan untuk digunakan sebagai mestinya. | Demikian Dispensasi ini diberikan untuk digunakan sebagai mestinya. | Demikian Dispensasi ini diberikan untuk digunakan sebagai mestinya.
+Baris 24: 
+Baris 25: 
+Baris 26:  |  |  |  |  |  |  | Jakarta, Kamis 06 Agustus 2026 | Jakarta, Kamis 06 Agustus 2026 | Jakarta, Kamis 06 Agustus 2026
+Baris 27: 
+Baris 28:  |  |  |  |  |  |  | Kepala Unit Pengelola | Kepala Unit Pengelola | Kepala Unit Pengelola
+Baris 29:  |  |  |  |  |  |  | Taman Margasatwa Ragunan | Taman Margasatwa Ragunan | Taman Margasatwa Ragunan
+Baris 30:  |  |  |  |  |  |  | Dinas Pertamanan dan Hutan Kota | Dinas Pertamanan dan Hutan Kota | Dinas Pertamanan dan Hutan Kota
+Baris 31:  |  |  |  |  |  |  | Provinsi DKI Jakarta | Provinsi DKI Jakarta | Provinsi DKI Jakarta
+Baris 32: 
+Baris 33: 
+Baris 34: 
+Baris 35: 
+Baris 36: 
+Baris 37: 
+Baris 38: 
+Baris 39: 
+Baris 40: 
+Baris 41: 
+Baris 42: 
+Baris 43: 
+Baris 44: 
+Baris 45: 
+Baris 46: 
+Baris 47: 
+Baris 48: 
+Baris 49: 
+Baris 50: 
+
+--- Sheet: 2026 ---
+
+Baris 1: No | Nomor Surat | Nama Rombongan / Instansi | NOPOL | Tanggal Kunjungan | Keperluan | Jam Loading | 434
+Baris 2: 1 | 1 | Two thumbs Ice cream  | 2 Dewasa 2 Mobil (                  ) (                    ) | 8,9,10,11,17,18, 24 januari 2026 | Loading Barang Promo | maksimal  06 :00 WIB | Dispensasi
+Baris 3: 2 | 2 | koperasi guru jatiasih | 3 mobil ( B 2107 BRJ ) ( B 2723 YC ) ( B 2177 KYC ) | "2026-01-17T00:00:00.000Z" | loading barang gedung serbaguna  |  06,00 s/d 07,30 WIB.
+Baris 4: 3 | 3 | ibu sulistiawati | 1 mobil (B 1986 TVB)  | "2026-01-10T00:00:00.000Z" | loading barang pendopo TSA 3 |  06,00 s/d 07,30 WIB. | https://docs.google.com/spreadsheets/d/1GIYP3gKlwKD1FjOm9J1bBxcXXS3yi7xxxQRVqMkhHXI/edit?gid=677168732#gid=677168732
+Baris 5: 4 | 4 | PT. DOMINOS | 2 Dewasa 1 Mobil (             ) 1 Motor(                    ) | 10, 11, 12, 17, 18, 24, 25, 31 Januari dan 1, 7 Februari 2026 | Loading Barang Promo | maksimal  06 :00 WIB
+Baris 6: 5 | 5 | PT. Pioneerindo Gourmet Internasional tbk call donat | 2 Dewasa 1 Mobil (                 ) 1 Motor (                  ) | 10,11,17,18,24,25,31 Januari dan 01 Februari 2026 | Loading Barang Promo | maksimal  06 :00 WIB
+Baris 7: 6 | 6 | PT PIONEERINDO GOURMET INT | 2 Dewasa 1 Mobil (                  ) | 10,11,17,18,24,25,31 Januari dan 01 Februari 2026 | Loading Barang Promo | maksimal  06 :00 WIB
+Baris 8: 7 | 7 | kartadinama | 1 mobil B 1933 SRQ | "2026-01-11T00:00:00.000Z" | loading barang  |  06,00 s/d 07,30 WIB.
+Baris 9: 8 | 8 | BSI | 1 Mobil ( B 1894 DYF )  | "2026-01-10T00:00:00.000Z" | Loading Barang Pendopo TSA 3 |  07,00 s/d 07,30 WIB.
+Baris 10: 9 | 9 | Jus Antara | 3 Dewasa 1 Mobil | "2026-01-18T00:00:00.000Z" | Loading barang promo | maksimal  06 :00 WIB
+Baris 11: 10 | 10 | Two thumbs ice cream | 2 Dewasa 2 Mobil (                     ) (                           ) | 16 dan 25 Januari 2026 | Loading barang promo | maksimal  06 :00 WIB
+Baris 12: 11 | 11 | SDTQ Imam Syafi'i  | 2 mobil ( B 2914 SRD ) ( B 8322 BW ) | 8 febuari 2026 | loading barang aula serbaguna  |  06,00 s/d 07,30 WIB.
+Baris 13: 12 | 12 | OISHI | 4 Dewasa 1 Mobil (                  ) | 16,17,18,25,31, Januari 2026 | Loading Barang Promo | maksimal  06 :00 WIB
+Baris 14: 13 | 13 | Biller Pane | 1 mobil (B 1073 FYZ ) | "2026-01-16T00:00:00.000Z" | loading barang |  07,00 s/d 07,30 WIB.
+Baris 15: 14 | 14 | DHORID | 1 mobil (B 1210 WN) | 18, 25 JANUARI DAN 1, 8 FEBRUARI 2026 | LOADING BARANG PROMO | maksimal  06 :00 WIB
+Baris 16: 15 | 15 | Arisan Mak Ijah  | 1 Mobil ( B 9498 EUC ) | "2026-01-18T00:00:00.000Z" | Loading Barang Pendopo TSA 4 |  07,00 s/d 07,30 WIB.
+Baris 17: 16 | 16 | IGTKI KECAMATAN JAGAKARSA | 1 MOBIL ( F 1766 LA ) | "2026-01-21T00:00:00.000Z" | Loading barang |  14,00 s/d 15,00 WIB.
+Baris 18: 17 | 17 | IGTKI KECAMATAN JAGAKARSA | 4 Kendaraan TAXI ONLINE | "2026-01-22T00:00:00.000Z" | Loading Barang ke Gazebo |  07,00 s/d 07,30 WIB.
+Baris 19: 18 | 18 | CV.Karya Insan Mandiri | 1 mobil (  D 8483 WI ) | "2026-01-25T00:00:00.000Z" | loading barang aula serbaguna  |  06,00 s/d 07,30 WIB.
+Baris 20: 19 | 19 | ULS Jabodetabek ( Maman Keswan ) | 3 mobil ( B 2048 KNI ) ( B 1133 KI ) ( B 2344 PBS ) | "2026-01-24T00:00:00.000Z" | Loading Barang  |  06,00 s/d 07,30 WIB.
+Baris 21: 20 | 20 | Taro FKS Food Sejahtera | 1 Mobil, 5 orang  | 24,25,31 Januari, 01 Februari 2026 | Loading Barang |  06,00 s/d 07,30 WIB.
+Baris 22: 21 | 21 | IBU YAYUK | 2 Mobil B 2898 SYF  dan (                           ) | "2026-01-24T00:00:00.000Z" | Loading Barang ke Aula Serbaguna |  06,00 s/d 07,30 WIB.
+Baris 23: 22 | 22 | Ikapureka | 1 Mobil ( B 219 RRF ) | "2026-01-25T00:00:00.000Z" | Loading Barang Gazebo |  06,00 s/d 07,30 WIB.
+Baris 24: 23 | 23 | Maria ( Pendopo 4 ) | 1 Mobil ( B 1541 URB ) | "2026-01-25T00:00:00.000Z" | Loading Barang |  06,00 s/d 07,30 WIB.
+Baris 25: 24 | 24 | Ibu iin indarwati | 1 Mobil ( B 1293 SRV ) | "2026-02-01T00:00:00.000Z" | Loading Barang Gazebo |  06,00 s/d 07,30 WIB.
+Baris 26: 25 | 25 | Bani Hamim | 1 Mobil ( B 1794 KYT ) | "2026-02-01T00:00:00.000Z" | Loading Barang LAP TIMUR INF 1 |  06,00 s/d 07,30 WIB.
+Baris 27: 26 | 26 | Domino's Pizza | 2 Dewasa 1 Mobil (             ) 1 Motor(                    ) | 8, 14, 15 Februari dan 20, 21, 22, 23, 24 Maret 2026 | Loading barang promo | maksimal  06 :00 WIB
+Baris 28: 27 | 27 | PT. Sumber Karya Pakarindo | 4 Orang, 1 Mobil (                  ) 1 Motor (                   ) | 1,7,8,14,15 februari dan 22,23,24,25,26,27,28,29 maret 2026 | Loading Barang |  06,00 s/d 07,30 WIB.
+Baris 29: 28 | 28 | NEEDS | 3 orang , 1 Mobil (                   ) | 31 januari dan 1,7,8 febuari | Loading Barang | maksimal  06 :00 WIB
+Baris 30: 29 | 29 | Two thumbs ice cream | 2 Dewasa 2 Mobil (                     ) (                           ) | 31 Januari 2026 dan 1,7,8 Febuari 2026 | Loading Barang Promo | maksimal  06 :00 WIB
+Baris 31: 30 | 30 | TPA AR Rahmah | 1 mobil (B 2461UKB), 2 dewasa | "2026-01-31T00:00:00.000Z" | Loading Barang |  07,00 s/d 07,30 WIB.
+Baris 32: 31 | 31 | Bu Santi | 1 Mobil ( B 1532 DZG ) | "2026-01-01T00:00:00.000Z" | Loading Barang |  07,00 s/d 07,30 WIB.
+Baris 33: 32 | 32 | TK Assalam kebagusan | 1 Mobil ( B 1477 SRY) | "2026-02-05T00:00:00.000Z" | Loading Barang Pendopo TSA 2 dan 3  |  07,00 s/d 07,30 WIB.
+Baris 34: 33 | 33 | PT. PIONEERINDO GOURMET  | 1 Motor (                   ) 2 dewasa  | 7,8,14,15,16,17 febuari 2026 | loading barang  | maksimal  06 :00 WIB
+Baris 35: 34 | 34 | PT MARGA NUSANTARA JAYA | 5 Dewasa 1 Mobil (                     ) | "2026-02-08T00:00:00.000Z" | loading barang aula serbaguna  | maksimal  06 :00 WIB
+Baris 36: 35 | 35 | Korpri Bareskrim Mabes Polri | 1 MOBIL (  B. 2606 SIV )  | 7 Febuari 2026 | loading barang aula serbaguna  |  06,00 s/d 07,30 WIB.
+Baris 37: 36 | 36 | Korpri Bareskrim Mabes Polri | 1 MOBIL ( B. 168.WUK  ) | 7 Febuari 2026 | loading barang aula serbaguna | maksimal  06 :00 WIB
+Baris 38: 37 | 37 | Korpri Bareskrim Mabes Polri | 1 MOBIL ( Taksi online ) | 7 Febuari 2026 | loading barang aula serbaguna | maksimal  06 :00 WIB
+Baris 39: 38 | 38 | Korpri Bareskrim Mabes Polri |  1 MOBIL ( Taksi online ) | 7 Febuari 2026 | loading barang aula serbaguna | maksimal  06 :00 WIB
+Baris 40: 39 | 39 | STHQ |  1 MOBIL ( B 2396 SIK ) | 5 FEBUARI 2026 | LOADING BARANG LAP TIMUR INF 1 |  07,00 s/d 07,30 WIB.
+Baris 41: 40 | 40 | PT. Pioneerindo Gourmet Int. Tbk. | 2 Dewasa, 1 Mobil (                       ), 2 Motor  (               ) | 7,8,14,15 Februari 2026 | Loading Barang Promo |  06,00 s/d 07,30 WIB.
+Baris 42: 41 | 41 | PT ADVISINDO ARTISTIKA/ IRIS Mayora ( Teh Pucuk ) | 5 Dewasa, 1 Mobil (                        ) | 14 FEBRUARI - 17 FEBRUARI 2026 | Loading Barang Promo | maksimal  06 :00 WIB
+Baris 43: 42 | 42 | PT ADVISINDO ARTISTIKA/ IRIS Mayora ( Teh Pucuk ) | 5 Dewasa, 1 Mobil (                        ) | 18 -25 MARET 2026 | Loading Barang Promo | maksimal  06 :00 WIB
+Baris 44: 43 | 43 | OISHI | 4 Dewasa, 1 Mobil (                        ) | 1,7,8 Februari 2026 | Loading Barang Promo | maksimal  06 :00 WIB
+Baris 45: 44 | 44 | PT. Kreasi Pandawa Sakti  Ichitan | 5 Dewasa 2 Mobil (                     ) (                             ) | 15 Februari, 22-23 Maret 2026 | Loading Barang Promo | maksimal  06 :00 WIB
+Baris 46: 45 | 45 | HANIFATUNNISA | 1 Mobil ( B 8570 NQ ) | "2026-02-08T00:00:00.000Z" | Loading Barang Pendopo |  07,00 s/d 07,30 WIB.
+Baris 47: 46 | 46 | Andri Kita Bisa | 1 Mobil  B 1573 EMZ dan B 1085 TJ | "2026-02-12T00:00:00.000Z" | Loading Barang ke Aula Serbaguna |  07,00 s/d 07,30 WIB.
+Baris 48: 47 | 47 | Two thumbs ice cream | 3 Dewasa 2 Mobil (                     ) (                           ) | 14, 15, 17 febuari 2026 | Loading Barang Promo | maksimal  06 :00 WIB
+Baris 49: 48 | 48 | Domino's Pizza | 2 Dewasa 1 Mobil (             ) 1 Motor(                    ) | 20, 21, 22, 23, 24 Maret 2026 | Loading Barang Promo | maksimal  06 :00 WIB
+Baris 50: 49 | 49 | Yayasan dompet yatim duafa | 1 Mobil  B 9268 ERU | "2026-02-15T00:00:00.000Z" | Loading Barang ke Aula Serbaguna |  06,00 s/d 07,30 WIB.
+
+--- Sheet: Sheet12 ---
+
+Baris 1: AGUSTUS | TANGGAL | NO | TGL | BLN | KET | THN | JUMLAH KARTU/PCS | JUMLAH KARTU/PCS 2
+Baris 2: 211/2/9/SUKJ/2025 | "2025-09-02T00:00:00.000Z" | 211 | 2 | 9 | SUKJ | 2025 | 186 | 36
+Baris 3: 212/3/9/SUKJ/2025 | "2025-09-03T00:00:00.000Z" | 212 | 3 | 9 | SUKJ | 2025 | 150 | 36
+Baris 4: 213/4/9/SUKJ/2025 | "2025-09-04T00:00:00.000Z" | 213 | 4 | 9 | SUKJ | 2025 | 161 | 28
+Baris 5: 214/5/9/SUKJ/2025 | "2025-09-05T00:00:00.000Z" | 214 | 5 | 9 | SUKJ | 2025
+Baris 6: 215/6/9/SUKJ/2025 | "2025-09-06T00:00:00.000Z" | 215 | 6 | 9 | SUKJ | 2025 | 910 | 226
+Baris 7: 216/7/9/SUKJ/2025 | "2025-09-07T00:00:00.000Z" | 216 | 7 | 9 | SUKJ | 2025 | 1758 | 458 |  |  | Hari/Tanggal : Kamis 06 Agustus | Hari/Tanggal : Kamis 06 Agustus | Hari/Tanggal : Kamis 06 Agustus | Hari/Tanggal : Kamis 06 Agustus
+Baris 8: 217/9/9/SUKJ/2025 | "2025-09-09T00:00:00.000Z" | 217 | 9 | 9 | SUKJ | 2025 | 162 | 34
+Baris 9: 218/10/9/SUKJ/2025 | "2025-09-10T00:00:00.000Z" | 218 | 10 | 9 | SUKJ | 2025 | 213 | 30
+Baris 10: 219/11/9/SUKJ/2025 | "2025-09-11T00:00:00.000Z" | 219 | 11 | 9 | SUKJ | 2025 | 187 | 33
+Baris 11: 220/12/9/SUKJ/2025 | "2025-09-12T00:00:00.000Z" | 220 | 12 | 9 | SUKJ | 2025 | 125 | 30
+Baris 12: 221/13/9/SUKJ/2025 | "2025-09-13T00:00:00.000Z" | 221 | 13 | 9 | SUKJ | 2025 | 858 | 209
+Baris 13: 222/14/9/SUKJ/2025 | "2025-09-14T00:00:00.000Z" | 222 | 14 | 9 | SUKJ | 2025 | 1658 | 453
+Baris 14: 223/16/9/SUKJ/2025 | "2025-09-16T00:00:00.000Z" | 223 | 16 | 9 | SUKJ | 2025 | 132 | 19
+Baris 15: 224/17/9/SUKJ/2025 | "2025-09-17T00:00:00.000Z" | 224 | 17 | 9 | SUKJ | 2025 | 200 | 36
+Baris 16: 225/18/9/SUKJ/2025 | "2025-09-18T00:00:00.000Z" | 225 | 18 | 9 | SUKJ | 2025 | 143 | 30
+Baris 17: 226/19/9/SUKJ/2025 | "2025-09-19T00:00:00.000Z" | 226 | 19 | 9 | SUKJ | 2025 | 160 | 23
+Baris 18: 227/20/9/SUKJ/2025 | "2025-09-20T00:00:00.000Z" | 227 | 20 | 9 | SUKJ | 2025 | 756 | 172
+Baris 19: 228/21/9/SUKJ/2025 | "2025-09-21T00:00:00.000Z" | 228 | 21 | 9 | SUKJ | 2025 | 1494 | 418
+Baris 20: 229/23/9/SUKJ/2025 | "2025-09-23T00:00:00.000Z" | 229 | 23 | 9 | SUKJ | 2025 | 192 | 48
+Baris 21: 230/24/9/SUKJ/2025 | "2025-09-24T00:00:00.000Z" | 230 | 24 | 9 | SUKJ | 2025 | 200 | 50
+Baris 22: 231/25/9/SUKJ/2025 | "2025-09-25T00:00:00.000Z" | 231 | 25 | 9 | SUKJ | 2025 | 148 | 36
+Baris 23: 232/26/9/SUKJ/2025 | "2025-09-26T00:00:00.000Z" | 232 | 26 | 9 | SUKJ | 2025
+Baris 24: 233/27/9/SUKJ/2025 | "2025-09-27T00:00:00.000Z" | 233 | 27 | 9 | SUKJ | 2025
+Baris 25: 234/28/9/SUKJ/2025 | "2025-09-28T00:00:00.000Z" | 234 | 28 | 9 | SUKJ | 2025
+Baris 26: 235/30/9/SUKJ/2025 | "2025-09-30T00:00:00.000Z" | 235 | 30 | 9 | SUKJ | 2025
+
+--- Sheet: Sheet15 ---
+
+
+--- Sheet: Sheet3 ---
+
+Baris 1: 
+Baris 2:  |  |  |  | DATA DISPENSASI
+Baris 3: Agung Puji Saputra | "2025-09-01T00:00:00.000Z" | Utara 1
+Baris 4: Ahmad Maulana | "2025-09-02T00:00:00.000Z" | Utara 2
+Baris 5: Aldi Priadi Ekapaksi | "2025-09-03T00:00:00.000Z" | Utara 3
+Baris 6: Amanda Luthfia Ramadhani | "2025-09-04T00:00:00.000Z" | Tol Utara
+Baris 7: Amanda Sabila | "2025-09-05T00:00:00.000Z" | Barat Kendaraan
+Baris 8: Arif Nurdiansah | "2025-09-06T00:00:00.000Z"
+Baris 9: Eka Priyatiningsih | "2025-09-07T00:00:00.000Z"
+Baris 10: Erfan | "2025-09-08T00:00:00.000Z"
+Baris 11: Ernawati Yuliastiningsih | "2025-09-09T00:00:00.000Z"
+Baris 12: Ervi Irawati | "2025-09-10T00:00:00.000Z"
+Baris 13: Febria Shafira | "2025-09-11T00:00:00.000Z"
+Baris 14: Feiruz | "2025-09-12T00:00:00.000Z"
+Baris 15: Fildzah Shabrina | "2025-09-13T00:00:00.000Z"
+Baris 16: Firda Anjanie | "2025-09-14T00:00:00.000Z"
+Baris 17: Herdi Nofiandi | "2025-09-15T00:00:00.000Z"
+Baris 18: Ilham Setiyono | "2025-09-16T00:00:00.000Z"
+Baris 19: Irma Khotimah | "2025-09-17T00:00:00.000Z"
+Baris 20: Laska Nur Shadrina | "2025-09-18T00:00:00.000Z"
+Baris 21: M. Zahwa Dwianka | "2025-09-19T00:00:00.000Z"
+Baris 22: Moh Izwan Ikhsani | "2025-09-20T00:00:00.000Z"
+Baris 23: Nabila Noor Main | "2025-09-21T00:00:00.000Z"
+Baris 24: Ningrum Septianti | "2025-09-22T00:00:00.000Z"
+Baris 25: Novya Istiqomah | "2025-09-23T00:00:00.000Z"
+Baris 26: Nuzul Khaerun Ramadhan | "2025-09-24T00:00:00.000Z"
+Baris 27: Rendy Renaldy | "2025-09-25T00:00:00.000Z"
+Baris 28: Ridwan Maulana | "2025-09-26T00:00:00.000Z"
+Baris 29: Rizmy Hikmat | "2025-09-27T00:00:00.000Z"
+Baris 30: Rosa Anjulina | "2025-09-28T00:00:00.000Z"
+Baris 31: Ryant Sena Perwira | "2025-09-29T00:00:00.000Z"
+Baris 32: Sahara Firyal Humaira | "2025-09-30T00:00:00.000Z"
+Baris 33: Sarifudin
+Baris 34: Siska Rahmawati
+Baris 35: Uci Anggraini
+Baris 36: Widyo Siswantoro
+Baris 37: Yusuf Safii
+Baris 38: 
+Baris 39: 
+Baris 40: 
+Baris 41: 
+Baris 42: 
+Baris 43: 
+Baris 44: 
+Baris 45: 
+Baris 46: 
+Baris 47: 
+Baris 48: 
+Baris 49: 
+Baris 50: 
