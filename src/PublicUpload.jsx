@@ -318,6 +318,7 @@ export default function PublicUpload() {
                     <input 
                       type="date" 
                       required
+                      max={new Date().toISOString().split('T')[0]}
                       value={paymentDate}
                       onChange={(e) => setPaymentDate(e.target.value)}
                       className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all"
