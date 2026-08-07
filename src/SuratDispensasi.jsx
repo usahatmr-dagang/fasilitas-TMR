@@ -15,6 +15,61 @@ const getPromoDate = (item) => {
     return item.tanggalPromo || null;
 };
 
+const formatMultiTanggal = (dates) => {
+    if (!dates || dates.length === 0) return '-';
+    
+    // Sort array strings so they are ordered by date
+    const dateStrs = dates.map(d => typeof d === 'object' && d !== null ? d.date : d).sort();
+    const dateObjs = dateStrs.map(d => new Date(d)).filter(d => !isNaN(d.getTime()));
+    if (dateObjs.length === 0) return '-';
+
+    const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+    
+    const grouped = {};
+    dateObjs.forEach(d => {
+        const year = d.getFullYear();
+        const month = d.getMonth();
+        const day = d.getDate();
+        if (!grouped[year]) grouped[year] = {};
+        if (!grouped[year][month]) grouped[year][month] = [];
+        if (!grouped[year][month].includes(day)) {
+            grouped[year][month].push(day);
+        }
+    });
+
+    const resultParts = [];
+    const years = Object.keys(grouped).sort();
+    
+    years.forEach((year) => {
+        const months = Object.keys(grouped[year]).sort((a, b) => Number(a) - Number(b));
+        const yearPart = [];
+        
+        months.forEach((month, monthIndex) => {
+            const days = grouped[year][month];
+            const daysStr = days.join(',');
+            const monthName = monthNames[month];
+            
+            if (years.length === 1) {
+                yearPart.push(`${daysStr} ${monthName}`);
+            } else {
+                if (monthIndex === months.length - 1) {
+                   yearPart.push(`${daysStr} ${monthName} ${year}`);
+                } else {
+                   yearPart.push(`${daysStr} ${monthName}`);
+                }
+            }
+        });
+        
+        if (years.length === 1) {
+            resultParts.push(yearPart.join(', ') + ` ${year}`);
+        } else {
+            resultParts.push(yearPart.join(', '));
+        }
+    });
+
+    return resultParts.join(', ');
+};
+
 export default function SuratDispensasi({ onNavigate }) {
   const [source, setSource] = useState('sewa'); // 'sewa' or 'promo'
   const [dataList, setDataList] = useState([]);
@@ -182,11 +237,37 @@ export default function SuratDispensasi({ onNavigate }) {
     if (selectedItem) {
       if (source === 'sewa') {
         setKeperluan(`Loading Barang ke ${selectedItem.lokasi_sewa || ''}`);
-        setTglKunjungan(selectedItem.tanggal_sewa || '');
+        
+        const singleDate = selectedItem.tanggal_sewa;
+        if (singleDate) {
+            const d = new Date(singleDate);
+            if (!isNaN(d.getTime())) {
+                setTglKunjungan(d.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }));
+            } else {
+                setTglKunjungan(singleDate);
+            }
+        } else {
+            setTglKunjungan('');
+        }
+        
       } else {
-        const pDate = getPromoDate(selectedItem);
         setKeperluan(`Loading Barang Promo (${selectedItem.namaProduk || ''})`);
-        setTglKunjungan(pDate || '');
+        
+        if (selectedItem.selectedDates && Array.isArray(selectedItem.selectedDates) && selectedItem.selectedDates.length > 0) {
+            setTglKunjungan(formatMultiTanggal(selectedItem.selectedDates));
+        } else {
+            const singlePDate = selectedItem.tanggalPromo;
+            if (singlePDate) {
+                const d = new Date(singlePDate);
+                if (!isNaN(d.getTime())) {
+                    setTglKunjungan(d.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }));
+                } else {
+                    setTglKunjungan(singlePDate);
+                }
+            } else {
+                setTglKunjungan('');
+            }
+        }
       }
     }
   }, [selectedItem, source]);
