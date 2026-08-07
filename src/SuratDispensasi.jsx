@@ -203,7 +203,7 @@ export default function SuratDispensasi({ onNavigate }) {
     return groups;
   }, [filteredData, source]);
 
-  const handlePrint = async () => {
+  const handlePrint = async (forceUpdate = false) => {
     if (!selectedItem || !tglKunjungan || !nopol) {
       alert("Harap lengkapi Tanggal Kunjungan dan Plat Nomor (NOPOL)!");
       return;
@@ -212,14 +212,16 @@ export default function SuratDispensasi({ onNavigate }) {
     setIsGenerating(true);
     try {
       const dateObj = new Date();
-      const currentYear = dateObj.getFullYear();
       
-      const padZero = (num) => num.toString().padStart(2, '0');
-      const yyyyMmDd = `${currentYear}-${padZero(dateObj.getMonth()+1)}-${padZero(dateObj.getDate())}`;
-      const kode = source === 'promo' ? 'P' : 'R';
-      
-      const randomCounter = Math.floor(1000 + Math.random() * 9000); 
-      const formatNomor = `${yyyyMmDd}/${kode}/${randomCounter}`;
+      let formatNomor = selectedItem.nomorSuratDispensasi;
+      if (!formatNomor || forceUpdate === false) {
+          const currentYear = dateObj.getFullYear();
+          const padZero = (num) => num.toString().padStart(2, '0');
+          const yyyyMmDd = `${currentYear}-${padZero(dateObj.getMonth()+1)}-${padZero(dateObj.getDate())}`;
+          const kode = source === 'promo' ? 'P' : 'R';
+          const randomCounter = Math.floor(1000 + Math.random() * 9000); 
+          formatNomor = `${yyyyMmDd}/${kode}/${randomCounter}`;
+      }
       
       const namaInstansi = source === 'sewa' ? selectedItem.nama_penyewa : selectedItem.namaPerusahaan;
       
@@ -392,21 +394,12 @@ export default function SuratDispensasi({ onNavigate }) {
         >
           <ChevronLeft size={24} />
         </button>
-        <div>
-          <h1 className="text-3xl font-black text-emerald-950 tracking-tight flex items-center gap-3">
-            <FileText className="text-emerald-600" size={32} />
+        <div className="flex flex-col">
+          <h2 className="text-3xl font-black text-slate-800 tracking-tight flex items-center gap-3">
+            <FileText className="text-emerald-500" size={32} />
             Cetak Surat Dispensasi
-          </h1>
+          </h2>
           <p className="text-slate-500 font-medium mt-1">Buat format surat dispensasi loading barang otomatis (langsung PDF).</p>
-        </div>
-        <div className="ml-auto flex gap-2">
-          <button 
-            onClick={handleOpenHistory}
-            className="px-4 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 hover:text-slate-900 rounded-xl font-bold flex items-center gap-2 transition-colors"
-          >
-            <Clock size={18} />
-            Lihat Riwayat
-          </button>
         </div>
       </div>
 
@@ -579,23 +572,25 @@ export default function SuratDispensasi({ onNavigate }) {
                     </span>
                   )}
                 </div>
-                {selectedItem.isDispensasiPrinted ? (
+                <div className="flex gap-2">
+                  {selectedItem.isDispensasiPrinted && (
+                    <button 
+                      onClick={() => window.open(selectedItem.dispensasiDriveUrl, '_blank')}
+                      className="px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl flex items-center gap-2 transition-all"
+                    >
+                      <FileText size={20} />
+                      Buka Doc
+                    </button>
+                  )}
                   <button 
-                    onClick={handleOpenHistory}
-                    className="px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl flex items-center gap-2 transition-all"
-                  >
-                    <Clock size={20} />
-                    Riwayat Cetak Ulang
-                  </button>
-                ) : (
-                  <button 
-                    onClick={handlePrint}
-                    className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-600/30 flex items-center gap-2 transition-all"
+                    onClick={() => handlePrint(selectedItem.isDispensasiPrinted)}
+                    disabled={isGenerating}
+                    className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-600/30 flex items-center gap-2 transition-all disabled:opacity-50"
                   >
                     <Printer size={20} />
-                    Cetak PDF
+                    {isGenerating ? "Memproses..." : (selectedItem.isDispensasiPrinted ? "Perbarui Format" : "Cetak PDF")}
                   </button>
-                )}
+                </div>
               </div>
             </div>
           ) : (
@@ -609,76 +604,6 @@ export default function SuratDispensasi({ onNavigate }) {
           )}
         </div>
       </div>
-
-      {/* Modal History */}
-      {showHistory && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowHistory(false)}></div>
-          <div className="bg-white w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] relative z-10 animate-in fade-in zoom-in duration-200">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-white">
-              <h2 className="text-xl font-black text-slate-800 flex items-center gap-2">
-                <Clock className="text-emerald-600" />
-                Riwayat Cetak Dispensasi
-              </h2>
-              <button 
-                onClick={() => setShowHistory(false)}
-                className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-400 hover:text-slate-700"
-              >
-                <X size={20} />
-              </button>
-            </div>
-            
-            <div className="p-6 overflow-y-auto flex-1 bg-slate-50">
-              {isHistoryLoading ? (
-                <div className="text-center py-12 text-slate-500 font-medium">Memuat Riwayat...</div>
-              ) : historyData.length === 0 ? (
-                <div className="text-center py-12">
-                  <div className="w-16 h-16 bg-slate-200 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <FileText size={24} />
-                  </div>
-                  <p className="text-slate-500 font-medium">Belum ada riwayat cetak surat.</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {historyData.map(hist => (
-                    <div key={hist.id} className="bg-white border border-slate-200 p-5 rounded-2xl flex items-center justify-between shadow-sm hover:border-emerald-200 transition-colors">
-                      <div>
-                        <div className="flex items-center gap-3 mb-1">
-                          <span className="text-xs font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">{hist.nomorSurat}</span>
-                          <span className="text-xs font-semibold text-slate-400">
-                            {new Date(hist.tanggalCetak).toLocaleDateString('id-ID', {day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'})}
-                          </span>
-                        </div>
-                        <h4 className="font-extrabold text-slate-800 text-base">{hist.namaRombongan}</h4>
-                        <p className="text-xs text-slate-500 mt-1">Kunjungan: <strong>{hist.tanggalKunjungan}</strong> | Nopol: <strong>{hist.nopol}</strong></p>
-                      </div>
-                      <div className="text-right flex flex-col items-end gap-2">
-                        <span className="inline-block text-[10px] font-black tracking-wider text-slate-400 uppercase bg-slate-100 px-2 py-1 rounded-md">
-                          {hist.sumber === 'sewa' ? 'Sewa/Rombongan' : 'Promo'}
-                        </span>
-                        <div className="flex gap-2">
-                          <button 
-                            onClick={() => handleReprintHistory(hist, true)}
-                            className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors border border-amber-200"
-                          >
-                            <RefreshCw size={14} /> Perbarui Format
-                          </button>
-                          <button 
-                            onClick={() => handleReprintHistory(hist)}
-                            className="px-3 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors"
-                          >
-                            <Printer size={14} /> Buka Doc
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
