@@ -234,10 +234,17 @@ export default function SuratDispensasi({ onNavigate }) {
         delimiters: { start: '<<', end: '>>' }
       });
 
+      const formatTgl = (tgl) => {
+          if (!tgl) return '-';
+          const tglObj = new Date(tgl);
+          return isNaN(tglObj.getTime()) ? tgl : tglObj.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+      };
+
       docTemplater.render({
+        nomor: formatNomor,
         nomorSurat: formatNomor,
         namaRombongan: namaInstansi || '-',
-        tanggalKunjungan: tglKunjungan,
+        tanggalKunjungan: formatTgl(tglKunjungan),
         keperluan: keperluan,
         nopol: nopol,
         jmlKendaraan: jmlKendaraan,
@@ -330,10 +337,17 @@ export default function SuratDispensasi({ onNavigate }) {
         delimiters: { start: '<<', end: '>>' }
       });
 
+      const formatTgl = (tgl) => {
+          if (!tgl) return '-';
+          const tglObj = new Date(tgl);
+          return isNaN(tglObj.getTime()) ? tgl : tglObj.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+      };
+
       docTemplater.render({
+        nomor: hist.nomorSurat,
         nomorSurat: hist.nomorSurat,
         namaRombongan: hist.namaRombongan || '-',
-        tanggalKunjungan: hist.tanggalKunjungan,
+        tanggalKunjungan: formatTgl(hist.tanggalKunjungan),
         keperluan: hist.keperluan,
         nopol: hist.nopol,
         jmlKendaraan: hist.jmlKendaraan || '-',
