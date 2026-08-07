@@ -997,7 +997,7 @@ export default function PromoDashboard({ onNavigate }) {
             
             {/* Calendar Section */}
             <div className="flex-1 w-full bg-white rounded-3xl shadow-lg border border-emerald-100 p-4 lg:p-6 flex flex-col min-h-[600px] lg:h-full lg:overflow-hidden">
-              <div className="flex items-center justify-between mb-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0 mb-6">
                 <div>
                   <h2 className="text-xl font-bold text-emerald-900">Jadwal TMR</h2>
                   <div className="flex gap-2 mt-2">
@@ -1015,11 +1015,11 @@ export default function PromoDashboard({ onNavigate }) {
                     </button>
                   </div>
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center w-full sm:w-auto justify-between sm:justify-start gap-4">
                   <button onClick={prevMonth} className="p-2 bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-600 rounded-xl transition-all">
                     <ChevronLeft size={20} />
                   </button>
-                  <span className="font-black text-emerald-800 text-lg min-w-[150px] text-center">
+                  <span className="font-black text-emerald-800 text-base sm:text-lg min-w-[120px] sm:min-w-[150px] text-center">
                     {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
                   </span>
                   <button onClick={nextMonth} className="p-2 bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-600 rounded-xl transition-all">
@@ -1028,17 +1028,17 @@ export default function PromoDashboard({ onNavigate }) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-7 gap-2 mb-2">
+              <div className="grid grid-cols-7 gap-1 sm:gap-2 mb-2">
                 {['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'].map(day => (
-                  <div key={day} className="text-center font-bold text-xs uppercase tracking-wider text-emerald-600/70 py-2">
+                  <div key={day} className="text-center font-bold text-[9px] sm:text-xs uppercase tracking-wider text-emerald-600/70 py-1 sm:py-2">
                     {day}
                   </div>
                 ))}
               </div>
 
-              <div className="grid grid-cols-7 gap-2 flex-1 auto-rows-fr min-h-0">
+              <div className="grid grid-cols-7 gap-1 sm:gap-2 flex-1 auto-rows-fr min-h-0">
                 {blanks.map((_, i) => (
-                  <div key={`blank-${i}`} className="bg-slate-50/50 rounded-2xl border border-transparent"></div>
+                  <div key={`blank-${i}`} className="bg-slate-50/50 rounded-lg sm:rounded-2xl border border-transparent"></div>
                 ))}
                 {daysInMonth.map((date, i) => {
                   const promos = getPromosForDate(date);
@@ -1047,7 +1047,7 @@ export default function PromoDashboard({ onNavigate }) {
                   return (
                     <div 
                       key={i} 
-                      className={`rounded-xl border p-1.5 flex flex-col transition-all cursor-pointer h-full min-h-0 ${isToday ? 'bg-emerald-50 border-emerald-300 shadow-inner' : 'bg-white border-slate-200 hover:border-emerald-400 hover:shadow-md'}`}
+                      className={`rounded-lg sm:rounded-xl border p-1 sm:p-1.5 flex flex-col transition-all cursor-pointer h-full min-h-0 ${isToday ? 'bg-emerald-50 border-emerald-300 shadow-inner' : 'bg-white border-slate-200 hover:border-emerald-400 hover:shadow-md'}`}
                       onClick={() => {
                         if (promos.length > 0) {
                           setSelectedDate(date);
@@ -1055,21 +1055,21 @@ export default function PromoDashboard({ onNavigate }) {
                         }
                       }}
                     >
-                      <div className="flex justify-between items-center shrink-0 mb-0.5">
-                        <span className={`text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full ${isToday ? 'bg-emerald-600 text-white' : 'text-slate-700'}`}>
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center shrink-0 mb-0.5 gap-1 sm:gap-0">
+                        <span className={`text-[10px] sm:text-xs font-bold w-4 h-4 sm:w-5 sm:h-5 flex items-center justify-center rounded-full ${isToday ? 'bg-emerald-600 text-white' : 'text-slate-700'}`}>
                           {date.getDate()}
                         </span>
                         {promos.length > 0 && (
-                          <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200 shadow-sm">
+                          <span className="text-[7px] sm:text-[9px] font-bold text-indigo-700 bg-indigo-50 px-1 py-0.5 sm:px-1.5 rounded border border-indigo-200 shadow-sm truncate max-w-full text-center">
                             {promos.reduce((sum, p) => sum + (parseInt(p?.jumlahTitik) || 1), 0)} Titik
                           </span>
                         )}
                       </div>
                       <div className="flex flex-col gap-0.5 flex-1 min-h-0 overflow-y-auto no-scrollbar">
                         {promos.map((p, idx) => (
-                          <div key={idx} className={`text-[9px] font-bold px-1 py-0.5 rounded border shrink-0 leading-[1.1] ${p.status === 'Terverifikasi' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-amber-50 border-amber-200 text-amber-700'}`}>
+                          <div key={idx} className={`text-[8px] sm:text-[9px] font-bold px-1 py-0.5 rounded border shrink-0 leading-[1.1] ${p.status === 'Terverifikasi' ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-amber-50 border-amber-200 text-amber-700'}`}>
                             <div className="truncate">{p.namaPerusahaan}</div>
-                            <div className="truncate font-medium opacity-80">{p.namaProduk}</div>
+                            <div className="truncate font-medium opacity-80 hidden sm:block">{p.namaProduk}</div>
                           </div>
                         ))}
                       </div>

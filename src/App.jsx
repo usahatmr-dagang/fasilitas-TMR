@@ -10,6 +10,7 @@ import {
   TreePine,
   Leaf,
   MapPin,
+  Menu,
   ChevronRight,
   ChevronLeft,
   UploadCloud,
@@ -340,6 +341,10 @@ export default function App() {
   const [calendarMonth, setCalendarMonth] = useState(new Date()); 
   
   const [cartLokasi, setCartLokasi] = useState([]);
+
+  // Mobile navigation state
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [formData, setFormData] = useState({
     namaRombongan: '', picRombongan: '', noWa: '', picKantor: '', keterangan: '', catatan: '', statusPembayaran: 'Belum Transfer', listrikTambahan: false, luasLahan: 50, isGazeboPackage: false
@@ -2466,11 +2471,77 @@ Terima kasih.`;
       </aside>
       )}
 
+      {/* Sidebar Mobile Overlay */}
+      {!isPortalRoute && isMobileMenuOpen && (
+        <div className="fixed inset-0 z-50 flex lg:hidden">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={() => setIsMobileMenuOpen(false)}></div>
+          <aside className="relative flex-1 max-w-[280px] w-full bg-gradient-to-b from-[#022c22] via-[#041e17] to-[#01140f] h-full flex flex-col shadow-2xl animate-slide-in-left overflow-hidden">
+            <button onClick={() => setIsMobileMenuOpen(false)} className="absolute top-5 right-5 p-2 bg-white/10 hover:bg-white/20 text-white rounded-full z-50 transition-colors">
+                <X size={18} />
+            </button>
+            <div className="absolute top-0 left-0 w-full h-72 bg-gradient-to-b from-emerald-500/10 to-transparent pointer-events-none"></div>
+            <div className="absolute -top-24 -right-24 w-64 h-64 bg-emerald-600/10 rounded-full blur-3xl pointer-events-none"></div>
+            
+            <div className="px-6 py-9 relative z-10">
+              <div className="w-12 h-12 bg-gradient-to-br from-amber-400 to-amber-500 rounded-2xl mb-5 flex items-center justify-center shadow-[0_4px_20px_rgba(245,158,11,0.25)] border border-amber-300/30 relative">
+                <Leaf className="text-white drop-shadow-md" size={24} strokeWidth={2.5} />
+              </div>
+              <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-emerald-100 to-teal-300 tracking-tight">TMR System</h1>
+              <p className="text-[9px] font-extrabold text-emerald-400/60 mt-1 tracking-[0.25em] uppercase">Fasilitas Ragunan</p>
+            </div>
+            
+            <nav className="flex-1 px-4 py-2 space-y-1.5 relative z-10 overflow-y-auto hide-scrollbar">
+              {[
+                { id: 'reservasi', label: 'Reservasi Lokasi', icon: LayoutDashboard },
+                { id: 'sewa', label: 'Data Pengunjung', icon: Users },
+                { id: 'pembayaran', label: 'Keuangan / Pembayaran', icon: CreditCard },
+                { id: 'dispensasi', label: 'Surat Dispensasi', icon: FileText },
+                { id: 'master', label: 'Master Data', icon: Settings },
+                { id: 'portal', label: 'Portal Bukti', icon: Wallet }
+              ].map(item => (
+                <button 
+                  type="button" 
+                  key={item.id} 
+                  onClick={() => { setActiveTab(item.id); setIsMobileMenuOpen(false); }} 
+                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-2xl text-xs font-bold transition-all duration-300 group relative overflow-hidden ${ 
+                    activeTab === item.id 
+                      ? 'text-white shadow-[0_4px_20px_rgba(4,120,87,0.25)] border border-emerald-500/20' 
+                      : 'text-emerald-300/60 hover:text-white' 
+                  }`}
+                >
+                  {activeTab === item.id && <div className="absolute inset-0 bg-gradient-to-r from-emerald-600/90 to-teal-700/90 backdrop-blur-md rounded-2xl"></div>}
+                  <div className={`relative z-10 p-2 rounded-xl transition-all duration-300 ${activeTab === item.id ? 'bg-white/15' : 'bg-emerald-950/50 group-hover:bg-white/10'}`}>
+                    <item.icon size={18} className={`transition-all duration-300 ${activeTab === item.id ? 'text-amber-400 drop-shadow-md' : 'text-emerald-400'}`} />
+                  </div>
+                  <span className="relative z-10 tracking-wide text-xs">{item.label}</span>
+                </button>
+              ))}
+            </nav>
+            <div className="p-4 relative z-10 border-t border-emerald-800/20">
+              <button 
+                type="button" 
+                onClick={() => { setActiveApp('dashboard'); setIsMobileMenuOpen(false); }}
+                className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-emerald-900/40 border border-emerald-700/30 text-emerald-100 rounded-2xl text-xs font-bold shadow-sm"
+              >
+                <ArrowLeft size={16} />
+                <span>Master Menu</span>
+              </button>
+            </div>
+          </aside>
+        </div>
+      )}
+
+
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
         <div className="absolute inset-0 opacity-[0.015] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#10b981 1.5px, transparent 1.5px)', backgroundSize: '24px 24px' }}></div>
         <header className="bg-emerald-950/95 backdrop-blur-md px-5 py-3.5 flex items-center justify-between z-[45] lg:hidden sticky top-0 border-b border-emerald-900/30 shadow-md">
           <div className="flex items-center space-x-2.5">
+            {!isPortalRoute && (
+              <button onClick={() => setIsMobileMenuOpen(true)} className="p-1.5 -ml-2 mr-1 text-emerald-100 hover:text-white hover:bg-emerald-900/50 rounded-lg transition-colors">
+                 <Menu size={20} />
+              </button>
+            )}
             <div className="w-8 h-8 bg-gradient-to-br from-amber-400 to-amber-500 rounded-lg flex items-center justify-center shadow-md"><Leaf className="text-white" size={16} strokeWidth={2.5} /></div>
             <span className="font-extrabold text-white text-base tracking-tight">TMR System</span>
           </div>
