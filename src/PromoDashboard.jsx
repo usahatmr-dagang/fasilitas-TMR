@@ -855,72 +855,67 @@ export default function PromoDashboard({ onNavigate }) {
                     <CheckCircle2 size={16} /> Verifikasi
                   </button>
                 )}
-                
-                {viewMode === 'transfer' && (
-                  <>
-                    {p.pksDriveUrl ? (
-                      <div className="grid grid-cols-2 gap-2">
-                        <button 
-                          onClick={() => window.open(p.pksDriveUrl, '_blank')}
-                          className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 text-sm"
-                        >
-                          Buka Google Doc
-                        </button>
-                        <button 
-                          onClick={() => handleGenerateSurat(p)}
-                          disabled={isGenerating}
-                          className="w-full py-2 bg-white border-2 border-emerald-600 text-emerald-700 hover:bg-emerald-50 rounded-xl font-bold flex items-center justify-center gap-2 text-sm"
-                        >
-                          {isGenerating ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-                          Buat Ulang PKS
-                        </button>
-                      </div>
-                    ) : (
-                      <button 
-                        onClick={() => handleGenerateSurat(p)}
-                        disabled={isGenerating}
-                        className="w-full py-2 bg-white border-2 border-emerald-600 text-emerald-700 hover:bg-emerald-50 rounded-xl font-bold flex items-center justify-center gap-2 text-sm"
-                      >
-                        {isGenerating ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-                        Buat & Simpan ke Drive
-                      </button>
-                    )}
-
-                    <div class="grid grid-cols-2 gap-2">
-                      <button 
-                        onClick={() => handleGenerateBuktiTransfer(p)}
-                        disabled={isGenerating}
-                        className="w-full py-2 bg-white border-2 border-emerald-600 text-emerald-700 hover:bg-emerald-50 rounded-xl font-bold flex items-center justify-center gap-2 text-sm"
-                      >
-                        <Download size={16} /> Bukti Transfer
-                      </button>
-
-                      <button 
-                        onClick={() => handleGenerateKwitansi(p)}
-                        disabled={isGenerating}
-                        className="w-full py-2 bg-white border-2 border-emerald-600 text-emerald-700 hover:bg-emerald-50 rounded-xl font-bold flex items-center justify-center gap-2 text-sm"
-                      >
-                        <Download size={16} /> Kwitansi
-                      </button>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-2 mt-2">
-                      <button 
-                        onClick={() => openEditModal(p)}
-                        className="w-full py-2 bg-white border-2 border-slate-300 text-slate-700 hover:bg-slate-50 rounded-xl font-bold flex items-center justify-center gap-2 text-sm transition-all"
-                      >
-                        <Edit size={16} /> Edit Data
-                      </button>
-
-                      <button 
-                        onClick={() => handleDelete(p.id, p.namaPerusahaan)}
-                        className="w-full py-2 bg-white border-2 border-rose-500 text-rose-600 hover:bg-rose-50 rounded-xl font-bold flex items-center justify-center gap-2 text-sm transition-all"
-                      >
-                        <Trash2 size={16} /> Hapus
-                      </button>
-                    </div>
-                  </>
+                {p.pksDriveUrl ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    <button 
+                      onClick={() => window.open(p.pksDriveUrl, '_blank')}
+                      className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 text-sm"
+                    >
+                      Buka Google Doc
+                    </button>
+                    <button 
+                      onClick={() => handleGenerateSurat(p)}
+                      disabled={isGenerating}
+                      className="w-full py-2 bg-white border-2 border-emerald-600 text-emerald-700 hover:bg-emerald-50 rounded-xl font-bold flex items-center justify-center gap-2 text-sm"
+                    >
+                      {isGenerating ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                      Buat Ulang PKS
+                    </button>
+                  </div>
+                ) : (
+                  <button 
+                    onClick={() => handleGenerateSurat(p)}
+                    disabled={isGenerating}
+                    className="w-full py-2 bg-white border-2 border-emerald-600 text-emerald-700 hover:bg-emerald-50 rounded-xl font-bold flex items-center justify-center gap-2 text-sm"
+                  >
+                    {isGenerating ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                    Buat & Simpan ke Drive
+                  </button>
                 )}
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button 
+                    onClick={() => handleGenerateBuktiTransfer(p)}
+                    disabled={isGenerating}
+                    className="w-full py-2 bg-white border-2 border-emerald-600 text-emerald-700 hover:bg-emerald-50 rounded-xl font-bold flex items-center justify-center gap-2 text-sm"
+                  >
+                    <Download size={16} /> Bukti Transfer
+                  </button>
+
+                  <button 
+                    onClick={() => handleGenerateKwitansi(p)}
+                    disabled={isGenerating}
+                    className="w-full py-2 bg-white border-2 border-emerald-600 text-emerald-700 hover:bg-emerald-50 rounded-xl font-bold flex items-center justify-center gap-2 text-sm"
+                  >
+                    <Download size={16} /> Kwitansi
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 mt-2">
+                  <button 
+                    onClick={() => openEditModal(p)}
+                    className="w-full py-2 bg-white border-2 border-slate-300 text-slate-700 hover:bg-slate-50 rounded-xl font-bold flex items-center justify-center gap-2 text-sm transition-all"
+                  >
+                    <Edit size={16} /> Edit Data
+                  </button>
+
+                  <button 
+                    onClick={() => handleDelete(p.id, p.namaPerusahaan)}
+                    className="w-full py-2 bg-white border-2 border-rose-500 text-rose-600 hover:bg-rose-50 rounded-xl font-bold flex items-center justify-center gap-2 text-sm transition-all"
+                  >
+                    <Trash2 size={16} /> Hapus
+                  </button>
+                </div>
               </div>
             </div>
           ))}
