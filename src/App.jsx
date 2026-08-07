@@ -286,7 +286,7 @@ export default function App() {
     });
 
     const unsubSewa = onSnapshot(collection(db, 'sewaList'), (snapshot) => {
-      setSewaList(snapshot.docs.map(doc => ({ docId: doc.id, ...doc.data() })));
+      setSewaList(snapshot.docs.map(doc => ({ id: doc.id, docId: doc.id, ...doc.data() })));
       setDataLoaded(true);
     });
 
@@ -980,13 +980,16 @@ Terima kasih.`;
     
     setIsGenerating(true);
     try {
-      const response = await fetch(selectedRecord.bukti_transfer);
-      const blob = await response.blob();
-      const reader = new FileReader();
-      const base64data = await new Promise((resolve) => {
-         reader.onloadend = () => resolve(reader.result);
-         reader.readAsDataURL(blob);
-      });
+      let base64data = selectedRecord.bukti_transfer;
+      if (base64data && !base64data.startsWith('data:')) {
+          const response = await fetch(base64data);
+          const blob = await response.blob();
+          const reader = new FileReader();
+          base64data = await new Promise((resolve) => {
+             reader.onloadend = () => resolve(reader.result);
+             reader.readAsDataURL(blob);
+          });
+      }
 
       const tglSewaStr = formatTanggalPendek(selectedRecord.tanggal_sewa);
       const tglTransferStr = formatTanggalPendek(selectedRecord.tanggal_transfer) || '-';
@@ -1023,7 +1026,7 @@ Terima kasih.`;
       const docUrl = await uploadToGoogleDrive(htmlBlob, finalFileName, selectedRecord.docId, 'buktiTransferDocUrl');
       
       setSelectedRecord(prev => ({...prev, buktiTransferDocUrl: docUrl}));
-      setSewaList(prev => prev.map(item => item.id === selectedRecord.id ? { ...item, buktiTransferDocUrl: docUrl } : item));
+      setSewaList(prev => prev.map(item => item.docId === selectedRecord.docId ? { ...item, buktiTransferDocUrl: docUrl } : item));
       
       window.open(docUrl, '_blank');
     } catch (err) {
@@ -1039,13 +1042,16 @@ Terima kasih.`;
     
     setIsGenerating(true);
     try {
-      const response = await fetch(selectedRecord.bukti_transfer_listrik);
-      const blob = await response.blob();
-      const reader = new FileReader();
-      const base64data = await new Promise((resolve) => {
-         reader.onloadend = () => resolve(reader.result);
-         reader.readAsDataURL(blob);
-      });
+      let base64data = selectedRecord.bukti_transfer_listrik;
+      if (base64data && !base64data.startsWith('data:')) {
+          const response = await fetch(base64data);
+          const blob = await response.blob();
+          const reader = new FileReader();
+          base64data = await new Promise((resolve) => {
+             reader.onloadend = () => resolve(reader.result);
+             reader.readAsDataURL(blob);
+          });
+      }
 
       const tglSewaStr = formatTanggalPendek(selectedRecord.tanggal_sewa);
       const tglTransferStr = selectedRecord.tanggal_transfer_listrik ? formatTanggalPendek(selectedRecord.tanggal_transfer_listrik) : '-';
@@ -1082,7 +1088,7 @@ Terima kasih.`;
       const docUrl = await uploadToGoogleDrive(htmlBlob, finalFileName, selectedRecord.docId, 'buktiTransferListrikDocUrl');
       
       setSelectedRecord(prev => ({...prev, buktiTransferListrikDocUrl: docUrl}));
-      setSewaList(prev => prev.map(item => item.id === selectedRecord.id ? { ...item, buktiTransferListrikDocUrl: docUrl } : item));
+      setSewaList(prev => prev.map(item => item.docId === selectedRecord.docId ? { ...item, buktiTransferListrikDocUrl: docUrl } : item));
       
       window.open(docUrl, '_blank');
     } catch (err) {
