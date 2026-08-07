@@ -242,9 +242,12 @@ export default function SuratDispensasi({ onNavigate }) {
 
       docTemplater.render({
         nomor: formatNomor,
+        Nomor: formatNomor,
+        NOMOR: formatNomor,
         nomorSurat: formatNomor,
         namaRombongan: namaInstansi || '-',
         tanggalKunjungan: formatTgl(tglKunjungan),
+        TanggalKunjungan: formatTgl(tglKunjungan),
         keperluan: keperluan,
         nopol: nopol,
         jmlKendaraan: jmlKendaraan,
@@ -315,8 +318,8 @@ export default function SuratDispensasi({ onNavigate }) {
     setIsHistoryLoading(false);
   };
 
-  const handleReprintHistory = async (hist) => {
-    if (hist.dispensasiDriveUrl) {
+  const handleReprintHistory = async (hist, forceGenerate = false) => {
+    if (hist.dispensasiDriveUrl && !forceGenerate) {
       window.open(hist.dispensasiDriveUrl, '_blank');
       return;
     }
@@ -345,9 +348,12 @@ export default function SuratDispensasi({ onNavigate }) {
 
       docTemplater.render({
         nomor: hist.nomorSurat,
+        Nomor: hist.nomorSurat,
+        NOMOR: hist.nomorSurat,
         nomorSurat: hist.nomorSurat,
         namaRombongan: hist.namaRombongan || '-',
         tanggalKunjungan: formatTgl(hist.tanggalKunjungan),
+        TanggalKunjungan: formatTgl(hist.tanggalKunjungan),
         keperluan: hist.keperluan,
         nopol: hist.nopol,
         jmlKendaraan: hist.jmlKendaraan || '-',
@@ -650,12 +656,20 @@ export default function SuratDispensasi({ onNavigate }) {
                         <span className="inline-block text-[10px] font-black tracking-wider text-slate-400 uppercase bg-slate-100 px-2 py-1 rounded-md">
                           {hist.sumber === 'sewa' ? 'Sewa/Rombongan' : 'Promo'}
                         </span>
-                        <button 
-                          onClick={() => handleReprintHistory(hist)}
-                          className="px-3 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors"
-                        >
-                          <Printer size={14} /> Cetak Ulang
-                        </button>
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={() => handleReprintHistory(hist, true)}
+                            className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors border border-amber-200"
+                          >
+                            <RefreshCw size={14} /> Perbarui Format
+                          </button>
+                          <button 
+                            onClick={() => handleReprintHistory(hist)}
+                            className="px-3 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors"
+                          >
+                            <Printer size={14} /> Buka Doc
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
