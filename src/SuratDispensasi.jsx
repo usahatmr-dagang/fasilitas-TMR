@@ -125,14 +125,9 @@ export default function SuratDispensasi({ onNavigate }) {
     const kode = source === 'promo' ? 'P' : 'R';
     
     let formatNomor = "";
-    // Gunakan nomor surat yang sudah ada jika pernah dicetak
-    if (selectedItem.isDispensasiPrinted && selectedItem.nomorSuratDispensasi) {
-      formatNomor = selectedItem.nomorSuratDispensasi;
-    } else {
-      // Penomoran Acak Unik (4 digit) + Timestamp
-      const randomCounter = Math.floor(1000 + Math.random() * 9000); 
-      formatNomor = `${yyyyMmDd}/${kode}/${randomCounter}`;
-    }
+    // Penomoran Acak Unik (4 digit) + Timestamp
+    const randomCounter = Math.floor(1000 + Math.random() * 9000); 
+    formatNomor = `${yyyyMmDd}/${kode}/${randomCounter}`;
 
     // 2. Format HTML untuk Print
     const namaInstansi = source === 'sewa' ? selectedItem.nama_penyewa : selectedItem.namaPerusahaan;
@@ -270,6 +265,10 @@ export default function SuratDispensasi({ onNavigate }) {
           namaRombongan: namaInstansi,
           tanggalKunjungan: tglKunjungan,
           nopol: nopol,
+          keperluan: keperluan,
+          jmlKendaraan: jmlKendaraan,
+          jmlPersonel: jmlPersonel,
+          jamLoading: jamLoading,
           tanggalCetak: new Date().toISOString(),
           sumber: source
         });
@@ -306,6 +305,125 @@ export default function SuratDispensasi({ onNavigate }) {
       console.warn("Error fetching history:", err);
     }
     setIsHistoryLoading(false);
+  };
+
+  const handleReprintHistory = (hist) => {
+    const dateObj = new Date(hist.tanggalCetak);
+    const printHtml = `
+    <html>
+      <head>
+        <title>Cetak Surat Dispensasi - ${hist.namaRombongan}</title>
+        <style>
+          @page { margin: 20mm; size: A4 portrait; }
+          body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.5; color: #000; margin: 0; padding: 0; }
+          .kop-surat { text-align: center; border-bottom: 3px solid #000; padding-bottom: 15px; margin-bottom: 30px; position: relative; }
+          .kop-surat h3, .kop-surat h2, .kop-surat h1 { margin: 0; font-weight: bold; }
+          .kop-surat h3 { font-size: 14pt; font-weight: normal; }
+          .kop-surat h2 { font-size: 16pt; }
+          .kop-surat h1 { font-size: 18pt; letter-spacing: 1px; }
+          .kop-surat p { margin: 5px 0 0 0; font-size: 10pt; }
+          .title-surat { text-align: center; margin-bottom: 30px; }
+          .title-surat h3 { font-size: 14pt; font-weight: bold; text-decoration: underline; margin: 0 0 5px 0; }
+          .title-surat p { margin: 0; font-size: 12pt; }
+          .content { margin: 0 20px; }
+          .info-table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+          .info-table td { padding: 5px; vertical-align: top; }
+          .info-table td:first-child { width: 30%; }
+          .info-table td:nth-child(2) { width: 2%; }
+          .ket-list { padding-left: 20px; margin-top: 10px; }
+          .ket-list li { margin-bottom: 10px; text-align: justify; }
+          .ttd-box { float: right; width: 350px; text-align: center; margin-top: 40px; }
+          .ttd-box p { margin: 2px 0; }
+          .ttd-space { height: 80px; }
+          .footer { clear: both; margin-top: 30px; font-size: 11pt; text-align: justify; }
+        </style>
+      </head>
+      <body>
+        <div class="kop-surat">
+          <h3>PEMERINTAH PROVINSI DAERAH KHUSUS IBU KOTA JAKARTA</h3>
+          <h2>DINAS PERTAMANAN DAN HUTAN KOTA</h2>
+          <h1>UNIT PENGELOLA TAMAN MARGASATWA RAGUNAN</h1>
+          <p>Jalan Harsono RM. No. 1 Ragunan, Telp (021) 7820015 fax. (021) 7805280</p>
+          <p>JAKARTA</p>
+          <p style="text-align: right; font-weight: bold;">Kode Pos : 12550</p>
+        </div>
+
+        <div class="title-surat">
+          <h3>DISPENSASI</h3>
+          <p>NOMOR : ${hist.nomorSurat}</p>
+        </div>
+
+        <div class="content">
+          <p>Kepala Unit Pengelola Taman Margasatwa Ragunan Provinsi DKI Jakarta memberikan ijin kepada :</p>
+          
+          <table class="info-table">
+            <tr>
+              <td>Nama Rombongan</td>
+              <td>:</td>
+              <td><strong>${hist.namaRombongan || '-'}</strong></td>
+            </tr>
+            <tr>
+              <td>Tanggal Kunjungan</td>
+              <td>:</td>
+              <td><strong>${hist.tanggalKunjungan}</strong></td>
+            </tr>
+            <tr>
+              <td>Keperluan</td>
+              <td>:</td>
+              <td><strong>${hist.keperluan}</strong></td>
+            </tr>
+            <tr>
+              <td>Nomor Kendaraan</td>
+              <td>:</td>
+              <td><strong>${hist.jmlKendaraan || '-'} (${hist.nopol}) - ${hist.jmlPersonel || '-'}</strong></td>
+            </tr>
+          </table>
+
+          <div style="margin-top: 20px;">
+            <strong>Ketentuan :</strong>
+            <ol class="ket-list">
+              <li>Setelah selesai menurunkan barang, kendaraan kembali ke tempat parkir TMR dan tidak diperkenankan parkir ditempat acara ataupun berkeliling didalam kawasan TMR.</li>
+              <li>Setiap pengantar barang wajib membayar tarif masuk berikut kendaraannya.</li>
+              <li>Jadwal loading dari hari selasa s/d Minggu, ${hist.jamLoading || '-'}.</li>
+            </ol>
+          </div>
+
+          <p class="footer">Demikian Dispensasi ini diberikan untuk dipergunakan sebagaimana mestinya.</p>
+          
+          <div class="ttd-box">
+            <p>Jakarta, ${dateObj.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
+            <br/>
+            <p>Kepala Unit Pengelola</p>
+            <p>Taman Margasatwa Ragunan</p>
+            <p>Dinas Pertamanan dan Hutan Kota</p>
+            <p>Provinsi DKI Jakarta</p>
+            <div class="ttd-space"></div>
+            <p>(_________________________)</p>
+          </div>
+        </div>
+      </body>
+    </html>
+    `;
+
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'absolute';
+    iframe.style.width = '0px';
+    iframe.style.height = '0px';
+    iframe.style.border = 'none';
+    document.body.appendChild(iframe);
+
+    const iframeDoc = iframe.contentWindow.document;
+    iframeDoc.open();
+    iframeDoc.write(printHtml);
+    iframeDoc.close();
+
+    setTimeout(() => {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+      setTimeout(() => {
+        if (document.body.contains(iframe)) document.body.removeChild(iframe);
+      }, 2000);
+    }, 500);
   };
 
   return (
@@ -505,13 +623,23 @@ export default function SuratDispensasi({ onNavigate }) {
                     </span>
                   )}
                 </div>
-                <button 
-                  onClick={handlePrint}
-                  className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-600/30 flex items-center gap-2 transition-all"
-                >
-                  <Printer size={20} />
-                  {selectedItem.isDispensasiPrinted ? 'Cetak Ulang PDF' : 'Cetak PDF'}
-                </button>
+                {selectedItem.isDispensasiPrinted ? (
+                  <button 
+                    onClick={handleOpenHistory}
+                    className="px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl flex items-center gap-2 transition-all"
+                  >
+                    <Clock size={20} />
+                    Riwayat Cetak Ulang
+                  </button>
+                ) : (
+                  <button 
+                    onClick={handlePrint}
+                    className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-lg shadow-emerald-600/30 flex items-center gap-2 transition-all"
+                  >
+                    <Printer size={20} />
+                    Cetak PDF
+                  </button>
+                )}
               </div>
             </div>
           ) : (
@@ -568,10 +696,16 @@ export default function SuratDispensasi({ onNavigate }) {
                         <h4 className="font-extrabold text-slate-800 text-base">{hist.namaRombongan}</h4>
                         <p className="text-xs text-slate-500 mt-1">Kunjungan: <strong>{hist.tanggalKunjungan}</strong> | Nopol: <strong>{hist.nopol}</strong></p>
                       </div>
-                      <div className="text-right">
+                      <div className="text-right flex flex-col items-end gap-2">
                         <span className="inline-block text-[10px] font-black tracking-wider text-slate-400 uppercase bg-slate-100 px-2 py-1 rounded-md">
                           {hist.sumber === 'sewa' ? 'Sewa/Rombongan' : 'Promo'}
                         </span>
+                        <button 
+                          onClick={() => handleReprintHistory(hist)}
+                          className="px-3 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors"
+                        >
+                          <Printer size={14} /> Cetak Ulang
+                        </button>
                       </div>
                     </div>
                   ))}
