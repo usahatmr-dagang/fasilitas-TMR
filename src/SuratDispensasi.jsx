@@ -7,6 +7,14 @@ import { collection, getDocs, doc, getDoc, setDoc, updateDoc, addDoc } from 'fir
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 
+const getPromoDate = (item) => {
+    if (item.selectedDates && Array.isArray(item.selectedDates) && item.selectedDates.length > 0) {
+        const first = item.selectedDates[0];
+        return typeof first === 'object' && first !== null ? first.date : first;
+    }
+    return item.tanggalPromo || null;
+};
+
 export default function SuratDispensasi({ onNavigate }) {
   const [source, setSource] = useState('sewa'); // 'sewa' or 'promo'
   const [dataList, setDataList] = useState([]);
@@ -48,15 +56,15 @@ export default function SuratDispensasi({ onNavigate }) {
 
         // Filter out past dates (keep today and future)
         items = items.filter(item => {
-           const itemDate = source === 'sewa' ? item.tanggal_sewa : item.tanggalPromo;
+           const itemDate = source === 'sewa' ? item.tanggal_sewa : getPromoDate(item);
            if (!itemDate) return false;
            return itemDate >= todayStr;
         });
         
         // Sort by date ascending (closest to today first)
         items.sort((a, b) => {
-           const dateA = source === 'sewa' ? a.tanggal_sewa : a.tanggalPromo;
-           const dateB = source === 'sewa' ? b.tanggal_sewa : b.tanggalPromo;
+           const dateA = source === 'sewa' ? a.tanggal_sewa : getPromoDate(a);
+           const dateB = source === 'sewa' ? b.tanggal_sewa : getPromoDate(b);
            return new Date(dateA || 0) - new Date(dateB || 0);
         });
         
@@ -176,8 +184,9 @@ export default function SuratDispensasi({ onNavigate }) {
         setKeperluan(`Loading Barang ke ${selectedItem.lokasi_sewa || ''}`);
         setTglKunjungan(selectedItem.tanggal_sewa || '');
       } else {
+        const pDate = getPromoDate(selectedItem);
         setKeperluan(`Loading Barang Promo (${selectedItem.namaProduk || ''})`);
-        setTglKunjungan(selectedItem.tanggalPromo || '');
+        setTglKunjungan(pDate || '');
       }
     }
   }, [selectedItem, source]);
@@ -186,7 +195,7 @@ export default function SuratDispensasi({ onNavigate }) {
   const groupedData = useMemo(() => {
     const groups = {};
     filteredData.forEach(item => {
-      let rawDate = source === 'sewa' ? item.tanggal_sewa : item.tanggalPromo;
+      let rawDate = source === 'sewa' ? item.tanggal_sewa : getPromoDate(item);
       if (!rawDate) rawDate = 'Tanpa Tanggal';
       
       let displayDate = rawDate;
@@ -219,8 +228,27 @@ export default function SuratDispensasi({ onNavigate }) {
           const padZero = (num) => num.toString().padStart(2, '0');
           const yyyyMmDd = `${currentYear}-${padZero(dateObj.getMonth()+1)}-${padZero(dateObj.getDate())}`;
           const kode = source === 'promo' ? 'P' : 'R';
-          const randomCounter = Math.floor(1000 + Math.random() * 9000); 
-          formatNomor = `${yyyyMmDd}/${kode}/${randomCounter}`;
+          
+          // Get sequential counter starting from 437
+          const counterRef = doc(db, 'counters', 'dispensasi');
+          const counterSnap = await getDoc(counterRef);
+          
+          let nextNum = 437; // if no document exists, start at 437
+          if (counterSnap.exists()) {
+              const data = counterSnap.data();
+              if (data.year === currentYear) {
+                  nextNum = (data.currentNumber || 436) + 1;
+              } else if (data.year && data.year !== currentYear) {
+                  nextNum = 1; // Reset for new year
+              } else {
+                  // Transition phase for existing data without year
+                  nextNum = (data.currentNumber || 436) + 1;
+              }
+          }
+          await setDoc(counterRef, { currentNumber: nextNum, year: currentYear }, { merge: true });
+          
+          const seqStr = String(nextNum).padStart(4, '0'); 
+          formatNomor = `${yyyyMmDd}/${kode}/${seqStr}`;
       }
       
       const namaInstansi = source === 'sewa' ? selectedItem.nama_penyewa : selectedItem.namaPerusahaan;
