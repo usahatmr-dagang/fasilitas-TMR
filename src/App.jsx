@@ -167,6 +167,67 @@ const formatRupiah = (angka) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
 };
 
+const CLIENT_ID = '905355425334-tbtvuvufgvnom6vnlb5d0rka00ih03if.apps.googleusercontent.com';
+const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+
+const requestGoogleToken = () => {
+    return new Promise((resolve, reject) => {
+        if (!window.google || !window.google.accounts) {
+            reject(new Error("Google Identity Services library not loaded."));
+            return;
+        }
+        const client = window.google.accounts.oauth2.initTokenClient({
+            client_id: CLIENT_ID,
+            scope: SCOPES,
+            callback: (tokenResponse) => {
+                if (tokenResponse && tokenResponse.access_token) {
+                    resolve(tokenResponse.access_token);
+                } else {
+                    reject(new Error("Failed to get access token"));
+                }
+            },
+            error_callback: (err) => reject(err)
+        });
+        client.requestAccessToken({ prompt: 'consent' });
+    });
+};
+
+const uploadToGoogleDrive = async (blob, fileName, recordId, urlField) => {
+    try {
+        const token = await requestGoogleToken();
+        const metadata = { name: fileName, mimeType: 'application/vnd.google-apps.document' };
+        const form = new FormData();
+        form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+        form.append('file', blob);
+
+        const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+            method: 'POST',
+            headers: new Headers({ 'Authorization': 'Bearer ' + token }),
+            body: form,
+        });
+
+        if (!response.ok) throw new Error("Gagal mengunggah ke Google Drive");
+        const result = await response.json();
+        const fileId = result.id;
+        
+        await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/permissions`, {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ role: 'writer', type: 'anyone' })
+        });
+
+        const docUrl = `https://docs.google.com/document/d/${fileId}/edit`;
+        
+        if (recordId && urlField) {
+          await updateDoc(doc(db, 'sewaList', recordId), { [urlField]: docUrl });
+        }
+        return docUrl;
+    } catch (error) {
+        console.error("Drive Error:", error);
+        throw error;
+    }
+};
+
 export default function App() {
   // Routing & Authentication State
   const isPortalRoute = window.location.pathname === '/portal';
@@ -182,6 +243,7 @@ export default function App() {
   const [picList, setPicList] = useState([]);
   const [dataLoaded, setDataLoaded] = useState(false);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   useEffect(() => {
     // Secret Route
@@ -913,310 +975,122 @@ Terima kasih.`;
   };
 
   // --- HANDLER FITUR CETAK BUKTI TRANSFER (F4 PORTRAIT) ---
-  const handlePrintBukti = () => {
+  const handlePrintBukti = async () => {
     if (!selectedRecord || !selectedRecord.bukti_transfer) return;
     
-    const tglSewaStr = formatTanggalPendek(selectedRecord.tanggal_sewa);
-    const tglTransferStr = formatTanggalPendek(selectedRecord.tanggal_transfer) || '-';
-    
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = '0';
-    document.body.appendChild(iframe);
+    setIsGenerating(true);
+    try {
+      const response = await fetch(selectedRecord.bukti_transfer);
+      const blob = await response.blob();
+      const reader = new FileReader();
+      const base64data = await new Promise((resolve) => {
+         reader.onloadend = () => resolve(reader.result);
+         reader.readAsDataURL(blob);
+      });
 
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
+      const tglSewaStr = formatTanggalPendek(selectedRecord.tanggal_sewa);
+      const tglTransferStr = formatTanggalPendek(selectedRecord.tanggal_transfer) || '-';
+
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
         <head>
           <title>Cetak Bukti Transfer - ${selectedRecord.id_sewa}</title>
-          <style>
-            @page { 
-              size: 215mm 330mm; 
-              margin: 0; 
-            }
-            body { 
-              font-family: 'Arial', sans-serif; 
-              background-color: #ffffff; 
-              margin: 0; 
-              padding: 0; 
-              width: 215mm;
-              height: 330mm;
-              overflow: hidden; 
-              -webkit-print-color-adjust: exact; 
-              print-color-adjust: exact; 
-            }
-            .print-container {
-              width: 100%;
-              height: 100%;
-              padding: 15mm;
-              box-sizing: border-box;
-              display: flex;
-              flex-direction: column;
-              border: 10px solid #059669; 
-              background-color: #f0fdf4; 
-            }
-            .header {
-              text-align: center;
-              border-bottom: 3px solid #059669;
-              padding-bottom: 5mm;
-              margin-bottom: 5mm;
-              flex-shrink: 0;
-            }
-            .header h1 { 
-              font-size: 24px; 
-              color: #064e3b; 
-              margin: 0; 
-              font-weight: 900; 
-              letter-spacing: 1px; 
-            }
-            .header h2 { 
-              font-size: 16px; 
-              color: #059669; 
-              margin: 5px 0 0 0; 
-              letter-spacing: 2px; 
-            }
-            .details {
-              font-size: 12pt;
-              color: #064e3b;
-              margin-bottom: 10mm;
-              line-height: 1.5;
-              flex-shrink: 0;
-            }
-            .details table {
-              width: 100%;
-              border-collapse: collapse;
-            }
-            .details td {
-              padding: 4px 0;
-              vertical-align: top;
-            }
-            .details td:first-child {
-              font-weight: bold;
-              width: 150px;
-            }
-            .image-container {
-              flex: 1;
-              display: flex;
-              justify-content: center;
-              align-items: center;
-              border: 2px dashed #059669;
-              padding: 5mm;
-              background-color: #ffffff;
-              overflow: hidden;
-            }
-            .image-container img {
-              max-width: 100%;
-              max-height: 100%;
-              object-fit: contain;
-            }
-            .footer {
-              text-align: center;
-              margin-top: 5mm;
-              font-size: 10pt;
-              color: #064e3b;
-              font-weight: bold;
-              flex-shrink: 0;
-            }
-          </style>
         </head>
         <body>
-          <div class="print-container">
-            <div class="header">
-              <h1>TAMAN MARGASATWA RAGUNAN</h1>
-              <h2>BUKTI PEMBAYARAN RESERVASI LOKASI</h2>
+          <div style="text-align: center; font-family: Arial, sans-serif;">
+            <h2 style="color: #064e3b; margin-bottom: 5px;">TAMAN MARGASATWA RAGUNAN</h2>
+            <h3 style="color: #059669; letter-spacing: 2px; margin-top: 0;">BUKTI PEMBAYARAN RESERVASI LOKASI</h3>
+            <hr style="border: 1px solid #059669;" />
+            <div style="text-align: left; margin: 20px 0; font-size: 14pt;">
+              <p><b>ID Transaksi:</b> ${selectedRecord.id_sewa}</p>
+              <p><b>Nama Penyewa:</b> ${selectedRecord.nama_penyewa}</p>
+              <p><b>Lokasi Sewa:</b> ${selectedRecord.lokasi_sewa}</p>
+              <p><b>Tanggal Sewa:</b> ${tglSewaStr}</p>
+              <p><b>Tanggal Transfer:</b> ${tglTransferStr}</p>
             </div>
-            
-            <div class="details">
-              <table>
-                <tr><td>ID Transaksi</td><td>: <b>${selectedRecord.id_sewa}</b></td></tr>
-                <tr><td>Nama Penyewa</td><td>: ${selectedRecord.nama_penyewa}</td></tr>
-                <tr><td>Lokasi Sewa</td><td>: ${selectedRecord.lokasi_sewa}</td></tr>
-                <tr><td>Tanggal Sewa</td><td>: ${tglSewaStr}</td></tr>
-                <tr><td>Tanggal Transfer</td><td>: ${tglTransferStr}</td></tr>
-              </table>
-            </div>
-
-            <div class="image-container">
-              <img src="${selectedRecord.bukti_transfer}" alt="Bukti Transfer" />
-            </div>
-
-            <div class="footer">
-              Sistem Informasi Manajemen Fasilitas Taman Margasatwa Ragunan
+            <div style="border: 2px dashed #059669; padding: 10px;">
+              <img src="${base64data}" alt="Bukti Transfer" style="max-width: 100%; max-height: 800px; object-fit: contain;" />
             </div>
           </div>
         </body>
-      </html>
-    `;
+        </html>
+      `;
 
-    const doc = iframe.contentWindow.document;
-    doc.open();
-    doc.write(htmlContent);
-    doc.close();
-
-    setTimeout(() => {
-      iframe.contentWindow.focus();
-      iframe.contentWindow.print();
-      setTimeout(() => {
-        document.body.removeChild(iframe);
-      }, 1000);
-    }, 800); 
+      const htmlBlob = new Blob([htmlContent], { type: 'text/html' });
+      const finalFileName = `Bukti_Transfer_Reservasi_${selectedRecord.id_sewa}`;
+      
+      const docUrl = await uploadToGoogleDrive(htmlBlob, finalFileName, selectedRecord.docId, 'buktiTransferDocUrl');
+      
+      setSelectedRecord(prev => ({...prev, buktiTransferDocUrl: docUrl}));
+      setSewaList(prev => prev.map(item => item.id === selectedRecord.id ? { ...item, buktiTransferDocUrl: docUrl } : item));
+      
+      window.open(docUrl, '_blank');
+    } catch (err) {
+      console.error(err);
+      alert('Gagal membuat dokumen Bukti Transfer. Pastikan koneksi internet stabil.');
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
-  const handlePrintBuktiListrik = () => {
+  const handlePrintBuktiListrik = async () => {
     if (!selectedRecord || !selectedRecord.bukti_transfer_listrik) return;
     
-    const tglSewaStr = formatTanggalPendek(selectedRecord.tanggal_sewa);
-    const tglTransferStr = selectedRecord.tanggal_transfer_listrik ? formatTanggalPendek(selectedRecord.tanggal_transfer_listrik) : '-';
-    
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = '0';
-    document.body.appendChild(iframe);
+    setIsGenerating(true);
+    try {
+      const response = await fetch(selectedRecord.bukti_transfer_listrik);
+      const blob = await response.blob();
+      const reader = new FileReader();
+      const base64data = await new Promise((resolve) => {
+         reader.onloadend = () => resolve(reader.result);
+         reader.readAsDataURL(blob);
+      });
 
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
+      const tglSewaStr = formatTanggalPendek(selectedRecord.tanggal_sewa);
+      const tglTransferStr = selectedRecord.tanggal_transfer_listrik ? formatTanggalPendek(selectedRecord.tanggal_transfer_listrik) : '-';
+
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
         <head>
           <title>Cetak Bukti Listrik - ${selectedRecord.id_sewa}</title>
-          <style>
-            @page { 
-              size: 215mm 330mm; 
-              margin: 0; 
-            }
-            body { 
-              font-family: 'Arial', sans-serif; 
-              background-color: #ffffff; 
-              margin: 0; 
-              padding: 0; 
-              width: 215mm;
-              height: 330mm;
-              overflow: hidden; 
-              -webkit-print-color-adjust: exact; 
-              print-color-adjust: exact; 
-            }
-            .print-container {
-              width: 100%;
-              height: 100%;
-              padding: 15mm;
-              box-sizing: border-box;
-              display: flex;
-              flex-direction: column;
-              border: 10px solid #059669;
-              background-color: #f0fdf4;
-            }
-            .header {
-              text-align: center;
-              border-bottom: 3px solid #059669;
-              padding-bottom: 5mm;
-              margin-bottom: 5mm;
-              flex-shrink: 0;
-            }
-            .header h1 { 
-              font-size: 24px; 
-              color: #064e3b; 
-              margin: 0; 
-              font-weight: 900; 
-              letter-spacing: 1px; 
-            }
-            .header h2 { 
-              font-size: 16px; 
-              color: #059669; 
-              margin: 5px 0 0 0; 
-              letter-spacing: 2px; 
-            }
-            .details {
-              font-size: 12pt;
-              color: #064e3b;
-              margin-bottom: 10mm;
-              line-height: 1.5;
-              flex-shrink: 0;
-            }
-            .details table {
-              width: 100%;
-              border-collapse: collapse;
-            }
-            .details td {
-              padding: 4px 0;
-              vertical-align: top;
-            }
-            .details td:first-child {
-              font-weight: bold;
-              width: 150px;
-            }
-            .image-container {
-              flex: 1;
-              display: flex;
-              justify-content: center;
-              align-items: center;
-              border: 2px dashed #059669;
-              padding: 5mm;
-              background-color: #ffffff;
-              overflow: hidden;
-            }
-            .image-container img {
-              max-width: 100%;
-              max-height: 100%;
-              object-fit: contain;
-            }
-            .footer {
-              text-align: center;
-              margin-top: 5mm;
-              font-size: 10pt;
-              color: #064e3b;
-              font-weight: bold;
-              flex-shrink: 0;
-            }
-          </style>
         </head>
         <body>
-          <div class="print-container">
-            <div class="header">
-              <h1>TAMAN MARGASATWA RAGUNAN</h1>
-              <h2>BUKTI PEMBAYARAN LISTRIK TAMBAHAN</h2>
+          <div style="text-align: center; font-family: Arial, sans-serif;">
+            <h2 style="color: #064e3b; margin-bottom: 5px;">TAMAN MARGASATWA RAGUNAN</h2>
+            <h3 style="color: #059669; letter-spacing: 2px; margin-top: 0;">BUKTI PEMBAYARAN LISTRIK TAMBAHAN</h3>
+            <hr style="border: 1px solid #059669;" />
+            <div style="text-align: left; margin: 20px 0; font-size: 14pt;">
+              <p><b>ID Transaksi:</b> ${selectedRecord.id_sewa}</p>
+              <p><b>Nama Penyewa:</b> ${selectedRecord.nama_penyewa}</p>
+              <p><b>Lokasi Sewa:</b> ${selectedRecord.lokasi_sewa}</p>
+              <p><b>Tanggal Sewa:</b> ${tglSewaStr}</p>
+              <p><b>Tanggal Transfer Listrik:</b> ${tglTransferStr}</p>
             </div>
-            
-            <div class="details">
-              <table>
-                <tr><td>ID Transaksi</td><td>: <b>${selectedRecord.id_sewa}</b></td></tr>
-                <tr><td>Nama Penyewa</td><td>: ${selectedRecord.nama_penyewa}</td></tr>
-                <tr><td>Lokasi Sewa</td><td>: ${selectedRecord.lokasi_sewa}</td></tr>
-                <tr><td>Tanggal Sewa</td><td>: ${tglSewaStr}</td></tr>
-                <tr><td>Tanggal Transfer Listrik</td><td>: ${tglTransferStr}</td></tr>
-              </table>
-            </div>
-
-            <div class="image-container">
-              <img src="${selectedRecord.bukti_transfer_listrik}" alt="Bukti Transfer Listrik" />
-            </div>
-
-            <div class="footer">
-              Sistem Informasi Manajemen Fasilitas Taman Margasatwa Ragunan
+            <div style="border: 2px dashed #059669; padding: 10px;">
+              <img src="${base64data}" alt="Bukti Transfer Listrik" style="max-width: 100%; max-height: 800px; object-fit: contain;" />
             </div>
           </div>
         </body>
-      </html>
-    `;
+        </html>
+      `;
 
-    const doc = iframe.contentWindow.document;
-    doc.open();
-    doc.write(htmlContent);
-    doc.close();
-
-    setTimeout(() => {
-      iframe.contentWindow.focus();
-      iframe.contentWindow.print();
-      setTimeout(() => {
-        document.body.removeChild(iframe);
-      }, 1000);
-    }, 800); 
+      const htmlBlob = new Blob([htmlContent], { type: 'text/html' });
+      const finalFileName = `Bukti_Transfer_Listrik_${selectedRecord.id_sewa}`;
+      
+      const docUrl = await uploadToGoogleDrive(htmlBlob, finalFileName, selectedRecord.docId, 'buktiTransferListrikDocUrl');
+      
+      setSelectedRecord(prev => ({...prev, buktiTransferListrikDocUrl: docUrl}));
+      setSewaList(prev => prev.map(item => item.id === selectedRecord.id ? { ...item, buktiTransferListrikDocUrl: docUrl } : item));
+      
+      window.open(docUrl, '_blank');
+    } catch (err) {
+      console.error(err);
+      alert('Gagal membuat dokumen Bukti Transfer Listrik.');
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handleUploadListrikChange = (e) => {
@@ -1811,11 +1685,22 @@ Terima kasih.`;
                                       <span className="px-2.5 py-1 rounded-md text-[10px] font-bold bg-amber-100 text-amber-700 flex w-max items-center mb-2"><CheckCircle2 size={12} className="mr-1"/> Struk Listrik Tersedia</span>
                                       {selectedRecord.tanggal_transfer_listrik && <p className="text-[10px] text-amber-800 font-bold mb-2 tracking-wide">Tgl Transfer: {formatTanggalIndo(selectedRecord.tanggal_transfer_listrik)}</p>}
                                       <img src={selectedRecord.bukti_transfer_listrik} alt="Struk Listrik" className="w-full rounded-2xl border border-slate-200 mt-1 mb-3 object-contain max-h-[500px] bg-slate-50 cursor-pointer hover:opacity-90 transition-opacity" onClick={() => setFullScreenImage(selectedRecord.bukti_transfer_listrik)} />
-                                      <div className="grid grid-cols-2 gap-2 mt-2">
-                                          <button type="button" onClick={handlePrintBuktiListrik} className="w-full bg-slate-100 text-slate-700 font-bold py-2.5 rounded-xl hover:bg-slate-200 transition-all duration-200 shadow-sm flex flex-col justify-center items-center text-[10px] border border-slate-200 text-center leading-tight h-14">
-                                              <Printer size={16} className="mb-1 text-slate-500"/> Cetak Struk Listrik
-                                          </button>
-                                          <button type="button" onClick={() => handleUpdateRecordInline(selectedRecord, { bukti_transfer_listrik: null }, 'Struk listrik dihapus.')} className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold py-2.5 rounded-xl transition-all duration-200 text-[10px] flex flex-col justify-center items-center h-14">
+                                      <div className="flex gap-2 mt-2 overflow-x-auto pb-1">
+                                          {selectedRecord.buktiTransferListrikDocUrl ? (
+                                              <>
+                                                  <button type="button" onClick={() => window.open(selectedRecord.buktiTransferListrikDocUrl, '_blank')} className="flex-1 min-w-[90px] bg-blue-50 text-blue-700 font-bold py-2.5 rounded-xl hover:bg-blue-100 transition-all duration-200 shadow-sm flex flex-col justify-center items-center text-[10px] border border-blue-200 text-center leading-tight h-14">
+                                                      <FileText size={16} className="mb-1 text-blue-500"/> Buka Doc Listrik
+                                                  </button>
+                                                  <button type="button" disabled={isGenerating} onClick={handlePrintBuktiListrik} className="flex-1 min-w-[90px] bg-slate-50 text-slate-500 font-bold py-2.5 rounded-xl hover:bg-slate-100 transition-all duration-200 shadow-sm flex flex-col justify-center items-center text-[10px] border border-slate-200 text-center leading-tight h-14 disabled:opacity-50">
+                                                      <Printer size={16} className="mb-1"/> {isGenerating ? '...' : 'Buat Ulang'}
+                                                  </button>
+                                              </>
+                                          ) : (
+                                              <button type="button" disabled={isGenerating} onClick={handlePrintBuktiListrik} className="flex-1 min-w-[90px] bg-slate-100 text-slate-700 font-bold py-2.5 rounded-xl hover:bg-slate-200 transition-all duration-200 shadow-sm flex flex-col justify-center items-center text-[10px] border border-slate-200 text-center leading-tight h-14 disabled:opacity-50">
+                                                  <Printer size={16} className="mb-1 text-slate-500"/> {isGenerating ? '...' : 'Cetak Struk Listrik'}
+                                              </button>
+                                          )}
+                                          <button type="button" onClick={() => handleUpdateRecordInline(selectedRecord, { bukti_transfer_listrik: null, buktiTransferListrikDocUrl: null }, 'Struk listrik dihapus.')} className="flex-1 min-w-[90px] bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold py-2.5 rounded-xl transition-all duration-200 text-[10px] flex flex-col justify-center items-center h-14">
                                               <X size={16} className="mb-1 text-rose-500"/> Hapus Struk Listrik
                                           </button>
                                       </div>
@@ -1843,15 +1728,26 @@ Terima kasih.`;
                          {selectedRecord.bukti_transfer && (
                              <div className="mt-2 space-y-3">
                                  <img src={selectedRecord.bukti_transfer} alt="Struk Utama" className="w-full rounded-2xl border border-slate-200 object-contain max-h-[500px] bg-slate-50 cursor-pointer hover:opacity-90 transition-opacity" onClick={() => setFullScreenImage(selectedRecord.bukti_transfer)} />
-                                 <div className={`grid ${selectedRecord.status_pembayaran === 'Lunas' ? 'grid-cols-3' : 'grid-cols-2'} gap-2`}>
-                                     <button type="button" onClick={handlePrintBukti} className="w-full bg-slate-100 text-slate-700 font-bold py-2.5 rounded-xl hover:bg-slate-200 transition-all duration-200 shadow-sm flex flex-col justify-center items-center text-[10px] border border-slate-200 text-center leading-tight h-14">
-                                         <Printer size={16} className="mb-1 text-slate-500"/> Cetak Bukti Transfer
-                                     </button>
-                                     <button type="button" onClick={() => handleUpdateRecordInline(selectedRecord, { bukti_transfer: null, status_pembayaran: 'Belum Transfer' }, 'Struk ditolak. Pengunjung dapat mengunggah ulang.')} className="w-full bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold py-2.5 rounded-xl transition-all duration-200 text-[10px] flex flex-col justify-center items-center h-14">
+                                 <div className="flex gap-2 mt-2 overflow-x-auto pb-1">
+                                     {selectedRecord.buktiTransferDocUrl ? (
+                                         <>
+                                             <button type="button" onClick={() => window.open(selectedRecord.buktiTransferDocUrl, '_blank')} className="flex-1 min-w-[90px] bg-blue-50 text-blue-700 font-bold py-2.5 rounded-xl hover:bg-blue-100 transition-all duration-200 shadow-sm flex flex-col justify-center items-center text-[10px] border border-blue-200 text-center leading-tight h-14">
+                                                 <FileText size={16} className="mb-1 text-blue-500"/> Buka Doc Bukti
+                                             </button>
+                                             <button type="button" disabled={isGenerating} onClick={handlePrintBukti} className="flex-1 min-w-[90px] bg-slate-50 text-slate-500 font-bold py-2.5 rounded-xl hover:bg-slate-100 transition-all duration-200 shadow-sm flex flex-col justify-center items-center text-[10px] border border-slate-200 text-center leading-tight h-14 disabled:opacity-50">
+                                                 <Printer size={16} className="mb-1"/> {isGenerating ? '...' : 'Buat Ulang'}
+                                             </button>
+                                         </>
+                                     ) : (
+                                         <button type="button" disabled={isGenerating} onClick={handlePrintBukti} className="flex-1 min-w-[90px] bg-slate-100 text-slate-700 font-bold py-2.5 rounded-xl hover:bg-slate-200 transition-all duration-200 shadow-sm flex flex-col justify-center items-center text-[10px] border border-slate-200 text-center leading-tight h-14 disabled:opacity-50">
+                                             <Printer size={16} className="mb-1 text-slate-500"/> {isGenerating ? '...' : 'Cetak Bukti Transfer'}
+                                         </button>
+                                     )}
+                                     <button type="button" onClick={() => handleUpdateRecordInline(selectedRecord, { bukti_transfer: null, status_pembayaran: 'Belum Transfer', buktiTransferDocUrl: null }, 'Struk ditolak. Pengunjung dapat mengunggah ulang.')} className="flex-1 min-w-[90px] bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold py-2.5 rounded-xl transition-all duration-200 text-[10px] flex flex-col justify-center items-center h-14">
                                          <X size={16} className="mb-1 text-rose-500"/> Tolak & Hapus
                                      </button>
                                      {selectedRecord.status_pembayaran === 'Lunas' && (
-                                         <button type="button" onClick={() => handlePrintKwitansi(selectedRecord)} className="w-full bg-indigo-50 text-indigo-700 font-bold py-2.5 rounded-xl hover:bg-indigo-100 transition-all duration-200 shadow-sm flex flex-col justify-center items-center text-[10px] border border-indigo-200 text-center leading-tight h-14">
+                                         <button type="button" onClick={() => handlePrintKwitansi(selectedRecord)} className="flex-1 min-w-[90px] bg-indigo-50 text-indigo-700 font-bold py-2.5 rounded-xl hover:bg-indigo-100 transition-all duration-200 shadow-sm flex flex-col justify-center items-center text-[10px] border border-indigo-200 text-center leading-tight h-14">
                                              <Printer size={16} className="mb-1 text-indigo-500"/> Cetak Kwitansi
                                          </button>
                                      )}

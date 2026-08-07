@@ -10,6 +10,7 @@ export default function PublicUpload() {
   const [loadingText, setLoadingText] = useState('Memproses...');
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [infoMsg, setInfoMsg] = useState('');
   
   const [uploadFile, setUploadFile] = useState(null);
   const [filePreview, setFilePreview] = useState(null);
@@ -41,10 +42,10 @@ export default function PublicUpload() {
         const isMainPending = data.status_pembayaran === 'Menunggu Verifikasi';
 
         if (isMainPaid && !needsListrik) {
-          setErrorMsg('Transaksi ini sudah lunas atau sudah memiliki bukti transfer yang valid.');
+          setInfoMsg('Transaksi ini sudah lunas atau sudah memiliki bukti transfer yang valid.');
           setBookingData(null);
         } else if (isMainPending && !needsListrik) {
-          setSuccessMsg('Bukti transfer Anda sudah diterima dan sedang Menunggu Verifikasi oleh Admin.');
+          setInfoMsg('Bukti transfer Anda sudah diterima dan sedang Menunggu Verifikasi oleh Admin.');
           setBookingData(null);
         } else {
           setBookingData({ id: docSnap.id, ...data });
@@ -222,6 +223,20 @@ export default function PublicUpload() {
           <button onClick={() => window.location.reload()} className="bg-emerald-600 text-white font-bold py-3 px-8 rounded-xl hover:bg-emerald-700 transition-colors shadow-md">
             Kembali
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (infoMsg) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans">
+        <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-8 text-center border border-sky-100">
+          <div className="w-20 h-20 bg-sky-100 text-sky-600 rounded-full flex items-center justify-center mx-auto mb-6">
+            <CheckCircle2 size={40} />
+          </div>
+          <h2 className="text-2xl font-black text-sky-950 mb-2 tracking-tight">Status Dokumen</h2>
+          <p className="text-slate-600 mb-8">{infoMsg}</p>
         </div>
       </div>
     );
