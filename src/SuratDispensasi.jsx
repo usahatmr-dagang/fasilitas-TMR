@@ -1,7 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { FileText, Printer, Search, Building, Users, Car, CheckCircle2, ChevronLeft, Clock, X } from 'lucide-react';
+import { FileText, Printer, Search, Building, Users, Car, CheckCircle2, ChevronLeft, Clock, X, Loader2 } from 'lucide-react';
 import { db } from './firebase';
 import { collection, getDocs, doc, getDoc, setDoc, updateDoc, addDoc } from 'firebase/firestore';
+
+// PizZip and Docxtemplater for docx generation
+import PizZip from 'pizzip';
+import Docxtemplater from 'docxtemplater';
 
 export default function SuratDispensasi({ onNavigate }) {
   const [source, setSource] = useState('sewa'); // 'sewa' or 'promo'
@@ -23,6 +27,11 @@ export default function SuratDispensasi({ onNavigate }) {
   const [showHistory, setShowHistory] = useState(false);
   const [historyData, setHistoryData] = useState([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+
+  // Print & Google Drive state
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [googleAccessToken, setGoogleAccessToken] = useState(null);
+  const CLIENT_ID = '905355425334-tbtvuvufgvnom6vnlb5d0rka00ih03if.apps.googleusercontent.com';
 
   // Fetch Data
   useEffect(() => {
@@ -53,14 +62,98 @@ export default function SuratDispensasi({ onNavigate }) {
         
         setDataList(items);
         setFilteredData(items);
-      } catch (error) {
-        console.error("Error fetching data: ", error);
+        setSelectedItem(null);
+      } catch (err) {
+        console.error("Gagal mengambil data:", err);
       }
       setIsLoading(false);
     };
     fetchData();
-    setSelectedItem(null);
+
+    // Inisialisasi Google API Client
+    if (window.gapi) {
+        window.gapi.load('client', () => {});
+    }
   }, [source]);
+
+  const requestGoogleToken = () => {
+      return new Promise((resolve, reject) => {
+          if (googleAccessToken) {
+              resolve(googleAccessToken);
+              return;
+          }
+          if (!window.google) {
+              reject(new Error("Google Script belum dimuat. Silakan muat ulang halaman."));
+              return;
+          }
+          const client = window.google.accounts.oauth2.initTokenClient({
+              client_id: CLIENT_ID,
+              scope: 'https://www.googleapis.com/auth/drive.file',
+              callback: (response) => {
+                  if (response.error) {
+                      reject(response.error);
+                  } else {
+                      setGoogleAccessToken(response.access_token);
+                      resolve(response.access_token);
+                  }
+              },
+          });
+          client.requestAccessToken();
+      });
+  };
+
+  const uploadToGoogleDrive = async (blob, fileName, recordId, targetCollection) => {
+      try {
+          const token = await requestGoogleToken();
+          
+          const metadata = {
+              name: fileName,
+              mimeType: 'application/vnd.google-apps.document',
+          };
+
+          const form = new FormData();
+          form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+          form.append('file', blob);
+
+          const response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+              method: 'POST',
+              headers: new Headers({ 'Authorization': 'Bearer ' + token }),
+              body: form,
+          });
+
+          if (!response.ok) {
+              throw new Error("Gagal mengunggah ke Google Drive");
+          }
+          const result = await response.json();
+          const fileId = result.id;
+          
+          await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}/permissions`, {
+              method: 'POST',
+              headers: {
+                  'Authorization': 'Bearer ' + token,
+                  'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                  role: 'writer',
+                  type: 'anyone'
+              })
+          });
+
+          const docUrl = `https://docs.google.com/document/d/${fileId}/edit`;
+          
+          // Optionally update the doc to store the URL if needed, but not strictly required
+          if (recordId && targetCollection) {
+             await updateDoc(doc(db, targetCollection, recordId), {
+                 dispensasiDriveUrl: docUrl
+             });
+          }
+
+          return docUrl;
+      } catch (error) {
+          console.error("Drive Error:", error);
+          throw error;
+      }
+  };
 
   // Search filter
   useEffect(() => {
@@ -116,179 +209,87 @@ export default function SuratDispensasi({ onNavigate }) {
       return;
     }
 
-    const dateObj = new Date();
-    const currentYear = dateObj.getFullYear();
-    
-    // Format Nomor
-    const padZero = (num) => num.toString().padStart(2, '0');
-    const yyyyMmDd = `${currentYear}-${padZero(dateObj.getMonth()+1)}-${padZero(dateObj.getDate())}`;
-    const kode = source === 'promo' ? 'P' : 'R';
-    
-    let formatNomor = "";
-    // Penomoran Acak Unik (4 digit) + Timestamp
-    const randomCounter = Math.floor(1000 + Math.random() * 9000); 
-    formatNomor = `${yyyyMmDd}/${kode}/${randomCounter}`;
-
-    // 2. Format HTML untuk Print
-    const namaInstansi = source === 'sewa' ? selectedItem.nama_penyewa : selectedItem.namaPerusahaan;
-    
-    const printHtml = `
-    <html>
-      <head>
-        <title>Cetak Surat Dispensasi - ${namaInstansi}</title>
-        <style>
-          @page { margin: 20mm; size: A4 portrait; }
-          body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.5; color: #000; margin: 0; padding: 0; }
-          .kop-surat { text-align: center; border-bottom: 3px solid #000; padding-bottom: 15px; margin-bottom: 30px; position: relative; }
-          .kop-surat h3, .kop-surat h2, .kop-surat h1 { margin: 0; font-weight: bold; }
-          .kop-surat h3 { font-size: 14pt; font-weight: normal; }
-          .kop-surat h2 { font-size: 16pt; }
-          .kop-surat h1 { font-size: 18pt; letter-spacing: 1px; }
-          .kop-surat p { margin: 5px 0 0 0; font-size: 10pt; }
-          .title-surat { text-align: center; margin-bottom: 30px; }
-          .title-surat h3 { font-size: 14pt; font-weight: bold; text-decoration: underline; margin: 0 0 5px 0; }
-          .title-surat p { margin: 0; font-size: 12pt; }
-          .content { margin: 0 20px; }
-          .info-table { width: 100%; border-collapse: collapse; margin: 15px 0; }
-          .info-table td { padding: 5px; vertical-align: top; }
-          .info-table td:first-child { width: 30%; }
-          .info-table td:nth-child(2) { width: 2%; }
-          .ket-list { padding-left: 20px; margin-top: 10px; }
-          .ket-list li { margin-bottom: 10px; text-align: justify; }
-          .ttd-box { float: right; width: 350px; text-align: center; margin-top: 40px; }
-          .ttd-box p { margin: 2px 0; }
-          .ttd-space { height: 80px; }
-          .footer { clear: both; margin-top: 30px; font-size: 11pt; text-align: justify; }
-        </style>
-      </head>
-      <body>
-        <div class="kop-surat">
-          <h3>PEMERINTAH PROVINSI DAERAH KHUSUS IBU KOTA JAKARTA</h3>
-          <h2>DINAS PERTAMANAN DAN HUTAN KOTA</h2>
-          <h1>UNIT PENGELOLA TAMAN MARGASATWA RAGUNAN</h1>
-          <p>Jalan Harsono RM. No. 1 Ragunan, Telp (021) 7820015 fax. (021) 7805280</p>
-          <p>JAKARTA</p>
-          <p style="text-align: right; font-weight: bold;">Kode Pos : 12550</p>
-        </div>
-
-        <div class="title-surat">
-          <h3>DISPENSASI</h3>
-          <p>NOMOR : ${formatNomor}</p>
-        </div>
-
-        <div class="content">
-          <p>Kepala Unit Pengelola Taman Margasatwa Ragunan Provinsi DKI Jakarta memberikan ijin kepada :</p>
-          
-          <table class="info-table">
-            <tr>
-              <td>Nama Rombongan</td>
-              <td>:</td>
-              <td><strong>${namaInstansi || '-'}</strong></td>
-            </tr>
-            <tr>
-              <td>Tanggal Kunjungan</td>
-              <td>:</td>
-              <td><strong>${tglKunjungan}</strong></td>
-            </tr>
-            <tr>
-              <td>Keperluan</td>
-              <td>:</td>
-              <td><strong>${keperluan}</strong></td>
-            </tr>
-            <tr>
-              <td>Nomor Kendaraan</td>
-              <td>:</td>
-              <td><strong>${jmlKendaraan} (${nopol}) - ${jmlPersonel}</strong></td>
-            </tr>
-          </table>
-
-          <div style="margin-top: 20px;">
-            <strong>Ketentuan :</strong>
-            <ol class="ket-list">
-              <li>Setelah selesai menurunkan barang, kendaraan kembali ke tempat parkir TMR dan tidak diperkenankan parkir ditempat acara ataupun berkeliling didalam kawasan TMR.</li>
-              <li>Setiap pengantar barang wajib membayar tarif masuk berikut kendaraannya.</li>
-              <li>Jadwal loading dari hari selasa s/d Minggu, ${jamLoading}.</li>
-            </ol>
-          </div>
-
-          <p class="footer">Demikian Dispensasi ini diberikan untuk dipergunakan sebagaimana mestinya.</p>
-          
-          <div class="ttd-box">
-            <p>Jakarta, ${dateObj.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
-            <br/>
-            <p>Kepala Unit Pengelola</p>
-            <p>Taman Margasatwa Ragunan</p>
-            <p>Dinas Pertamanan dan Hutan Kota</p>
-            <p>Provinsi DKI Jakarta</p>
-            <div class="ttd-space"></div>
-            <p>(_________________________)</p>
-          </div>
-        </div>
-      </body>
-    </html>
-    `;
-
-    // 3. Cetak menggunakan Iframe tersembunyi (Tidak Buka Tab Baru)
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'absolute';
-    iframe.style.width = '0px';
-    iframe.style.height = '0px';
-    iframe.style.border = 'none';
-    document.body.appendChild(iframe);
-
-    const iframeDoc = iframe.contentWindow.document;
-    iframeDoc.open();
-    iframeDoc.write(printHtml);
-    iframeDoc.close();
-
-    // Tunggu render selesai baru panggil print
-    setTimeout(async () => {
-      iframe.contentWindow.focus();
-      iframe.contentWindow.print();
+    setIsGenerating(true);
+    try {
+      const dateObj = new Date();
+      const currentYear = dateObj.getFullYear();
       
-      // Simpan riwayat dan update status cetak ke database di background
-      try {
-        const targetCollection = source === 'sewa' ? 'sewaList' : 'promoList';
-        const docRef = doc(db, targetCollection, selectedItem.id);
-        
-        // Update status dokumen utama
-        await updateDoc(docRef, {
-          isDispensasiPrinted: true,
-          nomorSuratDispensasi: formatNomor,
-          tanggalCetakDispensasi: new Date().toISOString()
-        });
-        
-        // Simpan ke riwayat
-        await addDoc(collection(db, 'historyDispensasi'), {
-          nomorSurat: formatNomor,
-          idRombongan: selectedItem.id,
-          namaRombongan: namaInstansi,
-          tanggalKunjungan: tglKunjungan,
-          nopol: nopol,
-          keperluan: keperluan,
-          jmlKendaraan: jmlKendaraan,
-          jmlPersonel: jmlPersonel,
-          jamLoading: jamLoading,
-          tanggalCetak: new Date().toISOString(),
-          sumber: source
-        });
+      const padZero = (num) => num.toString().padStart(2, '0');
+      const yyyyMmDd = `${currentYear}-${padZero(dateObj.getMonth()+1)}-${padZero(dateObj.getDate())}`;
+      const kode = source === 'promo' ? 'P' : 'R';
+      
+      const randomCounter = Math.floor(1000 + Math.random() * 9000); 
+      const formatNomor = `${yyyyMmDd}/${kode}/${randomCounter}`;
+      
+      const namaInstansi = source === 'sewa' ? selectedItem.nama_penyewa : selectedItem.namaPerusahaan;
+      
+      const response = await fetch('/dispensasi.docx');
+      if (!response.ok) throw new Error("Template dispensasi.docx tidak ditemukan");
+      const arrayBuffer = await response.arrayBuffer();
 
-        // Update local state untuk memunculkan badge secara instan
-        setFilteredData(prev => prev.map(item => item.id === selectedItem.id ? { ...item, isDispensasiPrinted: true, nomorSuratDispensasi: formatNomor } : item));
-        setDataList(prev => prev.map(item => item.id === selectedItem.id ? { ...item, isDispensasiPrinted: true, nomorSuratDispensasi: formatNomor } : item));
-        setSelectedItem(prev => ({...prev, isDispensasiPrinted: true, nomorSuratDispensasi: formatNomor}));
+      const zip = new PizZip(arrayBuffer);
+      const docTemplater = new Docxtemplater(zip, {
+        paragraphLoop: true,
+        linebreaks: true,
+        delimiters: { start: '<<', end: '>>' }
+      });
 
-      } catch (err) {
-        console.warn("Gagal menyimpan riwayat/status (Mungkin karena limit kuota Firebase).", err);
-      }
+      docTemplater.render({
+        nomorSurat: formatNomor,
+        namaRombongan: namaInstansi || '-',
+        tanggalKunjungan: tglKunjungan,
+        keperluan: keperluan,
+        nopol: nopol,
+        jmlKendaraan: jmlKendaraan,
+        jmlPersonel: jmlPersonel,
+        jamLoading: jamLoading,
+        tanggalHariIni: dateObj.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+      });
 
-      // Hapus iframe setelah popup print ditutup
-      setTimeout(() => {
-        if (document.body.contains(iframe)) {
-          document.body.removeChild(iframe);
-        }
-      }, 2000);
-    }, 500);
+      const docxBlob = docTemplater.getZip().generate({
+        type: 'blob',
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      });
+
+      const fileName = `Surat Dispensasi - ${namaInstansi} - ${formatNomor.replace(/\//g, '_')}`;
+      const targetCollection = source === 'sewa' ? 'sewaList' : 'promoList';
+      
+      const docUrl = await uploadToGoogleDrive(docxBlob, fileName, selectedItem.id, targetCollection);
+
+      const docRef = doc(db, targetCollection, selectedItem.id);
+      await updateDoc(docRef, {
+        isDispensasiPrinted: true,
+        nomorSuratDispensasi: formatNomor,
+        tanggalCetakDispensasi: new Date().toISOString()
+      });
+      
+      await addDoc(collection(db, 'historyDispensasi'), {
+        nomorSurat: formatNomor,
+        idRombongan: selectedItem.id,
+        namaRombongan: namaInstansi,
+        tanggalKunjungan: tglKunjungan,
+        nopol: nopol,
+        keperluan: keperluan,
+        jmlKendaraan: jmlKendaraan,
+        jmlPersonel: jmlPersonel,
+        jamLoading: jamLoading,
+        tanggalCetak: new Date().toISOString(),
+        sumber: source,
+        dispensasiDriveUrl: docUrl
+      });
+
+      setFilteredData(prev => prev.map(item => item.id === selectedItem.id ? { ...item, isDispensasiPrinted: true, nomorSuratDispensasi: formatNomor, dispensasiDriveUrl: docUrl } : item));
+      setDataList(prev => prev.map(item => item.id === selectedItem.id ? { ...item, isDispensasiPrinted: true, nomorSuratDispensasi: formatNomor, dispensasiDriveUrl: docUrl } : item));
+      setSelectedItem(prev => ({...prev, isDispensasiPrinted: true, nomorSuratDispensasi: formatNomor, dispensasiDriveUrl: docUrl}));
+
+      window.open(docUrl, '_blank');
+
+    } catch (err) {
+      console.error(err);
+      alert("Gagal membuat/mengunggah dokumen. Pastikan template 'dispensasi.docx' ada di public dan format tag benar.");
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   // Fungsi untuk membuka dan mengambil riwayat
@@ -307,123 +308,58 @@ export default function SuratDispensasi({ onNavigate }) {
     setIsHistoryLoading(false);
   };
 
-  const handleReprintHistory = (hist) => {
-    const dateObj = new Date(hist.tanggalCetak);
-    const printHtml = `
-    <html>
-      <head>
-        <title>Cetak Surat Dispensasi - ${hist.namaRombongan}</title>
-        <style>
-          @page { margin: 20mm; size: A4 portrait; }
-          body { font-family: 'Times New Roman', Times, serif; font-size: 12pt; line-height: 1.5; color: #000; margin: 0; padding: 0; }
-          .kop-surat { text-align: center; border-bottom: 3px solid #000; padding-bottom: 15px; margin-bottom: 30px; position: relative; }
-          .kop-surat h3, .kop-surat h2, .kop-surat h1 { margin: 0; font-weight: bold; }
-          .kop-surat h3 { font-size: 14pt; font-weight: normal; }
-          .kop-surat h2 { font-size: 16pt; }
-          .kop-surat h1 { font-size: 18pt; letter-spacing: 1px; }
-          .kop-surat p { margin: 5px 0 0 0; font-size: 10pt; }
-          .title-surat { text-align: center; margin-bottom: 30px; }
-          .title-surat h3 { font-size: 14pt; font-weight: bold; text-decoration: underline; margin: 0 0 5px 0; }
-          .title-surat p { margin: 0; font-size: 12pt; }
-          .content { margin: 0 20px; }
-          .info-table { width: 100%; border-collapse: collapse; margin: 15px 0; }
-          .info-table td { padding: 5px; vertical-align: top; }
-          .info-table td:first-child { width: 30%; }
-          .info-table td:nth-child(2) { width: 2%; }
-          .ket-list { padding-left: 20px; margin-top: 10px; }
-          .ket-list li { margin-bottom: 10px; text-align: justify; }
-          .ttd-box { float: right; width: 350px; text-align: center; margin-top: 40px; }
-          .ttd-box p { margin: 2px 0; }
-          .ttd-space { height: 80px; }
-          .footer { clear: both; margin-top: 30px; font-size: 11pt; text-align: justify; }
-        </style>
-      </head>
-      <body>
-        <div class="kop-surat">
-          <h3>PEMERINTAH PROVINSI DAERAH KHUSUS IBU KOTA JAKARTA</h3>
-          <h2>DINAS PERTAMANAN DAN HUTAN KOTA</h2>
-          <h1>UNIT PENGELOLA TAMAN MARGASATWA RAGUNAN</h1>
-          <p>Jalan Harsono RM. No. 1 Ragunan, Telp (021) 7820015 fax. (021) 7805280</p>
-          <p>JAKARTA</p>
-          <p style="text-align: right; font-weight: bold;">Kode Pos : 12550</p>
-        </div>
+  const handleReprintHistory = async (hist) => {
+    if (hist.dispensasiDriveUrl) {
+      window.open(hist.dispensasiDriveUrl, '_blank');
+      return;
+    }
+    
+    // Jika belum punya url drive (data lama) generate ulang
+    setIsHistoryLoading(true);
+    try {
+      const dateObj = new Date(hist.tanggalCetak || Date.now());
+      
+      const response = await fetch('/dispensasi.docx');
+      if (!response.ok) throw new Error("Template dispensasi.docx tidak ditemukan");
+      const arrayBuffer = await response.arrayBuffer();
 
-        <div class="title-surat">
-          <h3>DISPENSASI</h3>
-          <p>NOMOR : ${hist.nomorSurat}</p>
-        </div>
+      const zip = new PizZip(arrayBuffer);
+      const docTemplater = new Docxtemplater(zip, {
+        paragraphLoop: true,
+        linebreaks: true,
+        delimiters: { start: '<<', end: '>>' }
+      });
 
-        <div class="content">
-          <p>Kepala Unit Pengelola Taman Margasatwa Ragunan Provinsi DKI Jakarta memberikan ijin kepada :</p>
-          
-          <table class="info-table">
-            <tr>
-              <td>Nama Rombongan</td>
-              <td>:</td>
-              <td><strong>${hist.namaRombongan || '-'}</strong></td>
-            </tr>
-            <tr>
-              <td>Tanggal Kunjungan</td>
-              <td>:</td>
-              <td><strong>${hist.tanggalKunjungan}</strong></td>
-            </tr>
-            <tr>
-              <td>Keperluan</td>
-              <td>:</td>
-              <td><strong>${hist.keperluan}</strong></td>
-            </tr>
-            <tr>
-              <td>Nomor Kendaraan</td>
-              <td>:</td>
-              <td><strong>${hist.jmlKendaraan || '-'} (${hist.nopol}) - ${hist.jmlPersonel || '-'}</strong></td>
-            </tr>
-          </table>
+      docTemplater.render({
+        nomorSurat: hist.nomorSurat,
+        namaRombongan: hist.namaRombongan || '-',
+        tanggalKunjungan: hist.tanggalKunjungan,
+        keperluan: hist.keperluan,
+        nopol: hist.nopol,
+        jmlKendaraan: hist.jmlKendaraan || '-',
+        jmlPersonel: hist.jmlPersonel || '-',
+        jamLoading: hist.jamLoading || '-',
+        tanggalHariIni: dateObj.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+      });
 
-          <div style="margin-top: 20px;">
-            <strong>Ketentuan :</strong>
-            <ol class="ket-list">
-              <li>Setelah selesai menurunkan barang, kendaraan kembali ke tempat parkir TMR dan tidak diperkenankan parkir ditempat acara ataupun berkeliling didalam kawasan TMR.</li>
-              <li>Setiap pengantar barang wajib membayar tarif masuk berikut kendaraannya.</li>
-              <li>Jadwal loading dari hari selasa s/d Minggu, ${hist.jamLoading || '-'}.</li>
-            </ol>
-          </div>
+      const docxBlob = docTemplater.getZip().generate({
+        type: 'blob',
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      });
 
-          <p class="footer">Demikian Dispensasi ini diberikan untuk dipergunakan sebagaimana mestinya.</p>
-          
-          <div class="ttd-box">
-            <p>Jakarta, ${dateObj.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
-            <br/>
-            <p>Kepala Unit Pengelola</p>
-            <p>Taman Margasatwa Ragunan</p>
-            <p>Dinas Pertamanan dan Hutan Kota</p>
-            <p>Provinsi DKI Jakarta</p>
-            <div class="ttd-space"></div>
-            <p>(_________________________)</p>
-          </div>
-        </div>
-      </body>
-    </html>
-    `;
+      const fileName = `Surat Dispensasi - ${hist.namaRombongan} - ${hist.nomorSurat.replace(/\//g, '_')}`;
+      const docUrl = await uploadToGoogleDrive(docxBlob, fileName, hist.id, 'historyDispensasi');
 
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'absolute';
-    iframe.style.width = '0px';
-    iframe.style.height = '0px';
-    iframe.style.border = 'none';
-    document.body.appendChild(iframe);
+      // Update state
+      setHistoryData(prev => prev.map(h => h.id === hist.id ? { ...h, dispensasiDriveUrl: docUrl } : h));
 
-    const iframeDoc = iframe.contentWindow.document;
-    iframeDoc.open();
-    iframeDoc.write(printHtml);
-    iframeDoc.close();
-
-    setTimeout(() => {
-      iframe.contentWindow.focus();
-      iframe.contentWindow.print();
-      setTimeout(() => {
-        if (document.body.contains(iframe)) document.body.removeChild(iframe);
-      }, 2000);
-    }, 500);
+      window.open(docUrl, '_blank');
+    } catch (err) {
+      console.error(err);
+      alert("Gagal membuat/mengunggah dokumen ulang.");
+    } finally {
+      setIsHistoryLoading(false);
+    }
   };
 
   return (

@@ -127,7 +127,7 @@ export default function PromoDashboard({ onNavigate }) {
       });
   };
 
-  const uploadToGoogleDrive = async (blob, fileName, promoId) => {
+  const uploadToGoogleDrive = async (blob, fileName, promoId, urlField = 'pksDriveUrl') => {
       try {
           const token = await requestGoogleToken();
           
@@ -169,9 +169,11 @@ export default function PromoDashboard({ onNavigate }) {
           const docUrl = `https://docs.google.com/document/d/${fileId}/edit`;
           
           // Simpan link ke firebase
-          await updateDoc(doc(db, 'promoList', promoId), {
-              pksDriveUrl: docUrl
-          });
+          if (promoId && urlField) {
+            await updateDoc(doc(db, 'promoList', promoId), {
+                [urlField]: docUrl
+            });
+          }
 
           return docUrl;
       } catch (error) {
@@ -604,107 +606,67 @@ export default function PromoDashboard({ onNavigate }) {
     }
   };
 
-  const handlePrintBukti = () => {
-    if (!selectedPromo || !selectedPromo.buktiTransferUrl) return;
+  const handleGenerateBuktiTransfer = async (p) => {
+    if (!p || !p.buktiTransferUrl) {
+        alert("Bukti transfer belum diunggah.");
+        return;
+    }
     
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = '0';
-    document.body.appendChild(iframe);
+    setIsGenerating(true);
+    try {
+      // 1. Fetch image and convert to base64 to ensure Google Docs can embed it
+      const response = await fetch(p.buktiTransferUrl);
+      const blob = await response.blob();
+      const reader = new FileReader();
+      const base64data = await new Promise((resolve) => {
+         reader.onloadend = () => resolve(reader.result);
+         reader.readAsDataURL(blob);
+      });
 
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
+      // 2. Buat dokumen HTML sederhana
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
         <head>
-          <title>Cetak Bukti Transfer Promo - ${selectedPromo.namaPerusahaan}</title>
-          <style>
-            @page { size: A4 portrait; margin: 0; }
-            body { 
-              font-family: 'Arial', sans-serif; 
-              background-color: #ffffff; 
-              margin: 0; 
-              padding: 0; 
-              overflow: hidden; 
-              -webkit-print-color-adjust: exact; 
-              print-color-adjust: exact; 
-            }
-            .print-container {
-              width: 100%;
-              padding: 15mm;
-              box-sizing: border-box;
-              border: 5px solid #059669; 
-              background-color: #f0fdf4; 
-              min-height: 297mm;
-            }
-            .header {
-              text-align: center;
-              border-bottom: 3px solid #059669;
-              padding-bottom: 5mm;
-              margin-bottom: 5mm;
-            }
-            .header h1 { font-size: 24px; color: #064e3b; margin: 0; font-weight: 900; }
-            .header h2 { font-size: 16px; color: #059669; margin: 5px 0 0 0; letter-spacing: 2px; }
-            .details {
-              font-size: 12pt;
-              color: #064e3b;
-              margin-bottom: 10mm;
-              line-height: 1.5;
-            }
-            .details table { width: 100%; border-collapse: collapse; }
-            .details td { padding: 4px 0; vertical-align: top; }
-            .details td:first-child { font-weight: bold; width: 180px; }
-            .image-container {
-              display: flex;
-              justify-content: center;
-              align-items: center;
-              border: 2px dashed #059669;
-              padding: 5mm;
-              background-color: #ffffff;
-            }
-            .image-container img { max-width: 100%; max-height: 150mm; object-fit: contain; }
-          </style>
+          <title>Bukti Transfer - ${p.namaPerusahaan}</title>
         </head>
         <body>
-          <div class="print-container">
-            <div class="header">
-              <h1>TAMAN MARGASATWA RAGUNAN</h1>
-              <h2>BUKTI TRANSFER PROMO</h2>
+          <div style="text-align: center; font-family: Arial, sans-serif;">
+            <h2 style="color: #064e3b; margin-bottom: 5px;">TAMAN MARGASATWA RAGUNAN</h2>
+            <h3 style="color: #059669; letter-spacing: 2px; margin-top: 0;">BUKTI TRANSFER PROMO</h3>
+            <hr style="border: 1px solid #059669;" />
+            <div style="text-align: left; margin: 20px 0; font-size: 14pt;">
+              <p><b>Nama Perusahaan:</b> ${p.namaPerusahaan}</p>
+              <p><b>Jenis Produk:</b> ${p.namaProduk}</p>
+              <p><b>Tanggal Pelaksanaan:</b> ${p.tanggalPromo}</p>
+              <p><b>Tanggal Transfer:</b> ${p.tanggalTransfer || '-'}</p>
+              <p><b>Nominal Transfer:</b> Rp ${p.jumlahTransfer}</p>
             </div>
-            
-            <div class="details">
-              <table>
-                <tr><td>Nama Perusahaan / PT</td><td>: <b>${selectedPromo.namaPerusahaan}</b></td></tr>
-                <tr><td>Jenis Produk</td><td>: ${selectedPromo.namaProduk}</td></tr>
-                <tr><td>Tanggal Pelaksanaan</td><td>: ${selectedPromo.tanggalPromo}</td></tr>
-                <tr><td>Tanggal Transfer</td><td>: ${selectedPromo.tanggalTransfer || '-'}</td></tr>
-                <tr><td>Nominal Transfer</td><td>: Rp ${selectedPromo.jumlahTransfer}</td></tr>
-              </table>
-            </div>
-
-            <div class="image-container">
-              <img src="${selectedPromo.buktiTransferUrl}" alt="Bukti Transfer Promo" />
+            <div style="border: 2px dashed #059669; padding: 10px;">
+              <img src="${base64data}" alt="Bukti Transfer" style="max-width: 100%; max-height: 800px; object-fit: contain;" />
             </div>
           </div>
         </body>
-      </html>
-    `;
+        </html>
+      `;
 
-    const doc = iframe.contentWindow.document;
-    doc.open();
-    doc.write(htmlContent);
-    doc.close();
-
-    setTimeout(() => {
-      iframe.contentWindow.focus();
-      iframe.contentWindow.print();
-      setTimeout(() => {
-        document.body.removeChild(iframe);
-      }, 1000);
-    }, 800); 
+      // 3. Convert to Blob (HTML format)
+      const htmlBlob = new Blob([htmlContent], { type: 'text/html' });
+      
+      const safeName = (p.namaPerusahaan || 'TMR').replace(/[^a-zA-Z0-9]/g, '_');
+      const finalFileName = `Bukti_Transfer_${safeName}`;
+      
+      // 4. Upload ke Google Drive (otomatis diconvert ke Google Doc)
+      const docUrl = await uploadToGoogleDrive(htmlBlob, finalFileName, p.id, 'buktiTransferDocUrl');
+      
+      // Buka link
+      window.open(docUrl, '_blank');
+    } catch (err) {
+      console.error(err);
+      alert('Gagal membuat dokumen Bukti Transfer. Pastikan koneksi internet stabil.');
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handleVerifikasi = async (id) => {
@@ -883,19 +845,38 @@ export default function PromoDashboard({ onNavigate }) {
                   </button>
                 )}
 
-                <div className="grid grid-cols-2 gap-2">
-                  <button 
-                    onClick={() => handleGenerateBuktiTransfer(p)}
-                    disabled={isGenerating}
-                    className="w-full py-2 bg-white border-2 border-emerald-600 text-emerald-700 hover:bg-emerald-50 rounded-xl font-bold flex items-center justify-center gap-2 text-sm"
-                  >
-                    <Download size={16} /> Bukti Transfer
-                  </button>
+                <div className="grid grid-cols-2 gap-2 mt-2">
+                  {p.buktiTransferDocUrl ? (
+                    <>
+                      <button 
+                        onClick={() => window.open(p.buktiTransferDocUrl, '_blank')}
+                        className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 text-sm"
+                      >
+                        Buka Doc Bukti
+                      </button>
+                      <button 
+                        onClick={() => handleGenerateBuktiTransfer(p)}
+                        disabled={isGenerating}
+                        className="w-full py-2 bg-white border-2 border-emerald-600 text-emerald-700 hover:bg-emerald-50 rounded-xl font-bold flex items-center justify-center gap-2 text-sm"
+                      >
+                        {isGenerating ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                        Buat Ulang Bukti
+                      </button>
+                    </>
+                  ) : (
+                    <button 
+                      onClick={() => handleGenerateBuktiTransfer(p)}
+                      disabled={isGenerating}
+                      className="w-full py-2 bg-white border-2 border-emerald-600 text-emerald-700 hover:bg-emerald-50 rounded-xl font-bold flex items-center justify-center gap-2 text-sm col-span-2 lg:col-span-1"
+                    >
+                      <Download size={16} /> Bukti Transfer
+                    </button>
+                  )}
 
                   <button 
                     onClick={() => handleGenerateKwitansi(p)}
                     disabled={isGenerating}
-                    className="w-full py-2 bg-white border-2 border-emerald-600 text-emerald-700 hover:bg-emerald-50 rounded-xl font-bold flex items-center justify-center gap-2 text-sm"
+                    className="w-full py-2 bg-white border-2 border-emerald-600 text-emerald-700 hover:bg-emerald-50 rounded-xl font-bold flex items-center justify-center gap-2 text-sm col-span-2 lg:col-span-1"
                   >
                     <Download size={16} /> Kwitansi
                   </button>
