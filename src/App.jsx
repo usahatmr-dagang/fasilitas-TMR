@@ -2668,7 +2668,7 @@ Terima kasih.`;
                             </div>
     
                             <div className="mt-auto mb-1 pointer-events-none">
-                              <h4 className={`font-bold text-[11px] leading-tight line-clamp-2 transition-colors duration-300 ${isLapangan ? 'text-emerald-950 group-hover:text-emerald-900' : 'text-emerald-950 group-hover:text-amber-900'}`}>{fasilitas.nama}</h4>
+                              <h4 className={`text-[11px] leading-tight line-clamp-2 transition-colors duration-300 ${isLapangan ? 'font-bold font-sans text-emerald-950 group-hover:text-emerald-900' : 'font-black font-serif text-emerald-950 group-hover:text-amber-900'}`}>{fasilitas.nama}</h4>
                             </div>
     
                             <div className="pointer-events-none w-full">
@@ -2740,7 +2740,7 @@ Terima kasih.`;
                           </div>
 
                           <div className="mt-auto mb-1 pointer-events-none">
-                            <h4 className={`font-bold text-[11px] leading-tight line-clamp-2 transition-colors duration-300 ${isDitutup ? 'text-slate-500' : 'text-rose-950'}`}>{fasilitas.nama}</h4>
+                            <h4 className={`text-[11px] leading-tight line-clamp-2 transition-colors duration-300 ${isDitutup ? 'font-bold text-slate-500' : (isLapangan ? 'font-bold font-sans text-rose-950' : 'font-black font-serif text-rose-950')}`}>{fasilitas.nama}</h4>
                           </div>
 
                           <div className="pointer-events-none w-full">
