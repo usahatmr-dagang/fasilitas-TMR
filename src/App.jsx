@@ -3209,49 +3209,51 @@ Terima kasih.`;
                                  </div>
                              </div>
 
-                             {/* INPUT TANGGAL UPLOAD / TRANSFER */}
-                             {((portalBooking.status_pembayaran !== 'Sudah Transfer' && portalBooking.status_pembayaran !== 'Menunggu Verifikasi') || (portalBooking.listrik_tambahan && portalBooking.akses_upload_listrik && !portalBooking.bukti_transfer_listrik)) && (
-                                 <div className="mb-6 bg-white rounded-2xl p-5 border border-emerald-900/5 shadow-sm hover:border-emerald-300 transition-all duration-200">
-                                     <label className="block text-[10px] font-black text-emerald-900 mb-2 uppercase tracking-wider">Pilih Tanggal Transfer Sesuai Struk</label>
-                                     <input 
-                                         type="date" 
-                                         max={getTodayString()}
-                                         value={tanggalUploadPortal} 
-                                         onChange={(e) => {
-                                             if(e.target.value > getTodayString()) {
-                                                 showToast("Tanggal upload tidak boleh melebihi hari ini!", 'error');
-                                                 setTanggalUploadPortal(getTodayString());
-                                             } else {
-                                                 setTanggalUploadPortal(e.target.value);
-                                             }
-                                         }} 
-                                         className="relative w-full px-4 py-3 rounded-xl border border-emerald-900/10 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10 outline-none text-emerald-950 font-bold bg-slate-50 cursor-pointer custom-date-picker" 
-                                     />
-                                     <p className="text-[10px] text-slate-500 font-semibold mt-2.5 flex items-center gap-1">*Pilih tanggal sesuai struk bukti transfer Anda. Pengisian maksimal adalah tanggal hari ini.</p>
+                             {portalBooking.status_pembayaran === 'Menunggu Verifikasi' ? (
+                                 <div className="text-center py-8 bg-blue-500/5 rounded-2xl border border-blue-500/10 mt-4">
+                                     <AlertCircle size={36} className="mx-auto text-blue-600 mb-3 animate-pulse" />
+                                     <p className="font-extrabold text-blue-950 text-sm">Anda sudah upload bukti transfer dan sedang diverifikasi oleh admin.</p>
                                  </div>
-                             )}
+                             ) : (
+                                 <>
+                                     {/* INPUT TANGGAL UPLOAD / TRANSFER */}
+                                     {((portalBooking.status_pembayaran !== 'Sudah Transfer') || (portalBooking.listrik_tambahan && portalBooking.akses_upload_listrik && !portalBooking.bukti_transfer_listrik)) && (
+                                         <div className="mb-6 bg-white rounded-2xl p-5 border border-emerald-900/5 shadow-sm hover:border-emerald-300 transition-all duration-200">
+                                             <label className="block text-[10px] font-black text-emerald-900 mb-2 uppercase tracking-wider">Pilih Tanggal Transfer Sesuai Struk</label>
+                                             <input 
+                                                 type="date" 
+                                                 max={getTodayString()}
+                                                 value={tanggalUploadPortal} 
+                                                 onChange={(e) => {
+                                                     if(e.target.value > getTodayString()) {
+                                                         showToast("Tanggal upload tidak boleh melebihi hari ini!", 'error');
+                                                         setTanggalUploadPortal(getTodayString());
+                                                     } else {
+                                                         setTanggalUploadPortal(e.target.value);
+                                                     }
+                                                 }} 
+                                                 className="relative w-full px-4 py-3 rounded-xl border border-emerald-900/10 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10 outline-none text-emerald-950 font-bold bg-slate-50 cursor-pointer custom-date-picker" 
+                                             />
+                                             <p className="text-[10px] text-slate-500 font-semibold mt-2.5 flex items-center gap-1">*Pilih tanggal sesuai struk bukti transfer Anda. Pengisian maksimal adalah tanggal hari ini.</p>
+                                         </div>
+                                     )}
 
-                             {/* SEKSI 1: UPLOAD BUKTI LOKASI UTAMA */}
-                             <div className="mb-6">
-                                 <h4 className="font-extrabold text-emerald-950 text-xs uppercase tracking-wider mb-3">Bukti Pembayaran Lokasi Utama</h4>
-                                 {(portalBooking.status_pembayaran === 'Sudah Transfer' || portalBooking.status_pembayaran === 'Lunas') ? (
-                                     <div className="text-center py-8 bg-emerald-500/5 rounded-2xl border border-emerald-500/10 animate-slide-in-right">
-                                         <CheckCircle2 size={36} className="mx-auto text-emerald-600 mb-3" />
-                                         <p className="font-extrabold text-emerald-950 text-sm mb-1">Pembayaran Lokasi Utama Lunas & Tervalidasi.</p>
-                                         <p className="text-xs text-slate-500 font-medium">Data mutasi transfer telah dicocokkan oleh sistem.</p>
-                                         {portalBooking.status_pembayaran === 'Lunas' && (
-                                             <button type="button" onClick={() => handlePrintKwitansi(portalBooking)} className="mt-4 inline-flex items-center bg-white border border-emerald-900/15 hover:border-emerald-600 hover:bg-emerald-50 text-emerald-800 hover:text-emerald-950 px-5 py-2.5 rounded-xl font-bold text-xs hover:bg-emerald-100 transition-colors shadow-sm active:scale-95">
-                                                 <Printer size={16} className="mr-2 text-emerald-600"/> Cetak Kwitansi Resmi
-                                             </button>
-                                         )}
-                                     </div>
-                                 ) : portalBooking.status_pembayaran === 'Menunggu Verifikasi' ? (
-                                     <div className="text-center py-8 bg-blue-500/5 rounded-2xl border border-blue-500/10">
-                                         <AlertCircle size={36} className="mx-auto text-blue-600 mb-3 animate-pulse" />
-                                         <p className="font-extrabold text-blue-950 text-sm">Anda sudah upload bukti transfer dan sedang diverifikasi oleh admin.</p>
-                                     </div>
-                                 ) : (
-                                     <div className="space-y-4">
+                                     {/* SEKSI 1: UPLOAD BUKTI LOKASI UTAMA */}
+                                     <div className="mb-6">
+                                         <h4 className="font-extrabold text-emerald-950 text-xs uppercase tracking-wider mb-3">Bukti Pembayaran Lokasi Utama</h4>
+                                         {(portalBooking.status_pembayaran === 'Sudah Transfer' || portalBooking.status_pembayaran === 'Lunas') ? (
+                                             <div className="text-center py-8 bg-emerald-500/5 rounded-2xl border border-emerald-500/10 animate-slide-in-right">
+                                                 <CheckCircle2 size={36} className="mx-auto text-emerald-600 mb-3" />
+                                                 <p className="font-extrabold text-emerald-950 text-sm mb-1">Pembayaran Lokasi Utama Lunas & Tervalidasi.</p>
+                                                 <p className="text-xs text-slate-500 font-medium">Data mutasi transfer telah dicocokkan oleh sistem.</p>
+                                                 {portalBooking.status_pembayaran === 'Lunas' && (
+                                                     <button type="button" onClick={() => handlePrintKwitansi(portalBooking)} className="mt-4 inline-flex items-center bg-white border border-emerald-900/15 hover:border-emerald-600 hover:bg-emerald-50 text-emerald-800 hover:text-emerald-950 px-5 py-2.5 rounded-xl font-bold text-xs hover:bg-emerald-100 transition-colors shadow-sm active:scale-95">
+                                                         <Printer size={16} className="mr-2 text-emerald-600"/> Cetak Kwitansi Resmi
+                                                     </button>
+                                                 )}
+                                             </div>
+                                         ) : (
+                                             <div className="space-y-4">
                                          {!uploadFile && !isScanning && (
                                             <label className="block w-full border-2 border-dashed border-emerald-900/15 rounded-2xl p-8 text-center cursor-pointer hover:bg-emerald-50/50 hover:border-emerald-400 transition-all duration-200 group">
                                                 <input type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
@@ -3315,6 +3317,8 @@ Terima kasih.`;
                                          </div>
                                      )}
                                  </div>
+                             )}
+                                 </>
                              )}
                           </div>
                       )}
