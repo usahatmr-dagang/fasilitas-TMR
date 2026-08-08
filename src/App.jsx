@@ -1367,7 +1367,7 @@ Terima kasih.`;
 
   const handleKirimBukti = async () => {
       if (isSubmittingPortal) return;
-      if (portalBooking.status_pembayaran === 'Sudah Transfer' || portalBooking.status_pembayaran === 'Lunas' || portalBooking.status_pembayaran === 'Menunggu Verifikasi') {
+      if (portalBooking.bukti_transfer || portalBooking.status_pembayaran === 'Sudah Transfer' || portalBooking.status_pembayaran === 'Lunas' || portalBooking.status_pembayaran === 'Menunggu Verifikasi') {
           showToast('Bukti transfer lokasi sudah pernah diunggah atau sudah lunas!', 'error');
           return;
       }
@@ -1378,9 +1378,9 @@ Terima kasih.`;
           const docSnap = await getDoc(docRef);
           if (docSnap.exists()) {
               const currentData = docSnap.data();
-              if (currentData.status_pembayaran === 'Sudah Transfer' || currentData.status_pembayaran === 'Lunas' || currentData.status_pembayaran === 'Menunggu Verifikasi') {
+              if (currentData.bukti_transfer || currentData.status_pembayaran === 'Sudah Transfer' || currentData.status_pembayaran === 'Lunas' || currentData.status_pembayaran === 'Menunggu Verifikasi') {
                   showToast('Maaf, bukti transfer sudah diunggah di perangkat/sesi lain!', 'error');
-                  setPortalBooking({ ...portalBooking, status_pembayaran: currentData.status_pembayaran });
+                  setPortalBooking({ ...portalBooking, bukti_transfer: currentData.bukti_transfer, status_pembayaran: currentData.status_pembayaran });
                   return;
               }
           }
@@ -3218,7 +3218,8 @@ Terima kasih.`;
                                  </div>
                              </div>
 
-                             {portalBooking.status_pembayaran === 'Menunggu Verifikasi' ? (
+                             {/* UI MENGHILANGKAN FORM JIKA SUDAH UPLOAD ATAU STATUS MENUNGGU */}
+                             {(portalBooking.bukti_transfer || portalBooking.status_pembayaran === 'Menunggu Verifikasi') && (portalBooking.status_pembayaran !== 'Sudah Transfer' && portalBooking.status_pembayaran !== 'Lunas') ? (
                                  <div className="text-center py-8 bg-blue-500/5 rounded-2xl border border-blue-500/10 mt-4">
                                      <AlertCircle size={36} className="mx-auto text-blue-600 mb-3 animate-pulse" />
                                      <p className="font-extrabold text-blue-950 text-sm">Anda sudah upload bukti transfer dan sedang diverifikasi oleh admin.</p>
