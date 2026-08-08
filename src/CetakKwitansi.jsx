@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { FileText, Printer, Search, Building, CheckCircle2, ChevronLeft } from 'lucide-react';
 import { db } from './firebase';
 import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
+import PizZip from 'pizzip';
 
 const getPromoDate = (item) => {
     if (item.selectedDates && Array.isArray(item.selectedDates) && item.selectedDates.length > 0) {
@@ -183,7 +184,106 @@ export default function CetakKwitansi({ onNavigate }) {
       // Fetch blank template from public
       const response = await fetch(`/kwitansi ${fileNameStr}.xlsx`);
       if (!response.ok) throw new Error(`Template kwitansi ${fileNameStr}.xlsx tidak ditemukan di folder public`);
-      const blob = await response.blob();
+      const arrayBuffer = await response.arrayBuffer();
+
+      const channelTransfer = window.prompt("Masukkan metode/channel transfer (contoh: Bank DKI, BCA, GoPay, ShopeePay):", "Bank DKI");
+      if (channelTransfer === null) {
+          setIsGenerating(false);
+          return;
+      }
+
+      const terbilang = (angka) => {
+          angka = Math.abs(parseInt(angka, 10));
+          if (isNaN(angka)) return "";
+          var kata = ["", "Satu", "Dua", "Tiga", "Empat", "Lima", "Enam", "Tujuh", "Delapan", "Sembilan", "Sepuluh", "Sebelas"];
+          if (angka < 12) return kata[angka];
+          if (angka < 20) return terbilang(angka - 10) + " Belas";
+          if (angka < 100) return terbilang(Math.floor(angka / 10)) + " Puluh " + terbilang(angka % 10);
+          if (angka < 200) return "Seratus " + terbilang(angka - 100);
+          if (angka < 1000) return terbilang(Math.floor(angka / 100)) + " Ratus " + terbilang(angka % 100);
+          if (angka < 2000) return "Seribu " + terbilang(angka - 1000);
+          if (angka < 1000000) return terbilang(Math.floor(angka / 1000)) + " Ribu " + terbilang(angka % 1000);
+          if (angka < 1000000000) return terbilang(Math.floor(angka / 1000000)) + " Juta " + terbilang(angka % 1000000);
+          if (angka < 1000000000000) return terbilang(Math.floor(angka / 1000000000)) + " Milyar " + terbilang(angka % 1000000000);
+          return "";
+      };
+
+      const formatRupiahStr = (angka) => new Intl.NumberFormat('id-ID').format(angka);
+      
+      const escapeXml = (unsafe) => {
+          if (!unsafe) return "";
+          return String(unsafe).replace(/[<>&'"]/g, function (c) {
+              switch (c) {
+                  case '<': return '&lt;';
+                  case '>': return '&gt;';
+                  case '&': return '&amp;';
+                  case '\'': return '&apos;';
+                  case '"': return '&quot;';
+              }
+          });
+      };
+
+      const today = new Date();
+      const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+      
+      let replacements = {};
+      if (source === 'promo') {
+          const nominalNumeric = selectedItem.jumlahTransferNumeric || parseInt(String(selectedItem.jumlahTransfer).replace(/\D/g, ''), 10) || 0;
+          replacements = {
+              '<<Nama PT>>': selectedItem.namaPerusahaan || '',
+              '<<Terbilang>>': terbilang(nominalNumeric) + ' Rupiah',
+              '<<nama produk>>': selectedItem.namaProduk || '',
+              '<<Jumlah hari>>': selectedItem.jumlahHari || '',
+              '<<tanggal promo>>': selectedItem.tanggalPromo || '',
+              '<<Transfer>>': channelTransfer,
+              '<<reff>>': `KWT-TMR-${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`,
+              '<<tanggal>>': String(today.getDate()),
+              '<<bulan>>': monthNames[today.getMonth()],
+              '<<tahun>>': String(today.getFullYear()),
+              '<<Jml Transfer>>': formatRupiahStr(nominalNumeric)
+          };
+      } else {
+          const nominalNumeric = selectedItem.total_biaya || 0;
+          replacements = {
+              '<<Nama Penyewa>>': selectedItem.nama_penyewa || '',
+              '<<Nama PT>>': selectedItem.nama_penyewa || '', 
+              '<<Terbilang>>': terbilang(nominalNumeric) + ' Rupiah',
+              '<<Lokasi Sewa>>': selectedItem.lokasi_sewa || '',
+              '<<Kegiatan>>': selectedItem.kegiatan || 'Sewa Fasilitas',
+              '<<Tanggal Sewa>>': selectedItem.tanggal_sewa || '',
+              '<<Transfer>>': channelTransfer,
+              '<<reff>>': selectedItem.id_sewa || '',
+              '<<tanggal>>': String(today.getDate()),
+              '<<bulan>>': monthNames[today.getMonth()],
+              '<<tahun>>': String(today.getFullYear()),
+              '<<Jml Transfer>>': formatRupiahStr(nominalNumeric)
+          };
+      }
+
+      const zip = new PizZip(arrayBuffer);
+      Object.keys(zip.files).forEach(filename => {
+          if (filename.endsWith('.xml')) {
+              let content = zip.files[filename].asText();
+              let changed = false;
+              for (const [key, value] of Object.entries(replacements)) {
+                  const escapedKey = escapeXml(key);
+                  const valStr = escapeXml(value);
+                  if (content.includes(escapedKey)) {
+                      content = content.split(escapedKey).join(valStr);
+                      changed = true;
+                  }
+                  if (content.includes(key)) {
+                      content = content.split(key).join(valStr);
+                      changed = true;
+                  }
+              }
+              if (changed) {
+                  zip.file(filename, content);
+              }
+          }
+      });
+
+      const blob = zip.generate({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
 
       const docName = `Kwitansi ${fileNameStr.charAt(0).toUpperCase() + fileNameStr.slice(1)} - ${namaInstansi} - ${source === 'sewa' ? selectedItem.id_sewa : (getPromoDate(selectedItem) || 'TanpaTanggal')}`;
       const targetCollection = source === 'sewa' ? 'sewaList' : 'promoList';
