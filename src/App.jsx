@@ -1365,6 +1365,10 @@ Terima kasih.`;
   };
 
   const handleKirimBukti = async () => {
+      if (portalBooking.status_pembayaran === 'Sudah Transfer' || portalBooking.status_pembayaran === 'Lunas' || portalBooking.status_pembayaran === 'Menunggu Verifikasi') {
+          showToast('Bukti transfer lokasi sudah pernah diunggah atau sudah lunas!', 'error');
+          return;
+      }
       const updatedBooking = { ...portalBooking, status_pembayaran: 'Menunggu Verifikasi', bukti_transfer: uploadFile, ocr_data: ocrResult, tanggal_transfer: tanggalUploadPortal };
       try {
           const { docId, ...dataToUpdate } = updatedBooking;
@@ -1395,6 +1399,10 @@ Terima kasih.`;
   };
 
   const handleKirimBuktiListrik = async () => {
+      if (portalBooking.bukti_transfer_listrik) {
+          showToast('Bukti transfer listrik sudah pernah diunggah!', 'error');
+          return;
+      }
       const updatedBooking = { ...portalBooking, bukti_transfer_listrik: uploadListrikFile, tanggal_transfer_listrik: tanggalUploadPortal };
       try {
           const { docId, ...dataToUpdate } = updatedBooking;

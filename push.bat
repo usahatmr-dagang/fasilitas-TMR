@@ -1,3 +1,3 @@
 git add .
-git commit -m "feat: tambahkan fitur Cetak Kwitansi via Google Spreadsheets"
+git commit -m "fix: tambahkan validasi pencegahan upload ganda untuk bukti transfer dan listrik"
 git push origin main
