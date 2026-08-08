@@ -1220,6 +1220,22 @@ Terima kasih.`;
   };
 
   const handlePrintKwitansi = (record) => {
+    let printDateObj = new Date();
+    if (adminUser) {
+        const d = new Date();
+        const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        const input = window.prompt("Tanggal Kwitansi (Otomatis Hari Ini).\nJika butuh tanggal mundur, masukkan dengan format YYYY-MM-DD:", todayStr);
+        if (input === null) return;
+        if (input.trim()) {
+            const parsed = new Date(input);
+            if (!isNaN(parsed.getTime())) {
+                printDateObj = parsed;
+            } else {
+                alert("Format salah. Menggunakan tanggal hari ini.");
+            }
+        }
+    }
+
     const printWindow = window.open('', '', 'width=950,height=600');
     
     const terbilang = (angka) => {
@@ -1243,7 +1259,7 @@ Terima kasih.`;
     const total_bayar = record.total_biaya;
     const terbilang_teks = terbilang(total_bayar).trim() + " Rupiah";
     const tanggal_sewa_teks = new Date(record.tanggal_sewa).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' });
-    const tanggal_bayar_teks = record.tanggal_transfer ? new Date(record.tanggal_transfer).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' }) : new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' });
+    const tanggal_bayar_teks = printDateObj.toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' });
     const peruntukan = record.kegiatan || "Kegiatan / Acara";
     
     const htmlContent = `

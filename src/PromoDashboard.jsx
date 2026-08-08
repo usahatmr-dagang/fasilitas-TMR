@@ -242,23 +242,36 @@ export default function PromoDashboard({ onNavigate }) {
 
 
   const handleGenerateKwitansi = (promo) => {
+    let printDateObj = new Date();
+    const d = new Date();
+    const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const input = window.prompt("Tanggal Kwitansi (Otomatis Hari Ini).\nJika butuh tanggal mundur, masukkan dengan format YYYY-MM-DD:", todayStr);
+    if (input === null) return;
+    if (input.trim()) {
+        const parsed = new Date(input);
+        if (!isNaN(parsed.getTime())) {
+            printDateObj = parsed;
+        } else {
+            alert("Format salah. Menggunakan tanggal hari ini.");
+        }
+    }
+
     // Determine sequential number from promoList index
     const promoIndex = promoList.findIndex(p => p.id === promo.id);
     const seqNum = String(promoIndex + 1).padStart(4, '0');
     
-    // Parse tanggal transfer
+    // Parse tanggal transfer untuk ID referensi
     const tglArr = (promo.tanggalTransfer || '').split('-');
-    const tahun = tglArr[0] || new Date().getFullYear();
-    const bulan = tglArr[1] || String(new Date().getMonth() + 1).padStart(2, '0');
-    const tanggal = tglArr[2] || String(new Date().getDate()).padStart(2, '0');
+    const tahun = tglArr[0] || printDateObj.getFullYear();
+    const bulan = tglArr[1] || String(printDateObj.getMonth() + 1).padStart(2, '0');
+    const tanggal = tglArr[2] || String(printDateObj.getDate()).padStart(2, '0');
     
     const noRef = `KWT-TMR-${tahun}-${bulan}-${tanggal}-${seqNum}`;
 
-    // Get signature date text
-    const dateObj = promo.tanggalTransfer ? new Date(promo.tanggalTransfer) : new Date();
-    const tanggalStr = dateObj.getDate();
-    const bulanStr = monthNames[dateObj.getMonth()];
-    const tahunStr = dateObj.getFullYear();
+    // Get signature date text based on chosen date
+    const tanggalStr = printDateObj.getDate();
+    const bulanStr = monthNames[printDateObj.getMonth()];
+    const tahunStr = printDateObj.getFullYear();
 
     // Parse nominal transfer
     const nominalNumeric = promo.jumlahTransferNumeric || parseInt(String(promo.jumlahTransfer).replace(/\D/g, ''), 10) || 0;
