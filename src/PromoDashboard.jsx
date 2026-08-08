@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, CheckCircle2, Download, Search, X, Loader2, Info, Settings, Save, ArrowLeft, Trash2, Edit } from 'lucide-react';
-import { db } from './firebase';
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, CheckCircle2, Download, Search, X, Loader2, Info, Settings, Save, ArrowLeft, Trash2, Edit, Lock } from 'lucide-react';
+import { db, auth } from './firebase';
 import { collection, onSnapshot, doc, updateDoc, setDoc, getDoc, deleteDoc } from 'firebase/firestore';
+import { signInWithEmailAndPassword } from 'firebase/auth';
 
 // PizZip and Docxtemplater for docx generation
 import PizZip from 'pizzip';
@@ -69,6 +70,12 @@ export default function PromoDashboard({ onNavigate }) {
     tanggalTransfer: ''
   });
   const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  // Lock state
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false);
+  const [authPassword, setAuthPassword] = useState('');
+  const [pendingAction, setPendingAction] = useState(null);
+  const [isVerifyingPassword, setIsVerifyingPassword] = useState(false);
 
   useEffect(() => {
     // Fetch Promos
@@ -611,6 +618,54 @@ export default function PromoDashboard({ onNavigate }) {
     }
   };
 
+  const handleEditClick = (p) => {
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      const isPast = selectedDate && selectedDate < today;
+      
+      if (isPast) {
+          setPendingAction({ type: 'edit', payload: p });
+          setPasswordModalOpen(true);
+      } else {
+          openEditModal(p);
+      }
+  };
+
+  const handleDeleteClick = (p) => {
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      const isPast = selectedDate && selectedDate < today;
+      
+      if (isPast) {
+          setPendingAction({ type: 'delete', payload: p });
+          setPasswordModalOpen(true);
+      } else {
+          handleDelete(p.id, p.namaPerusahaan);
+      }
+  };
+
+  const verifyPasswordAndExecute = async (e) => {
+      e.preventDefault();
+      setIsVerifyingPassword(true);
+      try {
+          const user = auth.currentUser;
+          if (!user) throw new Error("Anda belum login.");
+          await signInWithEmailAndPassword(auth, user.email, authPassword);
+          setPasswordModalOpen(false);
+          setAuthPassword('');
+          
+          if (pendingAction.type === 'edit') {
+              openEditModal(pendingAction.payload);
+          } else if (pendingAction.type === 'delete') {
+              handleDelete(pendingAction.payload.id, pendingAction.payload.namaPerusahaan);
+          }
+      } catch (err) {
+          alert('Password salah atau sesi tidak valid!');
+      } finally {
+          setIsVerifyingPassword(false);
+      }
+  };
+
   const openEditModal = (promo) => {
     setEditingPromo(promo);
     setEditForm({
@@ -806,14 +861,14 @@ export default function PromoDashboard({ onNavigate }) {
 
                 <div className="grid grid-cols-2 gap-2 mt-2">
                   <button 
-                    onClick={() => openEditModal(p)}
+                    onClick={() => handleEditClick(p)}
                     className="w-full py-2 bg-white border-2 border-slate-300 text-slate-700 hover:bg-slate-50 rounded-xl font-bold flex items-center justify-center gap-2 text-sm transition-all"
                   >
                     <Edit size={16} /> Edit Data
                   </button>
 
                   <button 
-                    onClick={() => handleDelete(p.id, p.namaPerusahaan)}
+                    onClick={() => handleDeleteClick(p)}
                     className="w-full py-2 bg-white border-2 border-rose-500 text-rose-600 hover:bg-rose-50 rounded-xl font-bold flex items-center justify-center gap-2 text-sm transition-all"
                   >
                     <Trash2 size={16} /> Hapus
@@ -829,6 +884,45 @@ export default function PromoDashboard({ onNavigate }) {
 
   return (
     <div className="flex-1 bg-[#F4F7F4] flex flex-col h-screen overflow-hidden">
+      {/* Password Lock Modal */}
+      {passwordModalOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <form onSubmit={verifyPasswordAndExecute} className="bg-white p-6 rounded-3xl shadow-xl max-w-sm w-full animate-in fade-in zoom-in-95 space-y-4">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-lg font-black text-rose-950 flex items-center gap-2">
+                <Lock className="text-rose-600" size={20} /> Autentikasi Diperlukan
+              </h3>
+              <button type="button" onClick={() => { setPasswordModalOpen(false); setAuthPassword(''); }} className="text-slate-400 hover:bg-slate-100 p-2 rounded-xl transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+            
+            <p className="text-xs font-bold text-rose-600 bg-rose-50 p-3 rounded-xl border border-rose-100">
+              Data ini berada di tanggal yang sudah lewat. Silakan masukkan password login Anda untuk mengizinkan perubahan.
+            </p>
+            
+            <div>
+               <input 
+                 required 
+                 type="password" 
+                 value={authPassword} 
+                 onChange={e => setAuthPassword(e.target.value)} 
+                 placeholder="Masukkan password admin" 
+                 className="w-full px-4 py-2.5 border-2 border-rose-200 rounded-xl text-sm focus:ring-4 focus:ring-rose-500/10 focus:border-rose-600 outline-none font-semibold text-rose-950 bg-white placeholder:text-rose-300" 
+               />
+            </div>
+            
+            <button 
+              type="submit"
+              disabled={isVerifyingPassword}
+              className="w-full py-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-black shadow-[0_4px_12px_rgba(225,29,72,0.2)] transition-all flex items-center justify-center gap-2"
+            >
+              {isVerifyingPassword ? <Loader2 size={16} className="animate-spin" /> : "Verifikasi & Lanjutkan"}
+            </button>
+          </form>
+        </div>
+      )}
+
       {/* Settings Modal */}
       {showSettings && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
