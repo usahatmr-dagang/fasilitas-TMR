@@ -41,7 +41,7 @@ import {
   ShoppingCart
 } from 'lucide-react';
 import { db, storage, auth } from './firebase';
-import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, setDoc } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, setDoc, getDoc } from 'firebase/firestore';
 import { ref, uploadString, getDownloadURL, uploadBytes } from 'firebase/storage';
 import { onAuthStateChanged, signInWithEmailAndPassword } from 'firebase/auth';
 import Login from './Login';
@@ -1371,8 +1371,19 @@ Terima kasih.`;
       }
       const updatedBooking = { ...portalBooking, status_pembayaran: 'Menunggu Verifikasi', bukti_transfer: uploadFile, ocr_data: ocrResult, tanggal_transfer: tanggalUploadPortal };
       try {
+          const docRef = doc(db, 'sewaList', portalBooking.docId);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+              const currentData = docSnap.data();
+              if (currentData.status_pembayaran === 'Sudah Transfer' || currentData.status_pembayaran === 'Lunas' || currentData.status_pembayaran === 'Menunggu Verifikasi') {
+                  showToast('Maaf, bukti transfer sudah diunggah di perangkat/sesi lain!', 'error');
+                  setPortalBooking({ ...portalBooking, status_pembayaran: currentData.status_pembayaran });
+                  return;
+              }
+          }
+
           const { docId, ...dataToUpdate } = updatedBooking;
-          await updateDoc(doc(db, 'sewaList', portalBooking.docId), dataToUpdate);
+          await updateDoc(docRef, dataToUpdate);
           
           await setDoc(doc(db, 'publicSewaList', portalBooking.docId), {
             tanggal_sewa: dataToUpdate.tanggal_sewa,
@@ -1405,8 +1416,19 @@ Terima kasih.`;
       }
       const updatedBooking = { ...portalBooking, bukti_transfer_listrik: uploadListrikFile, tanggal_transfer_listrik: tanggalUploadPortal };
       try {
+          const docRef = doc(db, 'sewaList', portalBooking.docId);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+              const currentData = docSnap.data();
+              if (currentData.bukti_transfer_listrik) {
+                  showToast('Maaf, bukti transfer listrik sudah diunggah di perangkat/sesi lain!', 'error');
+                  setPortalBooking({ ...portalBooking, bukti_transfer_listrik: currentData.bukti_transfer_listrik });
+                  return;
+              }
+          }
+
           const { docId, ...dataToUpdate } = updatedBooking;
-          await updateDoc(doc(db, 'sewaList', portalBooking.docId), dataToUpdate);
+          await updateDoc(docRef, dataToUpdate);
           
           await setDoc(doc(db, 'publicSewaList', portalBooking.docId), {
             tanggal_sewa: dataToUpdate.tanggal_sewa,
@@ -3224,7 +3246,10 @@ Terima kasih.`;
                                          )}
                                      </div>
                                  ) : portalBooking.status_pembayaran === 'Menunggu Verifikasi' ? (
-                                     <div className="text-center py-8 bg-blue-500/5 rounded-2xl border border-blue-500/10"><AlertCircle size={36} className="mx-auto text-blue-600 mb-3 animate-pulse" /><p className="font-extrabold text-blue-950 text-sm">Bukti Lokasi Sedang Diverifikasi Admin.</p><p className="text-xs text-slate-500 font-medium mt-1">Sistem sedang mencocokkan mutasi bank.</p></div>
+                                     <div className="text-center py-8 bg-blue-500/5 rounded-2xl border border-blue-500/10">
+                                         <AlertCircle size={36} className="mx-auto text-blue-600 mb-3 animate-pulse" />
+                                         <p className="font-extrabold text-blue-950 text-sm">Anda sudah upload bukti transfer dan sedang diverifikasi oleh admin.</p>
+                                     </div>
                                  ) : (
                                      <div className="space-y-4">
                                          {!uploadFile && !isScanning && (
