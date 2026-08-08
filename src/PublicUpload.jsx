@@ -171,6 +171,25 @@ export default function PublicUpload() {
       // Update Firestore directly bypassing Storage
       const docRef = doc(db, 'sewaList', bookingData.id);
       
+      // Validasi concurrency backend (mencegah double upload dari tab lain atau cache browser)
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+          const currentData = docSnap.data();
+          if (isListrikUpload) {
+              if (currentData.bukti_transfer_listrik) {
+                  setErrorMsg('Bukti transfer listrik sudah diunggah sebelumnya. Menunggu verifikasi admin.');
+                  setIsLoading(false);
+                  return;
+              }
+          } else {
+              if (currentData.status_pembayaran === 'Sudah Transfer' || currentData.status_pembayaran === 'Lunas' || currentData.status_pembayaran === 'Menunggu Verifikasi') {
+                  setErrorMsg('Bukti transfer lokasi sudah diunggah sebelumnya. Menunggu verifikasi admin.');
+                  setIsLoading(false);
+                  return;
+              }
+          }
+      }
+      
       if (isListrikUpload) {
         await updateDoc(docRef, {
           bukti_transfer_listrik: finalDataUrl,
