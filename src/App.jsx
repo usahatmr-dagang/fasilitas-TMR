@@ -246,6 +246,7 @@ export default function App() {
   const [dataLoaded, setDataLoaded] = useState(false);
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSubmittingPortal, setIsSubmittingPortal] = useState(false);
 
   useEffect(() => {
     // Secret Route
@@ -1365,10 +1366,12 @@ Terima kasih.`;
   };
 
   const handleKirimBukti = async () => {
+      if (isSubmittingPortal) return;
       if (portalBooking.status_pembayaran === 'Sudah Transfer' || portalBooking.status_pembayaran === 'Lunas' || portalBooking.status_pembayaran === 'Menunggu Verifikasi') {
           showToast('Bukti transfer lokasi sudah pernah diunggah atau sudah lunas!', 'error');
           return;
       }
+      setIsSubmittingPortal(true);
       const updatedBooking = { ...portalBooking, status_pembayaran: 'Menunggu Verifikasi', bukti_transfer: uploadFile, ocr_data: ocrResult, tanggal_transfer: tanggalUploadPortal };
       try {
           const docRef = doc(db, 'sewaList', portalBooking.docId);
@@ -1396,6 +1399,8 @@ Terima kasih.`;
           showToast('Bukti pembayaran LOKASI berhasil dikirim!');
       } catch (error) {
           showToast('Gagal mengirim bukti lokasi!', 'error');
+      } finally {
+          setIsSubmittingPortal(false);
       }
   };
 
@@ -1410,10 +1415,12 @@ Terima kasih.`;
   };
 
   const handleKirimBuktiListrik = async () => {
+      if (isSubmittingPortal) return;
       if (portalBooking.bukti_transfer_listrik) {
           showToast('Bukti transfer listrik sudah pernah diunggah!', 'error');
           return;
       }
+      setIsSubmittingPortal(true);
       const updatedBooking = { ...portalBooking, bukti_transfer_listrik: uploadListrikFile, tanggal_transfer_listrik: tanggalUploadPortal };
       try {
           const docRef = doc(db, 'sewaList', portalBooking.docId);
@@ -1440,6 +1447,8 @@ Terima kasih.`;
           showToast('Bukti pembayaran LISTRIK berhasil dikirim!');
       } catch (error) {
           showToast('Gagal mengirim bukti listrik!', 'error');
+      } finally {
+          setIsSubmittingPortal(false);
       }
   };
 
@@ -3280,7 +3289,7 @@ Terima kasih.`;
                                                          <div><span className="block text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">Nominal Pembayaran</span><span className="font-extrabold text-emerald-800 text-sm block mt-0.5">{formatRupiah(portalBooking.total_biaya)}</span></div>
                                                      </div>
                                                  </div>
-                                                 <button onClick={handleKirimBukti} className="w-full bg-emerald-600 text-white font-bold py-3 rounded-xl shadow-md hover:bg-emerald-700 active:scale-95 transition-all flex items-center justify-center gap-2">Kirim Bukti Pembayaran Lokasi</button>
+                                                 <button disabled={isSubmittingPortal} onClick={handleKirimBukti} className={`w-full bg-emerald-600 text-white font-bold py-3 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 ${isSubmittingPortal ? 'opacity-50 cursor-not-allowed' : 'hover:bg-emerald-700 active:scale-95'}`}>{isSubmittingPortal ? 'Mengirim...' : 'Kirim Bukti Pembayaran Lokasi'}</button>
                                              </div>
                                          )}
                                      </div>
@@ -3311,7 +3320,7 @@ Terima kasih.`;
                                              {uploadListrikFile && (
                                                   <div className="bg-white border border-amber-200/50 rounded-2xl p-4 shadow-sm animate-slide-in-right">
                                                       <img src={uploadListrikFile} alt="Preview Listrik" className="w-full h-40 object-contain rounded-lg border border-amber-100 bg-slate-50 mb-4" />
-                                                      <button onClick={handleKirimBuktiListrik} className="w-full bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 rounded-xl shadow-md transition-colors flex justify-center items-center"><Send size={16} className="mr-2"/> Kirim Bukti Listrik Tambahan</button>
+                                                      <button disabled={isSubmittingPortal} onClick={handleKirimBuktiListrik} className={`w-full bg-amber-500 text-white font-bold py-3 rounded-xl shadow-md transition-colors flex justify-center items-center ${isSubmittingPortal ? 'opacity-50 cursor-not-allowed' : 'hover:bg-amber-600'}`}><Send size={16} className="mr-2"/> {isSubmittingPortal ? 'Mengirim...' : 'Kirim Bukti Listrik Tambahan'}</button>
                                                   </div>
                                              )}
                                          </div>
