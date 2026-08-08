@@ -1,3 +1,3 @@
 git add .
-git commit -m "feat: tambahkan fitur otomatisasi cetak surat dispensasi PDF"
+git commit -m "feat: tambahkan fitur Cetak Kwitansi via Google Spreadsheets"
 git push origin main
