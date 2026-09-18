@@ -78,8 +78,14 @@ export default function PublicAvailability() {
     const booking = sewaList.find(sewa => {
       if (sewa.tanggal_sewa !== selectedDate) return false;
       if (!sewa.lokasi_sewa) return false;
-      const lokasiArray = sewa.lokasi_sewa.split(',').map(s => s.trim());
-      return lokasiArray.includes(lokasi.nama);
+      
+      let lokasiArray = [];
+      if (Array.isArray(sewa.lokasi_sewa)) {
+          lokasiArray = sewa.lokasi_sewa.map(s => String(s).trim().toLowerCase());
+      } else {
+          lokasiArray = String(sewa.lokasi_sewa).split(',').map(s => s.trim().toLowerCase());
+      }
+      return lokasiArray.includes(String(lokasi.nama).toLowerCase());
     });
     return { ...lokasi, isBooked: !!booking };
   });
