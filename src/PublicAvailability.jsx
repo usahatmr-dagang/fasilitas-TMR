@@ -75,7 +75,12 @@ export default function PublicAvailability() {
   }, []);
 
   const fasilitasHarian = masterLokasi.map(lokasi => {
-    const booking = sewaList.find(sewa => sewa.tanggal_sewa === selectedDate && sewa.lokasi_sewa === lokasi.nama);
+    const booking = sewaList.find(sewa => {
+      if (sewa.tanggal_sewa !== selectedDate) return false;
+      if (!sewa.lokasi_sewa) return false;
+      const lokasiArray = sewa.lokasi_sewa.split(',').map(s => s.trim());
+      return lokasiArray.includes(lokasi.nama);
+    });
     return { ...lokasi, isBooked: !!booking };
   });
 
