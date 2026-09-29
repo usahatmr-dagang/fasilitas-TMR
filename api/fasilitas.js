@@ -47,7 +47,7 @@ export default async function handler(req, res) {
                 id: doc.id,
                 ...d,
                 jumlahTransfer: d.total_biaya,
-                buktiTransferUrl: d.bukti_transfer
+                buktiTransferUrl: d.buktiTransferDocUrl || d.bukti_transfer
             };
         }).filter(item => item.buktiTransferUrl); // Hanya yang ada bukti transfer
 
@@ -77,7 +77,7 @@ export default async function handler(req, res) {
                         id: doc.id,
                         ...d,
                         jumlahTransfer: d.total_biaya,
-                        buktiTransferUrl: d.bukti_transfer
+                        buktiTransferUrl: d.buktiTransferDocUrl || d.bukti_transfer
                     };
                 }).filter(item => item.buktiTransferUrl);
 
