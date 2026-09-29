@@ -39,10 +39,16 @@ export default async function handler(req, res) {
         const q = query(collection(db, 'promoList'), orderBy('createdAt', 'desc'));
         const querySnapshot = await getDocs(q);
         
-        const data = querySnapshot.docs.map(doc => ({
+        const dateFilter = req.query.date;
+
+        let data = querySnapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
-        }));
+        })).filter(item => item.buktiTransferUrl);
+
+        if (dateFilter) {
+            data = data.filter(item => item.tanggalTransfer === dateFilter);
+        }
 
         res.status(200).json({ success: true, total: data.length, data });
     } catch (error) {
@@ -59,7 +65,14 @@ export default async function handler(req, res) {
         if (error.message.includes('index')) {
             try {
                 const querySnapshot = await getDocs(collection(db, 'promoList'));
-                const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                const dateFilter = req.query.date;
+                let data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+                                             .filter(item => item.buktiTransferUrl);
+
+                if (dateFilter) {
+                    data = data.filter(item => item.tanggalTransfer === dateFilter);
+                }
+                
                 return res.status(200).json({ success: true, total: data.length, data });
             } catch (fallbackError) {
                 return res.status(500).json({ success: false, error: fallbackError.message });

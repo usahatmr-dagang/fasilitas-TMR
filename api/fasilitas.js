@@ -39,7 +39,9 @@ export default async function handler(req, res) {
         const q = query(collection(db, 'sewaList'), orderBy('createdAt', 'desc'));
         const querySnapshot = await getDocs(q);
         
-        const data = querySnapshot.docs.map(doc => {
+        const dateFilter = req.query.date;
+
+        let data = querySnapshot.docs.map(doc => {
             const d = doc.data();
             return {
                 id: doc.id,
@@ -47,7 +49,11 @@ export default async function handler(req, res) {
                 jumlahTransfer: d.total_biaya,
                 buktiTransferUrl: d.bukti_transfer
             };
-        });
+        }).filter(item => item.buktiTransferUrl); // Hanya yang ada bukti transfer
+
+        if (dateFilter) {
+            data = data.filter(item => item.tanggal_transfer === dateFilter);
+        }
 
         res.status(200).json({ success: true, total: data.length, data });
     } catch (error) {
@@ -64,7 +70,8 @@ export default async function handler(req, res) {
         if (error.message.includes('index')) {
             try {
                 const querySnapshot = await getDocs(collection(db, 'sewaList'));
-                const data = querySnapshot.docs.map(doc => {
+                const dateFilter = req.query.date;
+                let data = querySnapshot.docs.map(doc => {
                     const d = doc.data();
                     return {
                         id: doc.id,
@@ -72,7 +79,12 @@ export default async function handler(req, res) {
                         jumlahTransfer: d.total_biaya,
                         buktiTransferUrl: d.bukti_transfer
                     };
-                });
+                }).filter(item => item.buktiTransferUrl);
+
+                if (dateFilter) {
+                    data = data.filter(item => item.tanggal_transfer === dateFilter);
+                }
+                
                 return res.status(200).json({ success: true, total: data.length, data });
             } catch (fallbackError) {
                 return res.status(500).json({ success: false, error: fallbackError.message });
