@@ -41,7 +41,13 @@ export default function PublicUpload() {
         const needsListrik = data.listrik_tambahan && data.akses_upload_listrik && !data.bukti_transfer_listrik && isMainPaid;
         const isMainPending = data.status_pembayaran === 'Menunggu Verifikasi' || !!data.bukti_transfer;
 
-        if (isMainPaid && !needsListrik) {
+        if (data.status_pembayaran === 'Batal') {
+          setErrorMsg('PESANAN DIBATALKAN. Anda melebihi batas waktu pembayaran atau pesanan dibatalkan oleh Admin.');
+          setBookingData(null);
+        } else if (data.status_pembayaran === 'Belum Transfer' && data.batas_pembayaran && new Date() > new Date(data.batas_pembayaran)) {
+          setErrorMsg('Waktu pembayaran telah habis. Pesanan Anda ditangguhkan. Silakan hubungi Admin TMR untuk perpanjangan waktu.');
+          setBookingData(null);
+        } else if (isMainPaid && !needsListrik) {
           setInfoMsg('Transaksi ini sudah lunas atau sudah memiliki bukti transfer yang valid.');
           setBookingData(null);
         } else if (isMainPending && !isMainPaid) {

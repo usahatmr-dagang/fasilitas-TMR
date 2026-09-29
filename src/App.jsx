@@ -640,6 +640,7 @@ export default function App() {
       luas_lahan: luas_lahan_total,
       total_biaya: totalBiaya,
       tanggal_booking: currentDateTime,
+      batas_pembayaran: (() => { const d = new Date(); d.setDate(d.getDate() + 3); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; })(),
       tanggal_transfer: isLunas ? getTodayString() : null,
       bukti_transfer: null, 
       bukti_transfer_listrik: null, 
@@ -685,6 +686,7 @@ ID Sewa: *${selectedRecord.id_sewa}*
 Nama Penyewa: ${selectedRecord.nama_penyewa} ${selectedRecord.pic_rombongan !== '-' && selectedRecord.pic_rombongan !== selectedRecord.nama_penyewa ? `(${selectedRecord.pic_rombongan})` : ''}
 Lokasi Sewa: ${selectedRecord.lokasi_sewa}${luasText}
 Tanggal Sewa: ${formatTanggalPendek(selectedRecord.tanggal_sewa)}${rincianBiayaText}
+${selectedRecord.batas_pembayaran ? `\nHarap lakukan pembayaran maksimal pada *${formatTanggalIndo(selectedRecord.batas_pembayaran)}*. Lewat dari batas waktu tersebut, link upload akan tertutup otomatis.` : ''}
 
 Silahkan transfer ke:
 Bank: >>BANK JAKARTA<<, Cabang Pondok Labu
@@ -708,6 +710,46 @@ Terima kasih.`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  };
+
+  const handlePerpanjangWaktu = async (record) => {
+      const d = new Date();
+      d.setDate(d.getDate() + 3);
+      const newBatas = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      try {
+          await updateDoc(doc(db, 'sewaList', record.docId), { batas_pembayaran: newBatas });
+          setSewaList(prev => prev.map(item => item.docId === record.docId ? { ...item, batas_pembayaran: newBatas } : item));
+          setSelectedRecord(prev => ({ ...prev, batas_pembayaran: newBatas }));
+          showToast('Batas waktu berhasil diperpanjang 3 hari.');
+      } catch (error) {
+          showToast('Gagal memperpanjang batas waktu', 'error');
+      }
+  };
+
+  const handleKirimWABatal = async (record) => {
+      const msg = `Mohon maaf Bapak/Ibu ${record.nama_penyewa}, karena tidak ada konfirmasi pembayaran hingga batas waktu yang telah ditentukan, maka pesanan reservasi lokasi ${record.lokasi_sewa} untuk tanggal ${formatTanggalPendek(record.tanggal_sewa)} dengan ID ${record.id_sewa} terpaksa *kami batalkan* otomatis oleh sistem.\n\nTerima kasih.`;
+      const rawPhone = String(record.no_hp_penyewa || '');
+      let phone = rawPhone.replace(/\D/g, ''); 
+      if (phone.startsWith('0')) phone = '62' + phone.substring(1);
+      
+      try {
+          await updateDoc(doc(db, 'sewaList', record.docId), { status_pembayaran: 'Batal' });
+          await deleteDoc(doc(db, 'publicSewaList', record.docId));
+          setSewaList(prev => prev.map(item => item.docId === record.docId ? { ...item, status_pembayaran: 'Batal' } : item));
+          setSelectedRecord(prev => ({ ...prev, status_pembayaran: 'Batal' }));
+          showToast('Pesanan telah dibatalkan.');
+          
+          const url = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+          const link = document.createElement('a');
+          link.href = url;
+          link.target = '_blank';
+          link.rel = 'noopener noreferrer';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+      } catch (error) {
+          showToast('Gagal membatalkan pesanan', 'error');
+      }
   };
 
   const handleSaveEdit = async (e) => {
@@ -1649,6 +1691,19 @@ Terima kasih.`;
 
              {detailMode === 'view' && (
                   <>
+                      {selectedRecord.status_pembayaran === 'Belum Transfer' && selectedRecord.batas_pembayaran && new Date() > new Date(selectedRecord.batas_pembayaran) ? (
+                          <div className="bg-rose-50 border border-rose-200 rounded-3xl p-4 mb-4 text-center">
+                              <p className="text-[10px] font-black text-rose-800 uppercase tracking-widest mb-3">Pesanan Kedaluwarsa</p>
+                              <div className="flex gap-2">
+                                  <button type="button" onClick={() => handlePerpanjangWaktu(selectedRecord)} className="flex-1 bg-white hover:bg-rose-100 text-rose-700 font-bold py-2.5 rounded-xl border border-rose-200 transition-all duration-200 shadow-sm text-[10px]">
+                                      Perpanjang 3 Hari
+                                  </button>
+                                  <button type="button" onClick={() => handleKirimWABatal(selectedRecord)} className="flex-1 bg-rose-600 hover:bg-rose-700 text-white font-bold py-2.5 rounded-xl transition-all duration-200 shadow-sm text-[10px]">
+                                      Batalkan & Kirim WA
+                                  </button>
+                              </div>
+                          </div>
+                      ) : null}
                       <div className="grid grid-cols-5 gap-2">
                          <button type="button" onClick={handleKirimWA} className="flex flex-col items-center justify-center bg-emerald-500/10 hover:bg-emerald-500 hover:text-white text-emerald-800 p-3 rounded-2xl text-[10px] font-bold border border-emerald-500/20 transition-all duration-200 shadow-sm text-center leading-tight hover:-translate-y-0.5">
                              <Send size={16} className="mb-1.5" /> Kirim WA

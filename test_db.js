@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, getDocs } from 'firebase/firestore';
+import { getFirestore, collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 
 const firebaseConfig = {
@@ -17,9 +17,26 @@ const auth = getAuth(app);
 
 async function run() {
     await signInWithEmailAndPassword(auth, "api_service@ragunan.com", "SandiApiRahasia123!");
-    const snap = await getDocs(collection(db, 'sewaList'));
-    const doc = snap.docs.find(d => d.data().nama_penyewa === 'rombongan tes aja');
-    if (doc) console.log(JSON.stringify(doc.data(), null, 2));
+    const q = query(collection(db, 'sewaList'), orderBy('createdAt', 'desc'));
+    let snap;
+    try {
+        snap = await getDocs(q);
+    } catch(e) {
+        console.error("Index error, fetching without orderBy");
+        snap = await getDocs(collection(db, 'sewaList'));
+    }
+    const data = snap.docs.map(doc => {
+       const d = doc.data();
+       return { 
+           id: doc.id,
+           ...d,
+           jumlahTransfer: d.total_biaya,
+           buktiTransferUrl: d.buktiTransferDocUrl || d.bukti_transfer 
+       };
+    }).filter(item => item.buktiTransferUrl);
+    
+    console.log("Found:", data.length);
+    console.log(JSON.stringify(data, null, 2));
     process.exit(0);
 }
 run();
