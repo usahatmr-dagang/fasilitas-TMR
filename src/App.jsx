@@ -687,7 +687,7 @@ Lokasi Sewa: ${selectedRecord.lokasi_sewa}${luasText}
 Tanggal Sewa: ${formatTanggalPendek(selectedRecord.tanggal_sewa)}${rincianBiayaText}
 
 Silahkan transfer ke:
-Bank: >>Bank DKI<<, Cabang Pondok Labu
+Bank: >>BANK JAKARTA<<, Cabang Pondok Labu
 No. Rek: 40142700918
 Atas Nama: TM Ragunan Penerimaan BLUD
 

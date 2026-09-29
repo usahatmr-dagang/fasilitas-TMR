@@ -38,13 +38,13 @@ export default function PublicUpload() {
       if (docSnap.exists()) {
         const data = docSnap.data();
         const isMainPaid = data.status_pembayaran === 'Lunas' || data.status_pembayaran === 'Sudah Transfer';
-        const needsListrik = data.listrik_tambahan && data.akses_upload_listrik && !data.bukti_transfer_listrik;
-        const isMainPending = data.status_pembayaran === 'Menunggu Verifikasi';
+        const needsListrik = data.listrik_tambahan && data.akses_upload_listrik && !data.bukti_transfer_listrik && isMainPaid;
+        const isMainPending = data.status_pembayaran === 'Menunggu Verifikasi' || !!data.bukti_transfer;
 
         if (isMainPaid && !needsListrik) {
           setInfoMsg('Transaksi ini sudah lunas atau sudah memiliki bukti transfer yang valid.');
           setBookingData(null);
-        } else if (isMainPending && !needsListrik) {
+        } else if (isMainPending && !isMainPaid) {
           setInfoMsg('Bukti transfer Anda sudah diterima dan sedang Menunggu Verifikasi oleh Admin.');
           setBookingData(null);
         } else {
