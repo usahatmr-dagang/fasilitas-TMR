@@ -1001,6 +1001,15 @@ Terima kasih.`;
       const tglSewaStr = formatTanggalPendek(selectedRecord.tanggal_sewa);
       const tglTransferStr = formatTanggalPendek(selectedRecord.tanggal_transfer) || '-';
 
+      const biayaListrik = selectedRecord.listrik_tambahan ? 100000 : 0;
+      let totalBayar = selectedRecord.total_biaya !== undefined ? selectedRecord.total_biaya : (getBiayaLokasi(selectedRecord.lokasi_sewa, selectedRecord.luas_lahan) + biayaListrik);
+      
+      let nominalText = formatRupiah(totalBayar);
+      if (selectedRecord.listrik_tambahan) {
+          const biayaTempat = totalBayar - biayaListrik;
+          nominalText = `${formatRupiah(totalBayar)} (${formatRupiah(biayaTempat)} Tempat + ${formatRupiah(biayaListrik)} Listrik)`;
+      }
+
       const htmlContent = `
         <!DOCTYPE html>
         <html>
@@ -1018,6 +1027,7 @@ Terima kasih.`;
               <p><b>Lokasi Sewa:</b> ${selectedRecord.lokasi_sewa}</p>
               <p><b>Tanggal Sewa:</b> ${tglSewaStr}</p>
               <p><b>Tanggal Transfer:</b> ${tglTransferStr}</p>
+              <p><b>Nominal Transfer:</b> ${nominalText}</p>
             </div>
             <div style="border: 2px dashed #059669; padding: 10px;">
               <img src="${base64data}" alt="Bukti Transfer" style="max-width: 100%; max-height: 800px; object-fit: contain;" />
@@ -1080,6 +1090,7 @@ Terima kasih.`;
               <p><b>Lokasi Sewa:</b> ${selectedRecord.lokasi_sewa}</p>
               <p><b>Tanggal Sewa:</b> ${tglSewaStr}</p>
               <p><b>Tanggal Transfer Listrik:</b> ${tglTransferStr}</p>
+              <p><b>Nominal Transfer:</b> Rp 100.000</p>
             </div>
             <div style="border: 2px dashed #059669; padding: 10px;">
               <img src="${base64data}" alt="Bukti Transfer Listrik" style="max-width: 100%; max-height: 800px; object-fit: contain;" />
