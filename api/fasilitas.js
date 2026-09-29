@@ -35,8 +35,7 @@ export default async function handler(req, res) {
         
         await signInWithEmailAndPassword(auth, email, password);
 
-        // Mengambil data karena sekarang kita sudah dianggap "Admin yang login"
-        const q = query(collection(db, 'sewaList'), orderBy('createdAt', 'desc'));
+        const q = query(collection(db, 'sewaList'));
         const querySnapshot = await getDocs(q);
         
         const dateFilter = req.query.date;
