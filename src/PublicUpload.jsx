@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UploadCloud, CheckCircle2, AlertCircle, Search, ShieldCheck, Zap } from 'lucide-react';
+import { UploadCloud, CheckCircle2, AlertCircle, Search, ShieldCheck, Zap, Clock, Copy } from 'lucide-react';
 import { db } from './firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 
@@ -15,6 +15,35 @@ export default function PublicUpload() {
   const [uploadFile, setUploadFile] = useState(null);
   const [filePreview, setFilePreview] = useState(null);
   const [paymentDate, setPaymentDate] = useState('');
+  const [timeLeft, setTimeLeft] = useState('');
+
+  useEffect(() => {
+    if (!bookingData || bookingData.status_pembayaran !== 'Belum Transfer' || !bookingData.batas_pembayaran) {
+      setTimeLeft('');
+      return;
+    }
+    const deadlineDate = new Date(bookingData.batas_pembayaran);
+    deadlineDate.setHours(23, 59, 59, 999);
+    
+    const interval = setInterval(() => {
+      const now = new Date().getTime();
+      const distance = deadlineDate.getTime() - now;
+      if (distance < 0) {
+        clearInterval(interval);
+        setTimeLeft('Waktu Habis');
+        return;
+      }
+      const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+      let timeString = '';
+      if (days > 0) timeString += `${days} Hari `;
+      timeString += `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+      setTimeLeft(timeString);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [bookingData]);
 
   // Parse URL on load
   useEffect(() => {
@@ -355,6 +384,30 @@ export default function PublicUpload() {
                   </div>
                 </div>
               </div>
+
+              {bookingData.status_pembayaran === 'Belum Transfer' && (
+                  <div className="bg-sky-50 border border-sky-100 rounded-2xl p-5 mb-6 text-center">
+                    <p className="text-xs font-bold text-sky-800 mb-3">Silahkan transfer tagihan ke rekening resmi berikut:</p>
+                    <div className="bg-white border border-sky-200 rounded-xl p-4 inline-block text-left shadow-sm w-full">
+                        <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Bank Tujuan</p>
+                        <p className="font-black text-sky-950 text-base mb-2">BANK JAKARTA (Cabang Pondok Labu)</p>
+                        
+                        <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Atas Nama</p>
+                        <p className="font-bold text-slate-800 mb-2">TM Ragunan Penerimaan BLUD</p>
+                        
+                        <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Nomor Rekening</p>
+                        <div className="flex items-center justify-between bg-slate-50 rounded-lg p-3 border border-slate-200 mt-1">
+                            <p className="font-mono font-bold text-xl text-slate-800 tracking-widest select-all">40142700918</p>
+                            <button type="button" onClick={() => { navigator.clipboard.writeText('40142700918'); alert('Nomor rekening berhasil disalin!'); }} className="flex items-center gap-1.5 bg-sky-100 hover:bg-sky-200 text-sky-700 px-3 py-2 rounded-md font-bold text-xs transition-colors"><Copy size={14}/> Salin</button>
+                        </div>
+                    </div>
+                    {timeLeft && (
+                        <div className="mt-4 flex items-center justify-center gap-2 text-rose-600 bg-white border border-rose-200 shadow-sm py-2 px-4 rounded-xl inline-flex font-bold text-sm">
+                            <Clock size={16} className="animate-pulse" /> Sisa Waktu Pembayaran: {timeLeft}
+                        </div>
+                    )}
+                  </div>
+              )}
 
               <form onSubmit={handleSubmit}>
                 <div className="mb-6">

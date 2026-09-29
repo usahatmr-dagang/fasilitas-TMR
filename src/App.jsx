@@ -687,13 +687,7 @@ Nama Penyewa: ${selectedRecord.nama_penyewa} ${selectedRecord.pic_rombongan !== 
 Lokasi Sewa: ${selectedRecord.lokasi_sewa}${luasText}
 Tanggal Sewa: ${formatTanggalPendek(selectedRecord.tanggal_sewa)}${rincianBiayaText}
 ${selectedRecord.batas_pembayaran ? `\nHarap lakukan pembayaran maksimal pada *${formatTanggalIndo(selectedRecord.batas_pembayaran)}*. Lewat dari batas waktu tersebut, link upload akan tertutup otomatis.` : ''}
-
-Silahkan transfer ke:
-Bank: >>BANK JAKARTA<<, Cabang Pondok Labu
-No. Rek: 40142700918
-Atas Nama: TM Ragunan Penerimaan BLUD
-
-Setelah transfer, silakan kirim bukti pembayaran melalui link ini:
+Silahkan lihat detail nomor rekening dan kirim bukti pembayaran melalui link berikut ini:
 https://${window.location.host}/upload/${selectedRecord.docId}
 
 Terima kasih.`;
