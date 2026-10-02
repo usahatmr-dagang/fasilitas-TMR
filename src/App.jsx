@@ -529,9 +529,7 @@ export default function App() {
   const groupedPembayaran = useMemo(() => {
     const todayStr = getTodayString();
     let dataBayar = sewaList.filter(sewa => {
-      const isPaidStatus = ['Sudah Transfer', 'Lunas', 'Sudah Lunas', 'Menunggu Verifikasi'].includes(sewa.status_pembayaran);
-      const normalizedDateSewa = normalizeDateString(sewa.tanggal_sewa);
-      return isPaidStatus && normalizedDateSewa >= todayStr;
+      return ['Sudah Transfer', 'Lunas', 'Sudah Lunas', 'Menunggu Verifikasi'].includes(sewa.status_pembayaran);
     });
     if (filterDatePembayaran !== '') dataBayar = dataBayar.filter(sewa => normalizeDateString(sewa.tanggal_transfer) === filterDatePembayaran);
     
