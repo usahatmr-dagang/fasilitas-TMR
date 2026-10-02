@@ -400,6 +400,12 @@ export default function PublicUpload() {
                             <p className="font-mono font-bold text-xl text-slate-800 tracking-widest select-all">40142700918</p>
                             <button type="button" onClick={() => { navigator.clipboard.writeText('40142700918'); alert('Nomor rekening berhasil disalin!'); }} className="flex items-center gap-1.5 bg-sky-100 hover:bg-sky-200 text-sky-700 px-3 py-2 rounded-md font-bold text-xs transition-colors"><Copy size={14}/> Salin</button>
                         </div>
+
+                        <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider mt-3">Nominal Transfer</p>
+                        <div className="flex items-center justify-between bg-slate-50 rounded-lg p-3 border border-slate-200 mt-1">
+                            <p className="font-mono font-bold text-xl text-amber-600 tracking-widest select-all">{formatRupiah(bookingData.total_biaya)}</p>
+                            <button type="button" onClick={() => { navigator.clipboard.writeText(String(bookingData.total_biaya)); alert('Nominal transfer berhasil disalin!'); }} className="flex items-center gap-1.5 bg-amber-100 hover:bg-amber-200 text-amber-700 px-3 py-2 rounded-md font-bold text-xs transition-colors"><Copy size={14}/> Salin</button>
+                        </div>
                     </div>
                     {timeLeft && (
                         <div className="mt-4 flex items-center justify-center gap-2 text-rose-600 bg-white border border-rose-200 shadow-sm py-2 px-4 rounded-xl inline-flex font-bold text-sm">
