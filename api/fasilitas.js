@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore, collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { getFirestore, collection, getDocs } from 'firebase/firestore';
 import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 
 const firebaseConfig = {
@@ -14,6 +14,87 @@ const firebaseConfig = {
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const db = getFirestore(app);
 const auth = getAuth(app);
+
+function normalizeDate(dateStr) {
+    if (!dateStr) return '';
+    if (typeof dateStr !== 'string') return '';
+    const cleanStr = dateStr.split(',')[0].trim().split(' ')[0].trim();
+    if (cleanStr.includes('/')) {
+        const parts = cleanStr.split('/');
+        if (parts.length === 3 && parts[2].length === 4) {
+            return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+        }
+    }
+    return cleanStr;
+}
+
+function transformSewaDoc(doc) {
+    const d = doc.data();
+    const transactions = [];
+
+    const rawTotal = Number(d.total_biaya) || 0;
+    const hasBuktiLokasi = Boolean(d.buktiTransferDocUrl || d.bukti_transfer);
+    const hasBuktiListrik = Boolean(d.buktiTransferListrikDocUrl || d.bukti_transfer_listrik);
+
+    const biayaListrik = 100000;
+    // Jika fasilitas memiliki listrik tambahan dan bukti listrik terpisah atau aktif, nominal lokasi dipisahkan
+    const biayaLokasi = (d.listrik_tambahan && hasBuktiListrik)
+        ? Math.max(0, rawTotal - biayaListrik)
+        : (d.listrik_tambahan ? Math.max(0, rawTotal - biayaListrik) : rawTotal);
+
+    const tglLokasi = normalizeDate(d.tanggal_transfer) || normalizeDate(d.tanggal_sewa);
+    const tglListrik = normalizeDate(d.tanggal_transfer_listrik) || tglLokasi;
+
+    // Transaksi 1: Sewa Lokasi / Fasilitas Utama
+    if (hasBuktiLokasi) {
+        transactions.push({
+            id: hasBuktiListrik ? `${doc.id}_lokasi` : doc.id,
+            docId: doc.id,
+            id_sewa: d.id_sewa || doc.id,
+            source: 'Fasilitas',
+            tipe_transaksi: 'Sewa Fasilitas',
+            kategori: 'Pemakaian Fasilitas',
+            nama_penyewa: d.nama_penyewa || '-',
+            pic_rombongan: d.pic_rombongan || '-',
+            lokasi_sewa: d.lokasi_sewa || '-',
+            keterangan_transaksi: `Sewa Lokasi: ${d.lokasi_sewa || '-'} (${d.nama_penyewa || '-'})`,
+            jumlahTransfer: biayaLokasi,
+            jumlahTransferNumeric: biayaLokasi,
+            tanggal_transfer: tglLokasi,
+            tanggalTransfer: tglLokasi,
+            buktiTransferUrl: d.buktiTransferDocUrl || d.bukti_transfer,
+            buktiTransferDocUrl: d.buktiTransferDocUrl || null,
+            status_pembayaran: d.status_pembayaran || 'Sudah Transfer',
+            listrik_tambahan: d.listrik_tambahan || false
+        });
+    }
+
+    // Transaksi 2: Listrik Tambahan
+    if (hasBuktiListrik) {
+        transactions.push({
+            id: `${doc.id}_listrik`,
+            docId: doc.id,
+            id_sewa: d.id_sewa ? `${d.id_sewa}-LST` : `${doc.id}-LST`,
+            source: 'Fasilitas',
+            tipe_transaksi: 'Listrik Tambahan',
+            kategori: 'Listrik Tambahan',
+            nama_penyewa: d.nama_penyewa || '-',
+            pic_rombongan: d.pic_rombongan || '-',
+            lokasi_sewa: d.lokasi_sewa || '-',
+            keterangan_transaksi: `Listrik Tambahan: ${d.lokasi_sewa || '-'} (${d.nama_penyewa || '-'})`,
+            jumlahTransfer: biayaListrik,
+            jumlahTransferNumeric: biayaListrik,
+            tanggal_transfer: tglListrik,
+            tanggalTransfer: tglListrik,
+            buktiTransferUrl: d.buktiTransferListrikDocUrl || d.bukti_transfer_listrik,
+            buktiTransferDocUrl: d.buktiTransferListrikDocUrl || null,
+            status_pembayaran: d.status_pembayaran || 'Sudah Transfer',
+            listrik_tambahan: true
+        });
+    }
+
+    return transactions;
+}
 
 export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -35,26 +116,20 @@ export default async function handler(req, res) {
         
         await signInWithEmailAndPassword(auth, email, password);
 
-        const q = query(collection(db, 'sewaList'));
-        const querySnapshot = await getDocs(q);
+        const querySnapshot = await getDocs(collection(db, 'sewaList'));
         
-        const dateFilter = req.query.date;
+        const dateFilter = req.query.date ? normalizeDate(req.query.date) : null;
 
-        let data = querySnapshot.docs.map(doc => {
-            const d = doc.data();
-            return {
-                id: doc.id,
-                ...d,
-                jumlahTransfer: d.total_biaya,
-                buktiTransferUrl: d.buktiTransferDocUrl || d.bukti_transfer
-            };
-        }).filter(item => item.buktiTransferUrl); // Hanya yang ada bukti transfer
+        let allTransactions = [];
+        querySnapshot.docs.forEach(doc => {
+            allTransactions.push(...transformSewaDoc(doc));
+        });
 
-        if (dateFilter) {
-            data = data.filter(item => item.tanggal_transfer === dateFilter);
+        if (dateFilter && dateFilter !== 'semua' && dateFilter !== 'all') {
+            allTransactions = allTransactions.filter(item => item.tanggal_transfer === dateFilter);
         }
 
-        res.status(200).json({ success: true, total: data.length, data });
+        res.status(200).json({ success: true, total: allTransactions.length, data: allTransactions });
     } catch (error) {
         console.error("Error fetching fasilitas data:", error);
         
@@ -64,30 +139,6 @@ export default async function handler(req, res) {
                 error: "Gagal login API. Pastikan Anda sudah membuat akun email dan password ini di Firebase Authentication.",
                 detail: error.message
             });
-        }
-
-        if (error.message.includes('index')) {
-            try {
-                const querySnapshot = await getDocs(collection(db, 'sewaList'));
-                const dateFilter = req.query.date;
-                let data = querySnapshot.docs.map(doc => {
-                    const d = doc.data();
-                    return {
-                        id: doc.id,
-                        ...d,
-                        jumlahTransfer: d.total_biaya,
-                        buktiTransferUrl: d.buktiTransferDocUrl || d.bukti_transfer
-                    };
-                }).filter(item => item.buktiTransferUrl);
-
-                if (dateFilter) {
-                    data = data.filter(item => item.tanggal_transfer === dateFilter);
-                }
-                
-                return res.status(200).json({ success: true, total: data.length, data });
-            } catch (fallbackError) {
-                return res.status(500).json({ success: false, error: fallbackError.message });
-            }
         }
 
         res.status(500).json({ success: false, error: error.message });

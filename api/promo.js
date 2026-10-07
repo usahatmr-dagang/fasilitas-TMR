@@ -15,6 +15,50 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 const db = getFirestore(app);
 const auth = getAuth(app);
 
+function normalizeDate(dateStr) {
+    if (!dateStr) return '';
+    if (typeof dateStr !== 'string') return '';
+    const cleanStr = dateStr.split(',')[0].trim().split(' ')[0].trim();
+    if (cleanStr.includes('/')) {
+        const parts = cleanStr.split('/');
+        if (parts.length === 3 && parts[2].length === 4) {
+            return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+        }
+    }
+    return cleanStr;
+}
+
+function transformPromoDoc(doc) {
+    const d = doc.data();
+    const buktiUrl = d.buktiTransferUrl || d.bukti_transfer;
+    if (!buktiUrl) return null;
+
+    const nominalNumeric = d.jumlahTransferNumeric || (typeof d.jumlahTransfer === 'string' ? Number(d.jumlahTransfer.replace(/[^0-9]/g, '')) : Number(d.jumlahTransfer)) || 0;
+    const tgl = normalizeDate(d.tanggalTransfer || d.tanggal_transfer || d.createdAt);
+
+    return {
+        id: doc.id,
+        docId: doc.id,
+        source: 'Promo',
+        tipe_transaksi: 'Promo & Event',
+        kategori: 'Promo Penjualan Produk',
+        nama_penyewa: d.namaPerusahaan || d.namaPenandaTangan || '-',
+        namaPerusahaan: d.namaPerusahaan || '-',
+        pic_rombongan: d.namaPenandaTangan || '-',
+        namaProduk: d.namaProduk || '-',
+        lokasi_sewa: `Promo (${d.jumlahTitik || 1} Titik, ${d.jumlahBanner || 0} Banner)`,
+        keterangan_transaksi: `Promo: ${d.namaProduk || '-'} (${d.namaPerusahaan || '-'})`,
+        jumlahTransfer: nominalNumeric,
+        jumlahTransferNumeric: nominalNumeric,
+        tanggal_transfer: tgl,
+        tanggalTransfer: tgl,
+        buktiTransferUrl: buktiUrl,
+        buktiTransferDocUrl: d.buktiTransferDocUrl || d.pksDriveUrl || null,
+        status_pembayaran: d.status || 'Menunggu Verifikasi',
+        ...d
+    };
+}
+
 export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -35,18 +79,19 @@ export default async function handler(req, res) {
         
         await signInWithEmailAndPassword(auth, email, password);
 
-        // Mengambil data karena sekarang kita sudah dianggap "Admin yang login"
-        const q = query(collection(db, 'promoList'), orderBy('createdAt', 'desc'));
-        const querySnapshot = await getDocs(q);
+        let querySnapshot;
+        try {
+            const q = query(collection(db, 'promoList'), orderBy('createdAt', 'desc'));
+            querySnapshot = await getDocs(q);
+        } catch(e) {
+            querySnapshot = await getDocs(collection(db, 'promoList'));
+        }
         
-        const dateFilter = req.query.date;
+        const dateFilter = req.query.date ? normalizeDate(req.query.date) : null;
 
-        let data = querySnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-        })).filter(item => item.buktiTransferUrl);
+        let data = querySnapshot.docs.map(transformPromoDoc).filter(Boolean);
 
-        if (dateFilter) {
+        if (dateFilter && dateFilter !== 'semua' && dateFilter !== 'all') {
             data = data.filter(item => item.tanggalTransfer === dateFilter);
         }
 
@@ -60,23 +105,6 @@ export default async function handler(req, res) {
                 error: "Gagal login API. Pastikan Anda sudah membuat akun email dan password ini di Firebase Authentication.",
                 detail: error.message
             });
-        }
-        
-        if (error.message.includes('index')) {
-            try {
-                const querySnapshot = await getDocs(collection(db, 'promoList'));
-                const dateFilter = req.query.date;
-                let data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
-                                             .filter(item => item.buktiTransferUrl);
-
-                if (dateFilter) {
-                    data = data.filter(item => item.tanggalTransfer === dateFilter);
-                }
-                
-                return res.status(200).json({ success: true, total: data.length, data });
-            } catch (fallbackError) {
-                return res.status(500).json({ success: false, error: fallbackError.message });
-            }
         }
 
         res.status(500).json({ success: false, error: error.message });
