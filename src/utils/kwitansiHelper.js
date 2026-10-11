@@ -3,19 +3,27 @@ import PizZip from 'pizzip';
 
 export const terbilang = (angka) => {
   angka = Math.abs(parseInt(angka, 10));
-  if (isNaN(angka) || angka === 0) return "Nol";
-  const kata = ["", "Satu", "Dua", "Tiga", "Empat", "Lima", "Enam", "Tujuh", "Delapan", "Sembilan", "Sepuluh", "Sebelas"];
-  if (angka < 12) return kata[angka];
-  if (angka < 20) return terbilang(angka - 10) + " Belas";
-  if (angka < 100) return (terbilang(Math.floor(angka / 10)) + " Puluh " + terbilang(angka % 10)).replace(/\s+/g, ' ').trim();
-  if (angka < 200) return ("Seratus " + terbilang(angka - 100)).trim();
-  if (angka < 1000) return (terbilang(Math.floor(angka / 100)) + " Ratus " + terbilang(angka % 100)).replace(/\s+/g, ' ').trim();
-  if (angka < 2000) return ("Seribu " + terbilang(angka - 1000)).trim();
-  if (angka < 1000000) return (terbilang(Math.floor(angka / 1000)) + " Ribu " + terbilang(angka % 1000)).replace(/\s+/g, ' ').trim();
-  if (angka < 1000000000) return (terbilang(Math.floor(angka / 1000000)) + " Juta " + terbilang(angka % 1000000)).replace(/\s+/g, ' ').trim();
-  if (angka < 1000000000000) return (terbilang(Math.floor(angka / 1000000000)) + " Milyar " + terbilang(angka % 1000000000)).replace(/\s+/g, ' ').trim();
-  if (angka < 1000000000000000) return (terbilang(Math.floor(angka / 1000000000000)) + " Triliun " + terbilang(angka % 1000000000000)).replace(/\s+/g, ' ').trim();
-  return "";
+  if (isNaN(angka)) return "";
+  if (angka === 0) return "Nol";
+
+  const satuan = ["", "Satu", "Dua", "Tiga", "Empat", "Lima", "Enam", "Tujuh", "Delapan", "Sembilan", "Sepuluh", "Sebelas"];
+
+  const convert = (n) => {
+    if (n === 0) return "";
+    if (n < 12) return satuan[n];
+    if (n < 20) return convert(n - 10) + " Belas";
+    if (n < 100) return (convert(Math.floor(n / 10)) + " Puluh " + convert(n % 10)).trim();
+    if (n < 200) return ("Seratus " + convert(n - 100)).trim();
+    if (n < 1000) return (convert(Math.floor(n / 100)) + " Ratus " + convert(n % 100)).trim();
+    if (n < 2000) return ("Seribu " + convert(n - 1000)).trim();
+    if (n < 1000000) return (convert(Math.floor(n / 1000)) + " Ribu " + convert(n % 1000)).trim();
+    if (n < 1000000000) return (convert(Math.floor(n / 1000000)) + " Juta " + convert(n % 1000000)).trim();
+    if (n < 1000000000000) return (convert(Math.floor(n / 1000000000)) + " Milyar " + convert(n % 1000000000)).trim();
+    if (n < 1000000000000000) return (convert(Math.floor(n / 1000000000000)) + " Triliun " + convert(n % 1000000000000)).trim();
+    return "";
+  };
+
+  return convert(angka).replace(/\s+/g, ' ').trim();
 };
 
 export const formatRupiahStr = (angka) => {
@@ -86,7 +94,7 @@ export const generateKwitansiHtml = ({
     row11Text = `pada tanggal ${formatDateIndonesian(tanggalPelaksanaan)}`;
   }
 
-  const row12Text = `di UP Taman Margasatwa Ragunan melalui transfer ${transferChannel || 'Bank DKI'} dengan No.ref ${noRef || '-'}`;
+  const row12Text = 'di UP Taman Margasatwa Ragunan';
 
   return `<!DOCTYPE html>
 <html lang="id">
@@ -356,7 +364,7 @@ export const generateKwitansiHtml = ({
         <div class="field-row">
           <div class="field-label">&nbsp;</div>
           <div class="field-colon">&nbsp;</div>
-          <div class="field-value">${row12Text}</div>
+          <div class="field-value">&nbsp;&nbsp;${row12Text}</div>
         </div>
       </div>
 
@@ -465,6 +473,11 @@ export const generateKwitansiExcelBlob = async ({
           content = content.split(key).join(valStr);
           changed = true;
         }
+      }
+      if (content.includes('melalui transfer')) {
+        content = content.split('di UP Taman Margasatwa Ragunan melalui transfer <<Transfer>> dengan No.ref <<reff>>').join('di UP Taman Margasatwa Ragunan');
+        content = content.replace(/\s*melalui transfer[^<]*/g, '');
+        changed = true;
       }
       if (changed) {
         zip.file(filename, content);
