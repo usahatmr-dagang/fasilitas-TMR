@@ -52,6 +52,7 @@ import MigrateData from './MigrateData';
 import SyncPembayaran from './SyncPembayaran';
 import SuratDispensasi from './SuratDispensasi';
 import CetakKwitansi from './CetakKwitansi';
+import { openKwitansiPrintWindow } from './utils/kwitansiHelper';
 // --- DATA LOKASI ---
 const defaultDataLokasi = [
   { id: 1, nama: 'PENDOPO TSA 1', tipe: 'pendopo', harga: 500000, urutan: 1 },
@@ -1281,103 +1282,17 @@ Terima kasih.`;
         }
     }
 
-    const printWindow = window.open('', '', 'width=950,height=600');
-    
-    const terbilang = (angka) => {
-      var bilne=["","Satu","Dua","Tiga","Empat","Lima","Enam","Tujuh","Delapan","Sembilan","Sepuluh","Sebelas"];
-      if(angka < 12) return bilne[angka];
-      if(angka < 20) return terbilang(angka-10)+" Belas";
-      if(angka < 100) return terbilang(Math.floor(angka/10))+" Puluh "+terbilang(angka%10);
-      if(angka < 200) return "Seratus "+terbilang(angka-100);
-      if(angka < 1000) return terbilang(Math.floor(angka/100))+" Ratus "+terbilang(angka%100);
-      if(angka < 2000) return "Seribu "+terbilang(angka-1000);
-      if(angka < 1000000) return terbilang(Math.floor(angka/1000))+" Ribu "+terbilang(angka%1000);
-      if(angka < 1000000000) return terbilang(Math.floor(angka/1000000))+" Juta "+terbilang(angka%1000000);
-      if(angka < 1000000000000) return terbilang(Math.floor(angka/1000000000))+" Milyar "+terbilang(angka%1000000000);
-      return "";
-    };
-
-    const formatRupiah = (angka) => {
-        return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
-    };
-
-    const total_bayar = record.total_biaya;
-    const terbilang_teks = terbilang(total_bayar).trim() + " Rupiah";
-    const tanggal_sewa_teks = new Date(record.tanggal_sewa).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' });
-    const tanggal_bayar_teks = printDateObj.toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' });
-    const peruntukan = record.kegiatan || "Kegiatan / Acara";
-    
-    const htmlContent = `
-      <html>
-        <head>
-          <title>Kwitansi Pembayaran - ${record.id_sewa}</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 20px; color: #000; margin:0; }
-            .kwitansi-container { width: 100%; max-width: 950px; margin: 0 auto; border: 1px solid #000; display: flex; position: relative; border-radius: 10px; overflow: hidden; }
-            .left-sidebar { width: 130px; border-right: 1px solid #000; padding: 20px 10px; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; text-align: center; }
-            .content { flex: 1; padding: 25px 40px; position: relative; background-image: repeating-linear-gradient(transparent, transparent 29px, #d1d5db 30px); background-size: 100% 30px; line-height: 30px; }
-            .row { display: flex; margin-bottom: 0; }
-            .label { width: 180px; font-style: italic; font-weight: bold; font-size: 14px; }
-            .value { flex: 1; font-weight: bold; font-style: italic; font-size: 14px; }
-            .bottom-section { margin-top: 50px; display: flex; justify-content: space-between; align-items: flex-end; }
-            .amount { font-size: 20px; font-weight: bold; font-style: italic; border-top: 2px solid #000; border-bottom: 4px double #000; padding: 2px 30px; display: inline-block; background-color: #fff; margin-left: 20px;}
-            .signature { text-align: center; font-weight: bold; font-style: italic; background-color: #fff; padding: 0 10px; line-height: 1.5;}
-            .watermark { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); opacity: 0.04; font-size: 120px; font-weight: bold; pointer-events: none; text-align: center; color: #000; }
-          </style>
-        </head>
-        <body onload="setTimeout(() => window.print(), 500);">
-          <div class="kwitansi-container">
-            <div class="left-sidebar">
-              <div style="font-size:9px; font-weight:bold; margin-bottom:10px;">PEMERINTAH PROVINSI<br/>DAERAH KHUSUS IBUKOTA<br/>JAKARTA</div>
-              <div style="font-size:12px; font-weight:bold; margin-bottom:20px;">TAMAN MARGASATWA<br/>RAGUNAN<br/><span style="font-size:10px;">ZOOLOGICAL PARK</span></div>
-              <div style="border: 1px solid #000; padding: 5px; font-size: 10px; font-weight: bold; transform: rotate(-90deg); margin-top: 90px; width: 150px; letter-spacing:2px;">
-                 RAGUNAN ZOOLOGICAL PARK
-              </div>
-            </div>
-            <div class="content">
-              <div class="watermark">RAGUNAN</div>
-              <div class="row">
-                <div class="label">Sudah terima dari</div>
-                <div class="value">: ${record.nama_penyewa} ${record.instansi_penyewa ? '/ ' + record.instansi_penyewa : ''}</div>
-              </div>
-              <div class="row">
-                <div class="label">Terbilang</div>
-                <div class="value">: <span style="background-color: #fff; padding:0 5px;">${terbilang_teks}</span></div>
-              </div>
-              <div class="row" style="margin-top: 0;">
-                <div class="label">Untuk pembayaran</div>
-                <div class="value">: Pembayaran sewa lokasi ${record.lokasi_sewa} untuk kegiatan ${peruntukan}</div>
-              </div>
-              <div class="row">
-                <div class="label"></div>
-                <div class="value">&nbsp;&nbsp;pada tanggal ${tanggal_sewa_teks}</div>
-              </div>
-              <div class="row">
-                <div class="label"></div>
-                <div class="value">&nbsp;&nbsp;di UP Taman Margasatwa Ragunan melalui transfer.</div>
-              </div>
-              <div class="row">
-                <div class="label"></div>
-                <div class="value">&nbsp;&nbsp;No. Ref Transaksi: ${record.id_sewa}</div>
-              </div>
-              
-              <div class="bottom-section">
-                <div class="amount">
-                  ${formatRupiah(total_bayar)},00
-                </div>
-                <div class="signature">
-                  Jakarta, ${tanggal_bayar_teks}<br/>
-                  <br/><br/><br/><br/>
-                  ( ........................................... )
-                </div>
-              </div>
-            </div>
-          </div>
-        </body>
-      </html>
-    `;
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
+    openKwitansiPrintWindow({
+      type: 'sewa',
+      namaPenyewa: `${record.nama_penyewa || ''}${record.instansi_penyewa ? ' / ' + record.instansi_penyewa : ''}`,
+      nominal: record.total_biaya || 0,
+      kegiatan: record.kegiatan || 'Sewa Fasilitas',
+      lokasi: record.lokasi_sewa || '-',
+      tanggalPelaksanaan: record.tanggal_sewa,
+      transferChannel: 'Bank DKI',
+      noRef: record.id_sewa || '',
+      printDate: printDateObj
+    });
   };
 
   const handlePortalSearch = (e) => {

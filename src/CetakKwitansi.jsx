@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { FileText, Printer, Search, Building, CheckCircle2, ChevronLeft } from 'lucide-react';
+import { FileText, Printer, Search, Building, CheckCircle2, ChevronLeft, Download } from 'lucide-react';
 import { db } from './firebase';
 import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
-import PizZip from 'pizzip';
+import { openKwitansiPrintWindow, downloadKwitansiExcel, generateKwitansiExcelBlob } from './utils/kwitansiHelper';
 
 const getPromoDate = (item) => {
     if (item.selectedDates && Array.isArray(item.selectedDates) && item.selectedDates.length > 0) {
@@ -170,6 +170,68 @@ export default function CetakKwitansi({ onNavigate }) {
     return groups;
   }, [filteredData, source]);
 
+  const handlePrintDirect = () => {
+    if (!selectedItem) {
+      alert("Harap pilih data terlebih dahulu!");
+      return;
+    }
+    
+    const d = new Date();
+    const todayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const input = window.prompt("Tanggal Kwitansi (Otomatis Hari Ini).\nJika butuh tanggal mundur, masukkan format YYYY-MM-DD:", todayStr);
+    let printDateObj = new Date();
+    if (input === null) return;
+    if (input.trim()) {
+      const parsed = new Date(input);
+      if (!isNaN(parsed.getTime())) printDateObj = parsed;
+    }
+
+    if (source === 'promo') {
+      const nominalNumeric = selectedItem.jumlahTransferNumeric || parseInt(String(selectedItem.jumlahTransfer).replace(/\D/g, ''), 10) || 0;
+      openKwitansiPrintWindow({
+        type: 'promo',
+        namaPenyewa: selectedItem.namaPerusahaan || '',
+        nominal: nominalNumeric,
+        namaProduk: selectedItem.namaProduk || '-',
+        jumlahHari: selectedItem.jumlahHari || 1,
+        tanggalPelaksanaan: getPromoDate(selectedItem),
+        transferChannel: 'Bank DKI',
+        noRef: selectedItem.noRef || selectedItem.id || '',
+        printDate: printDateObj
+      });
+    } else {
+      openKwitansiPrintWindow({
+        type: 'sewa',
+        namaPenyewa: `${selectedItem.nama_penyewa || ''}${selectedItem.instansi_penyewa ? ' / ' + selectedItem.instansi_penyewa : ''}`,
+        nominal: selectedItem.total_biaya || 0,
+        kegiatan: selectedItem.kegiatan || 'Sewa Fasilitas',
+        lokasi: selectedItem.lokasi_sewa || '-',
+        tanggalPelaksanaan: selectedItem.tanggal_sewa,
+        transferChannel: 'Bank DKI',
+        noRef: selectedItem.id_sewa || selectedItem.id || '',
+        printDate: printDateObj
+      });
+    }
+  };
+
+  const handleDownloadExcel = async () => {
+    if (!selectedItem) {
+      alert("Harap pilih data terlebih dahulu!");
+      return;
+    }
+    try {
+      await downloadKwitansiExcel({
+        type: source,
+        item: selectedItem,
+        channelTransfer: 'Bank DKI',
+        printDate: new Date()
+      });
+    } catch (err) {
+      console.error(err);
+      alert("Gagal mengunduh template Excel: " + err.message);
+    }
+  };
+
   const handleCreateSheet = async () => {
     if (!selectedItem) {
       alert("Harap pilih data terlebih dahulu!");
@@ -180,11 +242,6 @@ export default function CetakKwitansi({ onNavigate }) {
     try {
       const namaInstansi = source === 'sewa' ? selectedItem.nama_penyewa : selectedItem.namaPerusahaan;
       const fileNameStr = source === 'sewa' ? 'rombongan' : 'promo';
-      
-      // Fetch blank template from public
-      const response = await fetch(`/kwitansi ${fileNameStr}.xlsx`);
-      if (!response.ok) throw new Error(`Template kwitansi ${fileNameStr}.xlsx tidak ditemukan di folder public`);
-      const arrayBuffer = await response.arrayBuffer();
 
       const channelTransfer = window.prompt("Masukkan metode/channel transfer (contoh: Bank DKI, BCA, GoPay, ShopeePay):", "Bank DKI");
       if (channelTransfer === null) {
@@ -192,98 +249,12 @@ export default function CetakKwitansi({ onNavigate }) {
           return;
       }
 
-      const terbilang = (angka) => {
-          angka = Math.abs(parseInt(angka, 10));
-          if (isNaN(angka)) return "";
-          var kata = ["", "Satu", "Dua", "Tiga", "Empat", "Lima", "Enam", "Tujuh", "Delapan", "Sembilan", "Sepuluh", "Sebelas"];
-          if (angka < 12) return kata[angka];
-          if (angka < 20) return terbilang(angka - 10) + " Belas";
-          if (angka < 100) return terbilang(Math.floor(angka / 10)) + " Puluh " + terbilang(angka % 10);
-          if (angka < 200) return "Seratus " + terbilang(angka - 100);
-          if (angka < 1000) return terbilang(Math.floor(angka / 100)) + " Ratus " + terbilang(angka % 100);
-          if (angka < 2000) return "Seribu " + terbilang(angka - 1000);
-          if (angka < 1000000) return terbilang(Math.floor(angka / 1000)) + " Ribu " + terbilang(angka % 1000);
-          if (angka < 1000000000) return terbilang(Math.floor(angka / 1000000)) + " Juta " + terbilang(angka % 1000000);
-          if (angka < 1000000000000) return terbilang(Math.floor(angka / 1000000000)) + " Milyar " + terbilang(angka % 1000000000);
-          return "";
-      };
-
-      const formatRupiahStr = (angka) => new Intl.NumberFormat('id-ID').format(angka);
-      
-      const escapeXml = (unsafe) => {
-          if (!unsafe) return "";
-          return String(unsafe).replace(/[<>&'"]/g, function (c) {
-              switch (c) {
-                  case '<': return '&lt;';
-                  case '>': return '&gt;';
-                  case '&': return '&amp;';
-                  case '\'': return '&apos;';
-                  case '"': return '&quot;';
-              }
-          });
-      };
-
-      const today = new Date();
-      const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
-      
-      let replacements = {};
-      if (source === 'promo') {
-          const nominalNumeric = selectedItem.jumlahTransferNumeric || parseInt(String(selectedItem.jumlahTransfer).replace(/\D/g, ''), 10) || 0;
-          replacements = {
-              '<<Nama PT>>': selectedItem.namaPerusahaan || '',
-              '<<Terbilang>>': terbilang(nominalNumeric) + ' Rupiah',
-              '<<nama produk>>': selectedItem.namaProduk || '',
-              '<<Jumlah hari>>': selectedItem.jumlahHari || '',
-              '<<tanggal promo>>': selectedItem.tanggalPromo || '',
-              '<<Transfer>>': channelTransfer,
-              '<<reff>>': `KWT-TMR-${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`,
-              '<<tanggal>>': String(today.getDate()),
-              '<<bulan>>': monthNames[today.getMonth()],
-              '<<tahun>>': String(today.getFullYear()),
-              '<<Jml Transfer>>': formatRupiahStr(nominalNumeric)
-          };
-      } else {
-          const nominalNumeric = selectedItem.total_biaya || 0;
-          replacements = {
-              '<<Nama Penyewa>>': selectedItem.nama_penyewa || '',
-              '<<Nama PT>>': selectedItem.nama_penyewa || '', 
-              '<<Terbilang>>': terbilang(nominalNumeric) + ' Rupiah',
-              '<<Lokasi Sewa>>': selectedItem.lokasi_sewa || '',
-              '<<Kegiatan>>': selectedItem.kegiatan || 'Sewa Fasilitas',
-              '<<Tanggal Sewa>>': selectedItem.tanggal_sewa || '',
-              '<<Transfer>>': channelTransfer,
-              '<<reff>>': selectedItem.id_sewa || '',
-              '<<tanggal>>': String(today.getDate()),
-              '<<bulan>>': monthNames[today.getMonth()],
-              '<<tahun>>': String(today.getFullYear()),
-              '<<Jml Transfer>>': formatRupiahStr(nominalNumeric)
-          };
-      }
-
-      const zip = new PizZip(arrayBuffer);
-      Object.keys(zip.files).forEach(filename => {
-          if (filename.endsWith('.xml')) {
-              let content = zip.files[filename].asText();
-              let changed = false;
-              for (const [key, value] of Object.entries(replacements)) {
-                  const escapedKey = escapeXml(key);
-                  const valStr = escapeXml(value);
-                  if (content.includes(escapedKey)) {
-                      content = content.split(escapedKey).join(valStr);
-                      changed = true;
-                  }
-                  if (content.includes(key)) {
-                      content = content.split(key).join(valStr);
-                      changed = true;
-                  }
-              }
-              if (changed) {
-                  zip.file(filename, content);
-              }
-          }
+      const blob = await generateKwitansiExcelBlob({
+        type: source,
+        item: selectedItem,
+        channelTransfer: channelTransfer || 'Bank DKI',
+        printDate: new Date()
       });
-
-      const blob = zip.generate({ type: "blob", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
 
       const docName = `Kwitansi ${fileNameStr.charAt(0).toUpperCase() + fileNameStr.slice(1)} - ${namaInstansi} - ${source === 'sewa' ? selectedItem.id_sewa : (getPromoDate(selectedItem) || 'TanpaTanggal')}`;
       const targetCollection = source === 'sewa' ? 'sewaList' : 'promoList';
@@ -433,7 +404,7 @@ export default function CetakKwitansi({ onNavigate }) {
                 </div>
               </div>
 
-              <div className="pt-6 border-t border-slate-100 flex items-center justify-between">
+              <div className="pt-6 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
                 <div>
                   {selectedItem.kwitansiDriveUrl && (
                     <span className="flex items-center gap-1.5 text-xs font-bold text-amber-600 bg-amber-50 px-3 py-1.5 rounded-full">
@@ -441,31 +412,49 @@ export default function CetakKwitansi({ onNavigate }) {
                     </span>
                   )}
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <button 
+                    onClick={handlePrintDirect}
+                    className="px-5 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-xl shadow-md shadow-emerald-700/20 flex items-center gap-2 text-sm transition-all active:scale-95"
+                    title="Cetak kwitansi resmi langsung sesuai format Excel beserta logo Ragunan"
+                  >
+                    <Printer size={16} />
+                    Cetak Kwitansi (Print / PDF)
+                  </button>
+
+                  <button 
+                    onClick={handleDownloadExcel}
+                    className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl border border-slate-200 flex items-center gap-2 text-sm transition-all active:scale-95"
+                    title="Unduh file template Excel (.xlsx) yang sudah terisi otomatis"
+                  >
+                    <Download size={16} />
+                    Unduh Excel (.xlsx)
+                  </button>
+
                   {selectedItem.kwitansiDriveUrl && (
                     <button 
                       onClick={() => window.open(selectedItem.kwitansiDriveUrl, '_blank')}
-                      className="px-6 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl flex items-center gap-2 transition-all"
+                      className="px-4 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold rounded-xl border border-amber-200 flex items-center gap-2 text-sm transition-all"
                     >
-                      <FileText size={20} />
+                      <FileText size={16} />
                       Buka Spreadsheet
                     </button>
                   )}
+
                   <button 
                     onClick={() => handleCreateSheet()}
                     disabled={isGenerating}
-                    className="px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl shadow-lg shadow-amber-600/30 flex items-center gap-2 transition-all disabled:opacity-50"
+                    className="px-4 py-2.5 bg-white hover:bg-amber-50 text-amber-700 border border-amber-300 font-bold rounded-xl flex items-center gap-2 text-sm transition-all disabled:opacity-50"
                   >
-                    <Printer size={20} />
-                    {isGenerating ? "Memproses..." : (selectedItem.kwitansiDriveUrl ? "Buat Sheet Baru" : "Buat Spreadsheet & Cetak")}
+                    <FileText size={16} />
+                    {isGenerating ? "Memproses..." : (selectedItem.kwitansiDriveUrl ? "Perbarui Sheet" : "Upload ke Google Drive")}
                   </button>
                 </div>
               </div>
               
-              <div className="mt-8 bg-blue-50/50 p-4 rounded-xl border border-blue-100">
-                  <p className="text-sm text-blue-800 font-medium leading-relaxed">
-                      💡 <strong>Info:</strong> Fitur ini akan menggunakan file template Excel yang ada di folder public (<em>kwitansi {source === 'sewa' ? 'rombongan' : 'promo'}.xlsx</em>), 
-                      lalu mengunggahnya ke Google Drive Anda sebagai Google Spreadsheet kosong. Anda dapat mengisinya secara manual di Spreadsheet sebelum mencetak.
+              <div className="mt-8 bg-emerald-50/60 p-4 rounded-xl border border-emerald-100">
+                  <p className="text-sm text-emerald-900 font-medium leading-relaxed">
+                      💡 <strong>Format Resmi TMR:</strong> Kwitansi dicetak menggunakan tata letak resmi sesuai file Excel template di folder public lengkap dengan <strong>Logo Miring Ragunan</strong>, rincian terbilang, dan referensi transaksi.
                   </p>
               </div>
 
