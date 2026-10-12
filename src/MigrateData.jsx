@@ -5,7 +5,7 @@ import {
   Clock, Check, X, ShieldAlert, Sparkles, Layers, ArrowUpDown, ChevronDown
 } from 'lucide-react';
 import { db } from './firebase';
-import { collection, addDoc, getDocs, query, where, doc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
 import ExcelJS from 'exceljs/dist/exceljs.min.js';
 
 export default function MigrateData({ onNavigate }) {
@@ -63,11 +63,18 @@ export default function MigrateData({ onNavigate }) {
     if (cell === null || cell === undefined) return '';
     if (typeof cell === 'object') {
       if (cell instanceof Date) return cell;
-      if (cell.result !== undefined) return String(cell.result).trim();
-      if (cell.text !== undefined) return String(cell.text).trim();
-      if (Array.isArray(cell.richText)) {
-        return cell.richText.map(t => t.text || '').join('').trim();
+      const val = cell.value !== undefined ? cell.value : cell;
+      if (val instanceof Date) return val;
+      if (typeof val === 'number') return val;
+      if (typeof val === 'object' && val !== null) {
+        if (val.result !== undefined) return val.result instanceof Date ? val.result : String(val.result).trim();
+        if (val.text !== undefined) return String(val.text).trim();
+        if (Array.isArray(val.richText)) {
+          return val.richText.map(t => t.text || '').join('').trim();
+        }
       }
+      if (typeof val === 'string') return val.trim();
+      if (cell.text !== undefined && typeof cell.text === 'string') return cell.text.trim();
       return '';
     }
     return String(cell).trim();
@@ -94,12 +101,24 @@ export default function MigrateData({ onNavigate }) {
       }
     }
     const str = String(val).trim();
+    if (!str) return null;
+
     if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
       const y = parseInt(str.substring(0, 4), 10);
       const m = parseInt(str.substring(5, 7), 10);
       const d = parseInt(str.substring(8, 10), 10);
       return { ymd: `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`, year: y, month: m, day: d };
     }
+
+    // Full JS Date string (e.g. "Sun Jun 01 2025 07:00:00 GMT+0700..." or ISO string)
+    const parsedJs = new Date(str);
+    if (!isNaN(parsedJs.getTime()) && (str.includes('GMT') || str.includes('T') || str.length > 18)) {
+      const y = parsedJs.getFullYear();
+      const m = String(parsedJs.getMonth() + 1).padStart(2, '0');
+      const d = String(parsedJs.getDate()).padStart(2, '0');
+      return { ymd: `${y}-${m}-${d}`, year: y, month: parsedJs.getMonth() + 1, day: parsedJs.getDate() };
+    }
+
     let normalized = str.replace(/-/g, '/').replace(/ /g, '/');
     const parts = normalized.split('/').filter(p => p);
     if (parts.length >= 3) {
@@ -128,6 +147,20 @@ export default function MigrateData({ onNavigate }) {
       }
     }
     return null;
+  };
+
+  const formatTanggalIndo = (dateVal) => {
+    if (!dateVal) return '-';
+    try {
+      const parsed = parseIndoOrExcelDate(dateVal);
+      if (parsed) {
+        const d = new Date(parsed.year, parsed.month - 1, parsed.day);
+        return new Intl.DateTimeFormat('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(d);
+      }
+      return String(dateVal);
+    } catch (e) {
+      return String(dateVal);
+    }
   };
 
   const cleanKey = (str) => {
@@ -307,8 +340,23 @@ export default function MigrateData({ onNavigate }) {
       if (!nama && !lokasi && !rawTgl) return; // skip completely empty rows
 
       const parsedTgl = parseIndoOrExcelDate(rawTgl);
-      const formattedDate = parsedTgl ? parsedTgl.ymd : (String(rawTgl) || '');
-      const year = parsedTgl ? parsedTgl.year : 2025;
+      let formattedDate = '';
+      let year = 2025;
+      if (parsedTgl) {
+        formattedDate = parsedTgl.ymd;
+        year = parsedTgl.year;
+      } else if (rawTgl) {
+        const fallbackD = new Date(rawTgl);
+        if (!isNaN(fallbackD.getTime())) {
+          const y = fallbackD.getFullYear();
+          const m = String(fallbackD.getMonth() + 1).padStart(2, '0');
+          const d = String(fallbackD.getDate()).padStart(2, '0');
+          formattedDate = `${y}-${m}-${d}`;
+          year = y;
+        } else {
+          formattedDate = String(rawTgl).trim();
+        }
+      }
 
       // Hitung Biaya Dasar
       const isLapangan = String(lokasi).toLowerCase().includes('lap');
@@ -409,6 +457,36 @@ export default function MigrateData({ onNavigate }) {
   }, [reconciledData, onlyYear2025]);
 
   // Execute Migration to Firestore
+  // Fix existing dates in database that might have GMT string format
+  const handleFixExistingDatesInDB = async () => {
+    if (!window.confirm("Fitur ini akan merapikan format tanggal (GMT/Panjang) pada data sewaList yang sudah ada di database menjadi format standar YYYY-MM-DD. Lanjutkan?")) return;
+    setIsProcessing(true);
+    addLog("Merapikan format tanggal pada data yang ada di database...");
+    try {
+      const snap = await getDocs(collection(db, 'sewaList'));
+      let fixedCount = 0;
+      for (const d of snap.docs) {
+        const data = d.data();
+        const rawDate = data.tanggal_sewa;
+        if (typeof rawDate === 'string' && (rawDate.includes('GMT') || rawDate.length > 15)) {
+          const parsed = parseIndoOrExcelDate(rawDate);
+          if (parsed && parsed.ymd) {
+            await setDoc(doc(db, 'sewaList', d.id), { tanggal_sewa: parsed.ymd }, { merge: true });
+            fixedCount++;
+          }
+        }
+      }
+      addLog(`Selesai! Berhasil merapikan ${fixedCount} data tanggal di database.`);
+      alert(`Berhasil merapikan ${fixedCount} data tanggal di database!`);
+    } catch (err) {
+      console.error(err);
+      addLog(`ERROR: ${err.message}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Execute Migration to Firestore
   const handleExecuteMigration = async () => {
     const dataToMigrate = onlyYear2025 ? reconciledData.filter(d => d.year >= 2025) : reconciledData;
     if (dataToMigrate.length === 0) {
@@ -416,22 +494,44 @@ export default function MigrateData({ onNavigate }) {
       return;
     }
 
-    const confirmMsg = `Konfirmasi Migrasi Data:\n- Total data yang akan dimasukkan: ${dataToMigrate.length}\n- Sudah Bayar: ${stats.paid}\n- Belum Bayar: ${stats.unpaid}\n\nLanjutkan migrasi ke sistem?`;
+    const confirmMsg = `Konfirmasi Migrasi Data:\n- Total data yang akan diproses: ${dataToMigrate.length}\n- Sudah Bayar: ${stats.paid}\n- Belum Bayar: ${stats.unpaid}\n\nLanjutkan migrasi ke database?`;
     if (!window.confirm(confirmMsg)) return;
 
     setIsProcessing(true);
     setProgress(0);
-    addLog(`Memulai proses migrasi ${dataToMigrate.length} data ke database Firebase...`);
+    addLog(`Memulai persiapan migrasi ${dataToMigrate.length} data...`);
 
     let countAdded = 0;
     let countUpdated = 0;
     let countSkipped = 0;
 
     try {
+      // 1. Ambil data yang sudah ada di database SEKALI SAJA di awal
+      addLog(`Mengambil snapshot data sewaList dari Firebase untuk verifikasi duplikat...`);
+      const existingSnap = await getDocs(collection(db, 'sewaList'));
+      const existingById = new Map();
+      const existingByKey = new Map();
+
+      existingSnap.docs.forEach(docSnap => {
+        const d = docSnap.data();
+        const docId = docSnap.id;
+        if (d.id_sewa) {
+          existingById.set(cleanKey(d.id_sewa), docId);
+        }
+        const normDate = parseIndoOrExcelDate(d.tanggal_sewa)?.ymd || String(d.tanggal_sewa || '').trim();
+        const key = `${normDate}_${cleanKey(d.lokasi_sewa)}_${cleanKey(d.nama_penyewa)}`;
+        existingByKey.set(key, docId);
+      });
+      addLog(`Database terhubung: Ditemukan ${existingSnap.size} data di database. Melanjutkan migrasi...`);
+
+      // 2. Loop dan simpan data dengan setDoc
       for (let i = 0; i < dataToMigrate.length; i++) {
         const item = dataToMigrate[i];
-        
-        // Data to save (exclude helper UI flags)
+
+        const cleanId = cleanKey(item.id_sewa);
+        const compositeKey = `${item.tanggal_sewa}_${cleanKey(item.lokasi_sewa)}_${cleanKey(item.nama_penyewa)}`;
+        const existingDocId = (cleanId && existingById.get(cleanId)) || existingByKey.get(compositeKey);
+
         const docPayload = {
           id_sewa: item.id_sewa,
           tanggal_sewa: item.tanggal_sewa,
@@ -455,49 +555,42 @@ export default function MigrateData({ onNavigate }) {
           migratedAt: new Date().toISOString()
         };
 
-        // Check duplicate in Firestore
-        const q = query(
-          collection(db, 'sewaList'),
-          where('tanggal_sewa', '==', item.tanggal_sewa),
-          where('lokasi_sewa', '==', item.lokasi_sewa),
-          where('nama_penyewa', '==', item.nama_penyewa)
-        );
-        const snap = await getDocs(q);
-
-        if (snap.empty) {
-          // Tambah baru
-          await addDoc(collection(db, 'sewaList'), docPayload);
-          countAdded++;
-        } else {
-          // Sudah ada di DB
+        if (existingDocId) {
           if (skipExisting) {
             countSkipped++;
           } else {
-            // Update status pembayaran
-            const docRef = doc(db, 'sewaList', snap.docs[0].id);
-            await updateDoc(docRef, {
+            const targetRef = doc(db, 'sewaList', existingDocId);
+            await setDoc(targetRef, {
               status_pembayaran: item.status_pembayaran,
               tanggal_transfer: item.tanggal_transfer,
-              total_biaya: item.total_biaya
-            });
+              total_biaya: item.total_biaya,
+              tanggal_sewa: item.tanggal_sewa
+            }, { merge: true });
             countUpdated++;
           }
+        } else {
+          const newDocRef = doc(collection(db, 'sewaList'));
+          await setDoc(newDocRef, docPayload);
+          if (cleanId) existingById.set(cleanId, newDocRef.id);
+          existingByKey.set(compositeKey, newDocRef.id);
+          countAdded++;
         }
 
         const pct = Math.round(((i + 1) / dataToMigrate.length) * 100);
         setProgress(pct);
 
-        if ((i + 1) % 10 === 0 || i === dataToMigrate.length - 1) {
+        if ((i + 1) % 50 === 0 || i === dataToMigrate.length - 1) {
           addLog(`Progres: ${i + 1}/${dataToMigrate.length} data (${pct}%)`);
+          await new Promise(r => setTimeout(r, 10));
         }
       }
 
-      addLog(`MIGRASI SELESAI!`);
+      addLog(`MIGRASI SELESAI DENGAN SUKSES!`);
       addLog(`- Data Baru Ditambahkan: ${countAdded}`);
       addLog(`- Data Diperbarui: ${countUpdated}`);
-      addLog(`- Data Dilewati (Sudah ada): ${countSkipped}`);
+      addLog(`- Data Dilewati (Sudah ada di database): ${countSkipped}`);
 
-      alert(`Migrasi Berhasil Selesai!\n- Data Baru: ${countAdded}\n- Data Dilewati: ${countSkipped}`);
+      alert(`Migrasi Berhasil Selesai!\n- Data Baru Ditambahkan: ${countAdded}\n- Data Diperbarui: ${countUpdated}\n- Data Dilewati: ${countSkipped}`);
     } catch (err) {
       console.error(err);
       addLog(`ERROR: ${err.message}`);
@@ -896,7 +989,7 @@ export default function MigrateData({ onNavigate }) {
                             )}
                           </td>
                           <td className="py-2.5 px-4 font-mono font-bold text-slate-800">{item.id_sewa}</td>
-                          <td className="py-2.5 px-4 font-semibold text-slate-700">{item.tanggal_sewa}</td>
+                          <td className="py-2.5 px-4 font-semibold text-slate-700">{formatTanggalIndo(item.tanggal_sewa)}</td>
                           <td className="py-2.5 px-4 font-bold text-slate-800">{item.lokasi_sewa}</td>
                           <td className="py-2.5 px-4 font-bold text-slate-900">{item.nama_penyewa}</td>
                           <td className="py-2.5 px-4 text-slate-600">{item.no_hp_penyewa}</td>
@@ -930,23 +1023,37 @@ export default function MigrateData({ onNavigate }) {
                   </p>
                 </div>
 
-                <button 
-                  onClick={handleExecuteMigration}
-                  disabled={isProcessing || filteredPreview.length === 0}
-                  className="w-full md:w-auto px-8 py-4 bg-emerald-700 hover:bg-emerald-800 text-white font-black text-sm rounded-2xl shadow-xl shadow-emerald-700/25 flex items-center justify-center gap-3 transition-all active:scale-95 disabled:opacity-50"
-                >
-                  {isProcessing ? (
-                    <>
-                      <RefreshCw size={18} className="animate-spin" />
-                      Memproses Migrasi ({progress}%)...
-                    </>
-                  ) : (
-                    <>
-                      <Database size={18} />
-                      Migrasikan {filteredPreview.length} Data ke Sistem
-                    </>
-                  )}
-                </button>
+                <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                  <button 
+                    type="button"
+                    onClick={handleFixExistingDatesInDB}
+                    disabled={isProcessing}
+                    className="px-4 py-3 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 font-bold text-xs rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50"
+                    title="Rapikan data yang sudah sempat termigrasi sebelumnya dengan format tanggal panjang"
+                  >
+                    <RefreshCw size={14} />
+                    Rapikan Tanggal di Database
+                  </button>
+
+                  <button 
+                    type="button"
+                    onClick={handleExecuteMigration}
+                    disabled={isProcessing || filteredPreview.length === 0}
+                    className="w-full md:w-auto px-8 py-4 bg-emerald-700 hover:bg-emerald-800 text-white font-black text-sm rounded-2xl shadow-xl shadow-emerald-700/25 flex items-center justify-center gap-3 transition-all active:scale-95 disabled:opacity-50"
+                  >
+                    {isProcessing ? (
+                      <>
+                        <RefreshCw size={18} className="animate-spin" />
+                        Memproses Migrasi ({progress}%)...
+                      </>
+                    ) : (
+                      <>
+                        <Database size={18} />
+                        Migrasikan {filteredPreview.length} Data ke Sistem
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
 
               {/* Progress bar */}

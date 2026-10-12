@@ -101,13 +101,38 @@ const getTodayString = () => {
 
 const normalizeDateString = (dateStr) => {
   if (!dateStr) return '';
-  if (dateStr.includes('/')) {
-    const parts = dateStr.split('/');
+  if (typeof dateStr === 'object') {
+    if (dateStr instanceof Date && !isNaN(dateStr.getTime())) {
+      const y = dateStr.getFullYear();
+      const m = String(dateStr.getMonth() + 1).padStart(2, '0');
+      const d = String(dateStr.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+    if (dateStr.seconds !== undefined) {
+      const d = new Date(dateStr.seconds * 1000);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+  }
+  const s = String(dateStr).trim();
+  if (!s) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  if (s.includes('/')) {
+    const parts = s.split('/');
     if (parts.length === 3 && parts[2].length === 4) {
       return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
     }
   }
-  return dateStr;
+  const parsed = new Date(s);
+  if (!isNaN(parsed.getTime())) {
+    const y = parsed.getFullYear();
+    const m = String(parsed.getMonth() + 1).padStart(2, '0');
+    const d = String(parsed.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  return s;
 };
 
 const formatTanggalIndo = (dateStr) => {
@@ -493,8 +518,11 @@ export default function App() {
   const groupedSewa = useMemo(() => {
     const todayStr = getTodayString();
     let dataYangDitampilkan = sewaList.filter(sewa => sewa.status_pembayaran !== 'Ditutup');
-    if (filterDateSewa !== '') dataYangDitampilkan = dataYangDitampilkan.filter(sewa => sewa.tanggal_sewa === filterDateSewa);
-    else dataYangDitampilkan = dataYangDitampilkan.filter(sewa => sewa.tanggal_sewa >= todayStr);
+    if (filterDateSewa !== '') {
+      dataYangDitampilkan = dataYangDitampilkan.filter(sewa => normalizeDateString(sewa.tanggal_sewa) === filterDateSewa);
+    } else {
+      dataYangDitampilkan = dataYangDitampilkan.filter(sewa => normalizeDateString(sewa.tanggal_sewa) >= todayStr);
+    }
     
     if (filterStatusSewa === 'Sudah Bayar') {
        dataYangDitampilkan = dataYangDitampilkan.filter(sewa => sewa.status_pembayaran === 'Sudah Transfer' || sewa.status_pembayaran === 'Menunggu Verifikasi');
@@ -503,8 +531,10 @@ export default function App() {
     }
 
     const groups = dataYangDitampilkan.reduce((acc, curr) => {
-      if (!acc[curr.tanggal_sewa]) acc[curr.tanggal_sewa] = [];
-      acc[curr.tanggal_sewa].push(curr);
+      const normDate = normalizeDateString(curr.tanggal_sewa);
+      if (!normDate) return acc;
+      if (!acc[normDate]) acc[normDate] = [];
+      acc[normDate].push(curr);
       return acc;
     }, {});
     return Object.keys(groups).sort((a, b) => new Date(a) - new Date(b)).map(date => ({ date, data: groups[date] }));
@@ -512,10 +542,15 @@ export default function App() {
 
   const availableDatesList = useMemo(() => {
     const todayStr = getTodayString();
-    const dataKedepan = sewaList.filter(sewa => sewa.tanggal_sewa >= todayStr && sewa.status_pembayaran !== 'Ditutup');
+    const dataKedepan = sewaList.filter(sewa => {
+      const norm = normalizeDateString(sewa.tanggal_sewa);
+      return norm >= todayStr && sewa.status_pembayaran !== 'Ditutup';
+    });
     const groups = dataKedepan.reduce((acc, curr) => {
-      if (!acc[curr.tanggal_sewa]) acc[curr.tanggal_sewa] = 0;
-      acc[curr.tanggal_sewa]++;
+      const norm = normalizeDateString(curr.tanggal_sewa);
+      if (!norm) return acc;
+      if (!acc[norm]) acc[norm] = 0;
+      acc[norm]++;
       return acc;
     }, {});
     const totalCount = dataKedepan.length;
@@ -2229,10 +2264,6 @@ Terima kasih.`;
     return <CetakKwitansi onNavigate={(appId) => setActiveApp(appId)} />;
   }
 
-  if (activeApp === 'migrate' && adminUser && !isPortalRoute) {
-    return <MigrateData onNavigate={(appId) => setActiveApp(appId || 'dashboard')} />;
-  }
-
   return (
     <div className="flex h-screen bg-[#F4F7F4] font-sans selection:bg-amber-200 selection:text-emerald-900">
       
@@ -2474,7 +2505,6 @@ Terima kasih.`;
             { id: 'pembayaran', label: 'Keuangan / Pembayaran', icon: CreditCard },
             { id: 'dispensasi', label: 'Surat Dispensasi', icon: FileText },
             { id: 'kwitansi', label: 'Cetak Kwitansi', icon: Printer },
-            { id: 'migrate', label: 'Migrasi Data', icon: Database },
             { id: 'master', label: 'Master Data', icon: Settings },
             { id: 'portal', label: 'Portal Bukti', icon: Wallet }
           ].map(item => (
@@ -2537,7 +2567,6 @@ Terima kasih.`;
                 { id: 'pembayaran', label: 'Keuangan / Pembayaran', icon: CreditCard },
                 { id: 'dispensasi', label: 'Surat Dispensasi', icon: FileText },
                 { id: 'kwitansi', label: 'Cetak Kwitansi', icon: Printer },
-                { id: 'migrate', label: 'Migrasi Data', icon: Database },
                 { id: 'master', label: 'Master Data', icon: Settings },
                 { id: 'portal', label: 'Portal Bukti', icon: Wallet }
               ].map(item => (
@@ -3138,7 +3167,6 @@ Terima kasih.`;
 
             {activeTab === 'dispensasi' && <SuratDispensasi onNavigate={setActiveTab} />}
             {activeTab === 'kwitansi' && <CetakKwitansi onNavigate={setActiveTab} />}
-            {activeTab === 'migrate' && <MigrateData onNavigate={setActiveTab} />}
 
             {activeTab === 'master' && renderMasterData()}
 
