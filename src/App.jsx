@@ -896,6 +896,52 @@ Terima kasih.`;
     if (!selectedRecord) return;
     
     const tglStr = formatTanggalPendek(selectedRecord.tanggal_sewa);
+
+    // Deteksi dan format nama lokasi serta luas lahan jika lapangan
+    const isLokasiLap = (locName) => {
+      if (!locName) return false;
+      const upper = String(locName).toUpperCase();
+      if (upper.includes('LAP')) return true;
+      const match = masterLokasi.find(l => l.nama && l.nama.toUpperCase() === upper);
+      return match?.tipe === 'lapangan';
+    };
+
+    let displayLokasi = selectedRecord.lokasi_sewa || '-';
+
+    if (selectedRecord.detail_lokasi && Array.isArray(selectedRecord.detail_lokasi) && selectedRecord.detail_lokasi.length > 0) {
+      displayLokasi = selectedRecord.detail_lokasi.map(loc => {
+        const isLap = isLokasiLap(loc.nama) || (loc.luas && Number(loc.luas) > 0);
+        if (isLap) {
+          const luas = loc.luas || selectedRecord.luas_lahan || 50;
+          return `${loc.nama} (${luas} m²)`;
+        }
+        return loc.nama;
+      }).join(', ');
+    } else {
+      if (displayLokasi.includes(',')) {
+        displayLokasi = displayLokasi.split(',').map(item => {
+          const trimmed = item.trim();
+          const isLap = isLokasiLap(trimmed);
+          if (isLap && !trimmed.includes('m²') && !trimmed.includes('m2')) {
+            const luas = selectedRecord.luas_lahan || 50;
+            return `${trimmed} (${luas} m²)`;
+          }
+          return trimmed;
+        }).join(', ');
+      } else {
+        const isLap = isLokasiLap(displayLokasi) || (selectedRecord.luas_lahan && Number(selectedRecord.luas_lahan) > 0);
+        if (isLap && !displayLokasi.includes('m²') && !displayLokasi.includes('m2')) {
+          let luas = selectedRecord.luas_lahan;
+          if (!luas) {
+            const m = (selectedRecord.keterangan || '').match(/Luas(?:\s+Lahan)?[:\s]*(\d+)/i);
+            if (m) luas = m[1];
+            else luas = 50;
+          }
+          displayLokasi = `${displayLokasi} (${luas} m²)`;
+        }
+      }
+    }
+
     const iframe = document.createElement('iframe');
     iframe.style.position = 'fixed';
     iframe.style.right = '0';
@@ -994,6 +1040,10 @@ Terima kasih.`;
               padding: 10px 30px; 
               border-radius: 20px; 
               border: 4px dashed #f59e0b; 
+              max-width: 90%;
+              word-wrap: break-word;
+              line-height: 1.2;
+              text-align: center;
               flex-shrink: 0;
             }
             .rombongan-label { 
@@ -1049,7 +1099,7 @@ Terima kasih.`;
               <div class="date-badge">${tglStr}</div>
               
               <div class="lokasi-label">LOKASI PENYEWAAN</div>
-              <div class="lokasi-value">${selectedRecord.lokasi_sewa}</div>
+              <div class="lokasi-value">${displayLokasi}</div>
               
               <div class="rombongan-label">DISIAPKAN UNTUK ROMBONGAN:</div>
               <div class="rombongan-value">${selectedRecord.nama_penyewa}</div>
