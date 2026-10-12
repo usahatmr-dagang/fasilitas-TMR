@@ -1,8 +1,7 @@
 import React from 'react';
-import { Tent, Tag, FileText, LogOut } from 'lucide-react';
+import { Tent, Tag, FileText, LogOut, Database } from 'lucide-react';
 import { auth } from './firebase';
 import { signOut } from 'firebase/auth';
-
 
 export default function MainDashboard({ onNavigate }) {
   const handleLogout = () => {
@@ -23,7 +22,7 @@ export default function MainDashboard({ onNavigate }) {
         <p className="text-emerald-700/70 font-semibold">Sistem Informasi Manajemen Fasilitas TMR</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-5xl">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full max-w-6xl">
         {/* Fasilitas TMR */}
         <div 
           onClick={() => onNavigate('fasilitas')}
@@ -61,6 +60,19 @@ export default function MainDashboard({ onNavigate }) {
           </div>
           <h2 className="text-xl font-black text-emerald-950 mb-2">Dispensasi TMR</h2>
           <p className="text-emerald-700/60 text-sm font-semibold">Pengelolaan surat permohonan keringanan dan dispensasi.</p>
+        </div>
+
+        {/* Migrasi Data */}
+        <div 
+          onClick={() => onNavigate('migrate')}
+          className="bg-white p-8 rounded-3xl shadow-lg shadow-emerald-900/5 border border-emerald-100 flex flex-col items-center text-center cursor-pointer hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group relative overflow-hidden"
+        >
+          <div className="absolute top-0 right-0 w-32 h-32 bg-teal-50 rounded-bl-full -z-10 group-hover:scale-110 transition-transform"></div>
+          <div className="w-20 h-20 rounded-2xl bg-teal-100 text-teal-700 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+            <Database size={40} />
+          </div>
+          <h2 className="text-xl font-black text-emerald-950 mb-2">Migrasi Data</h2>
+          <p className="text-emerald-700/60 text-sm font-semibold">Impor & rekonsiliasi data penyewa dan pembayaran dari spreadsheet.</p>
         </div>
       </div>
     </div>

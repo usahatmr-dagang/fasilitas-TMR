@@ -1,247 +1,984 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
+import { 
+  Upload, FileSpreadsheet, CheckCircle2, AlertCircle, 
+  ArrowRight, RefreshCw, Database, ChevronLeft, Search, Filter, 
+  Clock, Check, X, ShieldAlert, Sparkles, Layers, ArrowUpDown, ChevronDown
+} from 'lucide-react';
 import { db } from './firebase';
-import { collection, addDoc, getDocs, query, where } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, where, doc, updateDoc } from 'firebase/firestore';
+import ExcelJS from 'exceljs/dist/exceljs.min.js';
 
-export default function MigrateData() {
+export default function MigrateData({ onNavigate }) {
+  // Step 1: Upload, Step 2: Mapping & Preview, Step 3: Result
+  const [activeStep, setActiveStep] = useState(1);
+  const [fileName, setFileName] = useState('');
+  const [workbook, setWorkbook] = useState(null);
+  const [sheetNames, setSheetNames] = useState([]);
+  
+  // Sheet selections
+  const [selectedPenyewaSheet, setSelectedPenyewaSheet] = useState('');
+  const [selectedBayarSheet, setSelectedBayarSheet] = useState('');
+
+  // Column headers
+  const [penyewaHeaders, setPenyewaHeaders] = useState([]);
+  const [bayarHeaders, setBayarHeaders] = useState([]);
+
+  // Column mappings
+  const [penyewaColMap, setPenyewaColMap] = useState({
+    idSewa: '',
+    tanggalSewa: '',
+    lokasiSewa: '',
+    namaPenyewa: '',
+    noHp: '',
+    keterangan: '',
+    pic: '',
+    luasLahan: '',
+    biaya: ''
+  });
+
+  const [bayarColMap, setBayarColMap] = useState({
+    idSewa: '',
+    tanggalBayar: '',
+    nominal: '',
+    namaPengirim: '',
+    keterangan: ''
+  });
+
+  // Reconciled Preview Data
+  const [reconciledData, setReconciledData] = useState([]);
+  const [filterTab, setFilterTab] = useState('all'); // 'all', 'paid', 'unpaid'
+  const [searchQuery, setSearchQuery] = useState('');
+  const [onlyYear2025, setOnlyYear2025] = useState(true);
+  const [skipExisting, setSkipExisting] = useState(true);
+
+  // Execution states
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [log, setLog] = useState([]);
-  const [loading, setLoading] = useState(false);
 
-  const addLog = (msg) => setLog(prev => [...prev, msg]);
+  const addLog = (msg) => setLog(prev => [...prev, `[${new Date().toLocaleTimeString('id-ID')}] ${msg}`]);
 
-  const parseIndoDate = (dateStr) => {
-    if (!dateStr) return null;
-    
-    // Normalize delimiters to slash
-    let normalized = dateStr.replace(/-/g, '/').replace(/ /g, '/');
+  // Clean cell value
+  const getCellValue = (cell) => {
+    if (cell === null || cell === undefined) return '';
+    if (typeof cell === 'object') {
+      if (cell instanceof Date) return cell;
+      if (cell.result !== undefined) return String(cell.result).trim();
+      if (cell.text !== undefined) return String(cell.text).trim();
+      if (Array.isArray(cell.richText)) {
+        return cell.richText.map(t => t.text || '').join('').trim();
+      }
+      return '';
+    }
+    return String(cell).trim();
+  };
+
+  // Safe Date Parser
+  const parseIndoOrExcelDate = (val) => {
+    if (!val) return null;
+    if (val instanceof Date && !isNaN(val.getTime())) {
+      const y = val.getFullYear();
+      const m = String(val.getMonth() + 1).padStart(2, '0');
+      const d = String(val.getDate()).padStart(2, '0');
+      return { ymd: `${y}-${m}-${d}`, year: y, month: val.getMonth() + 1, day: val.getDate() };
+    }
+    if (typeof val === 'number') {
+      // Excel serial date to JS Date
+      const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+      const jsDate = new Date(excelEpoch.getTime() + val * 86400000);
+      if (!isNaN(jsDate.getTime())) {
+        const y = jsDate.getUTCFullYear();
+        const m = String(jsDate.getUTCMonth() + 1).padStart(2, '0');
+        const d = String(jsDate.getUTCDate()).padStart(2, '0');
+        return { ymd: `${y}-${m}-${d}`, year: y, month: jsDate.getUTCMonth() + 1, day: jsDate.getUTCDate() };
+      }
+    }
+    const str = String(val).trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+      const y = parseInt(str.substring(0, 4), 10);
+      const m = parseInt(str.substring(5, 7), 10);
+      const d = parseInt(str.substring(8, 10), 10);
+      return { ymd: `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`, year: y, month: m, day: d };
+    }
+    let normalized = str.replace(/-/g, '/').replace(/ /g, '/');
     const parts = normalized.split('/').filter(p => p);
-    if (parts.length !== 3) return null;
-    
-    const day = parseInt(parts[0], 10);
-    const mStr = parts[1].toLowerCase();
-    const year = parseInt(parts[2], 10);
-    
-    let month = parseInt(mStr, 10);
-    if (isNaN(month)) {
+    if (parts.length >= 3) {
+      let day = parseInt(parts[0], 10);
+      let mStr = parts[1].toLowerCase();
+      let year = parseInt(parts[2], 10);
+      if (year < 100) year += 2000;
+      
+      let month = parseInt(mStr, 10);
+      if (isNaN(month)) {
         if (mStr.includes('jan')) month = 1;
         else if (mStr.includes('feb')) month = 2;
         else if (mStr.includes('mar')) month = 3;
         else if (mStr.includes('apr')) month = 4;
-        else if (mStr.includes('mei')) month = 5;
+        else if (mStr.includes('mei') || mStr.includes('may')) month = 5;
         else if (mStr.includes('jun')) month = 6;
         else if (mStr.includes('jul')) month = 7;
-        else if (mStr.includes('agu')) month = 8;
+        else if (mStr.includes('agu') || mStr.includes('aug')) month = 8;
         else if (mStr.includes('sep')) month = 9;
-        else if (mStr.includes('okt')) month = 10;
+        else if (mStr.includes('okt') || mStr.includes('oct')) month = 10;
         else if (mStr.includes('nov')) month = 11;
-        else if (mStr.includes('des')) month = 12;
+        else if (mStr.includes('des') || mStr.includes('dec')) month = 12;
+      }
+      if (day && month && year && !isNaN(day) && !isNaN(month) && !isNaN(year)) {
+        return { ymd: `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`, year, month, day };
+      }
     }
-
-    if (!day || !month || !year || isNaN(day) || isNaN(month) || isNaN(year)) return null;
-    return { day, month, year };
+    return null;
   };
 
-  const parseRow = (str) => {
-    // Deteksi pemisah: jika ada tab (dari paste Google Sheet), gunakan tab. Jika tidak, gunakan koma.
-    const delimiter = str.includes('\t') ? '\t' : ',';
-    let result = [];
-    let inQuotes = false;
-    let current = '';
-    for(let i=0; i<str.length; i++) {
-        let char = str[i];
-        if (char === '"') { inQuotes = !inQuotes; }
-        else if (char === delimiter && !inQuotes) { result.push(current); current = ''; }
-        else { current += char; }
-    }
-    result.push(current);
-    return result.map(s => s.trim().replace(/^"|"$/g, ''));
+  const cleanKey = (str) => {
+    return String(str || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
   };
 
-  const processCsvLines = async (lines) => {
-      const dataRows = lines.slice(1); // skip header
-      let countSuccess = 0;
-      let countSkippedDate = 0;
-      let countSkippedExists = 0;
+  // Helper auto-match header
+  const findBestHeaderMatch = (headers, keywords) => {
+    const lowerHeaders = headers.map(h => String(h || '').toLowerCase().trim());
+    for (const kw of keywords) {
+      const idx = lowerHeaders.findIndex(h => h.includes(kw));
+      if (idx !== -1) return headers[idx];
+    }
+    return '';
+  };
 
-      for (let i = 0; i < dataRows.length; i++) {
-        const row = dataRows[i];
-        const parsed = parseRow(row);
-        
-        // 0:id_sewa, 1:tanggal_sewa, 2:lokasi_sewa, 3:nama_penyewa, 4:no.hp_penyewa, 5:tanggal_booking, 6:luas_lahan, 7:keterangan, 8:PIC
-        const idSewaAsli = parsed[0];
-        const tanggalStr = parsed[1];
-        
-        const dateObj = parseIndoDate(tanggalStr);
-        if (!dateObj) {
-            continue;
-        }
+  // Handle Excel File Upload
+  const handleFileUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-        const { day, month, year } = dateObj;
-        
-        // Cek >= Tahun 2025
-        const isAfterTarget = year >= 2025;
-        
-        if (!isAfterTarget) {
-            countSkippedDate++;
-            continue;
-        }
+    try {
+      setFileName(file.name);
+      addLog(`Membaca file: ${file.name}...`);
+      const buffer = await file.arrayBuffer();
+      const wb = new ExcelJS.Workbook();
+      await wb.xlsx.load(buffer);
 
-        const formattedDate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        
-        const lokasi = parsed[2] || '';
-        const nama = parsed[3] || '';
-        const hp = parsed[4] || '-';
-        const tglBooking = parsed[5] || '';
-        const luasLahanStr = parsed[6] || '';
-        const keterangan = parsed[7] || '';
-        const pic = parsed[8] || '';
+      const sheets = wb.worksheets.map(ws => ws.name);
+      setWorkbook(wb);
+      setSheetNames(sheets);
+      addLog(`File berhasil dibaca. Terdapat ${sheets.length} sheet: ${sheets.join(', ')}`);
 
-        // Hitung Luas
-        const isLapangan = lokasi.toLowerCase().includes('lap');
-        const luas = isLapangan ? (parseInt(luasLahanStr, 10) || 50) : null;
+      // Auto detect Penyewa Sheet vs Bayar Sheet
+      let autoPenyewa = sheets.find(s => /penyewa|sewa|booking|pesanan|reservasi/i.test(s)) || sheets[0] || '';
+      let autoBayar = sheets.find(s => /bayar|lunas|transfer|rekap|pembayaran/i.test(s) && s !== autoPenyewa);
+      if (!autoBayar && sheets.length > 1) {
+        autoBayar = sheets[1];
+      }
 
-        // Hitung Biaya
-        let baseHarga = 250000;
-        if (lokasi === 'PENDOPO TSA 1') baseHarga = 500000;
-        if (lokasi === 'AULA SERBAGUNA') baseHarga = 2000000;
-        if (isLapangan) baseHarga = luas * 2000;
-        
-        const newData = {
-            id_sewa: idSewaAsli || `TMR-${Math.floor(Math.random() * 90000) + 10000}`,
-            tanggal_sewa: formattedDate,
-            lokasi_sewa: lokasi,
-            nama_penyewa: nama,
-            pic_rombongan: nama,
-            no_hp_penyewa: hp,
-            pic_kantor: pic,
-            keterangan: keterangan,
-            status_pembayaran: 'Sudah Transfer', // Anggap sudah fix atau sesuaikan
-            tanggal_booking: tglBooking || new Date().toLocaleString('id-ID'),
-            tanggal_transfer: null,
-            bukti_transfer: null,
-            bukti_transfer_listrik: null,
-            ocr_data: null,
-            history_reschedule: [],
-            listrik_tambahan: keterangan.toLowerCase().includes('listrik') || keterangan.toLowerCase().includes('tenda'),
-            akses_upload_listrik: false,
-            luas_lahan: luas,
-            total_biaya: baseHarga
+      setSelectedPenyewaSheet(autoPenyewa);
+      setSelectedBayarSheet(autoBayar || '');
+
+      loadSheetHeaders(wb, autoPenyewa, autoBayar);
+      setActiveStep(2);
+    } catch (err) {
+      console.error(err);
+      alert('Gagal membaca file Excel: ' + err.message);
+    }
+  };
+
+  const loadSheetHeaders = (wb, pSheetName, bSheetName) => {
+    let pHeaders = [];
+    let bHeaders = [];
+
+    if (pSheetName) {
+      const wsP = wb.getWorksheet(pSheetName);
+      if (wsP && wsP.rowCount > 0) {
+        const row1 = wsP.getRow(1);
+        pHeaders = row1.values.slice(1).map(v => getCellValue(v)).filter(v => v !== '');
+        setPenyewaHeaders(pHeaders);
+
+        // Auto map penyewa columns
+        setPenyewaColMap({
+          idSewa: findBestHeaderMatch(pHeaders, ['id_sewa', 'id sewa', 'id', 'kode', 'no. sewa', 'no sewa']),
+          tanggalSewa: findBestHeaderMatch(pHeaders, ['tanggal_sewa', 'tanggal sewa', 'tgl sewa', 'tgl', 'tanggal', 'kunjungan']),
+          lokasiSewa: findBestHeaderMatch(pHeaders, ['lokasi_sewa', 'lokasi', 'tempat', 'fasilitas', 'area']),
+          namaPenyewa: findBestHeaderMatch(pHeaders, ['nama_penyewa', 'nama penyewa', 'nama', 'instansi', 'penyewa', 'rombongan']),
+          noHp: findBestHeaderMatch(pHeaders, ['no.hp', 'no hp', 'hp', 'telepon', 'telp', 'wa']),
+          keterangan: findBestHeaderMatch(pHeaders, ['keterangan', 'ket', 'keperluan', 'catatan']),
+          pic: findBestHeaderMatch(pHeaders, ['pic', 'petugas', 'admin', 'operator']),
+          luasLahan: findBestHeaderMatch(pHeaders, ['luas', 'lahan', 'm2']),
+          biaya: findBestHeaderMatch(pHeaders, ['biaya', 'total', 'tarif', 'harga'])
+        });
+      }
+    }
+
+    if (bSheetName) {
+      const wsB = wb.getWorksheet(bSheetName);
+      if (wsB && wsB.rowCount > 0) {
+        const row1 = wsB.getRow(1);
+        bHeaders = row1.values.slice(1).map(v => getCellValue(v)).filter(v => v !== '');
+        setBayarHeaders(bHeaders);
+
+        // Auto map bayar columns
+        setBayarColMap({
+          idSewa: findBestHeaderMatch(bHeaders, ['id_sewa', 'id sewa', 'id', 'ref', 'no ref', 'kode', 'booking']),
+          tanggalBayar: findBestHeaderMatch(bHeaders, ['tanggal', 'tgl', 'transfer', 'bayar', 'tgl transfer']),
+          nominal: findBestHeaderMatch(bHeaders, ['nominal', 'jumlah', 'total', 'biaya', 'rp', 'bayar']),
+          namaPengirim: findBestHeaderMatch(bHeaders, ['nama', 'pengirim', 'penyewa', 'atas nama']),
+          keterangan: findBestHeaderMatch(bHeaders, ['keterangan', 'ket', 'bank', 'channel'])
+        });
+      }
+    }
+  };
+
+  // Perform Analysis & Smart Matching
+  const analyzeAndReconcile = () => {
+    if (!workbook || !selectedPenyewaSheet) {
+      alert('Pilih sheet data penyewa terlebih dahulu!');
+      return;
+    }
+
+    addLog('Memulai rekonsiliasi data...');
+    const wsP = workbook.getWorksheet(selectedPenyewaSheet);
+    const wsB = selectedBayarSheet ? workbook.getWorksheet(selectedBayarSheet) : null;
+
+    // 1. Build payment lookup table from Sheet Bayar
+    const paidMapById = new Map();
+    const paidMapByNameDate = new Map();
+
+    if (wsB) {
+      const bRow1 = wsB.getRow(1).values.slice(1).map(v => getCellValue(v));
+      const idIdx = bRow1.indexOf(bayarColMap.idSewa) + 1;
+      const tglIdx = bRow1.indexOf(bayarColMap.tanggalBayar) + 1;
+      const nomIdx = bRow1.indexOf(bayarColMap.nominal) + 1;
+      const namaIdx = bRow1.indexOf(bayarColMap.namaPengirim) + 1;
+
+      wsB.eachRow((row, rowNumber) => {
+        if (rowNumber === 1) return; // skip header
+        const rawId = idIdx > 0 ? getCellValue(row.getCell(idIdx)) : '';
+        const rawTgl = tglIdx > 0 ? getCellValue(row.getCell(tglIdx)) : '';
+        const rawNom = nomIdx > 0 ? getCellValue(row.getCell(nomIdx)) : '';
+        const rawNama = namaIdx > 0 ? getCellValue(row.getCell(namaIdx)) : '';
+
+        const cleanIdVal = cleanKey(rawId);
+        const parsedTgl = parseIndoOrExcelDate(rawTgl);
+        const nomNumeric = parseInt(String(rawNom).replace(/\D/g, ''), 10) || 0;
+
+        const paymentInfo = {
+          rawId,
+          tanggalTransfer: parsedTgl ? parsedTgl.ymd : (String(rawTgl) || null),
+          nominal: nomNumeric,
+          namaPengirim: rawNama
         };
 
-        // Cek duplikasi
-        const q = query(collection(db, 'sewaList'), 
-            where('tanggal_sewa', '==', formattedDate),
-            where('lokasi_sewa', '==', lokasi),
-            where('nama_penyewa', '==', nama)
+        if (cleanIdVal) {
+          paidMapById.set(cleanIdVal, paymentInfo);
+        }
+        if (rawNama && parsedTgl) {
+          const nameDateKey = `${cleanKey(rawNama)}_${parsedTgl.ymd}`;
+          paidMapByNameDate.set(nameDateKey, paymentInfo);
+        }
+      });
+      addLog(`Sheet Pembayaran berhasil dipetakan: ${paidMapById.size} data pembayaran teridentifikasi.`);
+    }
+
+    // 2. Process Sheet Penyewa and Match
+    const pRow1 = wsP.getRow(1).values.slice(1).map(v => getCellValue(v));
+    const pIdIdx = pRow1.indexOf(penyewaColMap.idSewa) + 1;
+    const pTglIdx = pRow1.indexOf(penyewaColMap.tanggalSewa) + 1;
+    const pLokIdx = pRow1.indexOf(penyewaColMap.lokasiSewa) + 1;
+    const pNamaIdx = pRow1.indexOf(penyewaColMap.namaPenyewa) + 1;
+    const pHpIdx = pRow1.indexOf(penyewaColMap.noHp) + 1;
+    const pKetIdx = pRow1.indexOf(penyewaColMap.keterangan) + 1;
+    const pPicIdx = pRow1.indexOf(penyewaColMap.pic) + 1;
+    const pLuasIdx = pRow1.indexOf(penyewaColMap.luasLahan) + 1;
+    const pBiayaIdx = pRow1.indexOf(penyewaColMap.biaya) + 1;
+
+    const list = [];
+    let countPaid = 0;
+    let countUnpaid = 0;
+
+    wsP.eachRow((row, rowNumber) => {
+      if (rowNumber === 1) return; // skip header
+
+      const rawId = pIdIdx > 0 ? getCellValue(row.getCell(pIdIdx)) : '';
+      const rawTgl = pTglIdx > 0 ? getCellValue(row.getCell(pTglIdx)) : '';
+      const lokasi = pLokIdx > 0 ? getCellValue(row.getCell(pLokIdx)) : '';
+      const nama = pNamaIdx > 0 ? getCellValue(row.getCell(pNamaIdx)) : '';
+      const hp = pHpIdx > 0 ? getCellValue(row.getCell(pHpIdx)) : '-';
+      const ket = pKetIdx > 0 ? getCellValue(row.getCell(pKetIdx)) : '';
+      const pic = pPicIdx > 0 ? getCellValue(row.getCell(pPicIdx)) : '';
+      const luasStr = pLuasIdx > 0 ? getCellValue(row.getCell(pLuasIdx)) : '';
+      const biayaStr = pBiayaIdx > 0 ? getCellValue(row.getCell(pBiayaIdx)) : '';
+
+      if (!nama && !lokasi && !rawTgl) return; // skip completely empty rows
+
+      const parsedTgl = parseIndoOrExcelDate(rawTgl);
+      const formattedDate = parsedTgl ? parsedTgl.ymd : (String(rawTgl) || '');
+      const year = parsedTgl ? parsedTgl.year : 2025;
+
+      // Hitung Biaya Dasar
+      const isLapangan = String(lokasi).toLowerCase().includes('lap');
+      const luas = isLapangan ? (parseInt(luasStr, 10) || 50) : null;
+      let calculatedBiaya = 250000;
+      if (lokasi === 'PENDOPO TSA 1') calculatedBiaya = 500000;
+      else if (lokasi === 'AULA SERBAGUNA') calculatedBiaya = 2000000;
+      else if (isLapangan) calculatedBiaya = (luas || 50) * 2000;
+
+      const userBiaya = parseInt(String(biayaStr).replace(/\D/g, ''), 10);
+      const finalBiaya = (!isNaN(userBiaya) && userBiaya > 0) ? userBiaya : calculatedBiaya;
+
+      // Matching check
+      const cleanIdVal = cleanKey(rawId);
+      const nameDateKey = parsedTgl ? `${cleanKey(nama)}_${parsedTgl.ymd}` : '';
+      
+      let match = null;
+      let matchMethod = '';
+
+      if (cleanIdVal && paidMapById.has(cleanIdVal)) {
+        match = paidMapById.get(cleanIdVal);
+        matchMethod = 'ID Sewa';
+      } else if (nameDateKey && paidMapByNameDate.has(nameDateKey)) {
+        match = paidMapByNameDate.get(nameDateKey);
+        matchMethod = 'Nama & Tanggal';
+      }
+
+      const isPaid = !!match;
+      if (isPaid) countPaid++;
+      else countUnpaid++;
+
+      const finalId = rawId || `TMR-${Math.floor(Math.random() * 90000) + 10000}`;
+
+      list.push({
+        id_sewa: finalId,
+        tanggal_sewa: formattedDate,
+        year: year,
+        lokasi_sewa: lokasi || 'Lokasi Sewa',
+        nama_penyewa: nama || 'Penyewa',
+        pic_rombongan: nama || 'Penyewa',
+        no_hp_penyewa: hp || '-',
+        pic_kantor: pic || '',
+        keterangan: ket || '',
+        status_pembayaran: isPaid ? 'Sudah Transfer' : 'Belum Transfer',
+        tanggal_booking: new Date().toLocaleString('id-ID'),
+        tanggal_transfer: match?.tanggalTransfer || (isPaid ? formattedDate : null),
+        bukti_transfer: isPaid ? 'migrasi_data_spreadsheet' : null,
+        bukti_transfer_listrik: null,
+        ocr_data: null,
+        history_reschedule: [],
+        listrik_tambahan: String(ket).toLowerCase().includes('listrik') || String(ket).toLowerCase().includes('tenda'),
+        akses_upload_listrik: false,
+        luas_lahan: luas,
+        total_biaya: match?.nominal && match.nominal > 0 ? match.nominal : finalBiaya,
+        // UI helper flags
+        isPaid,
+        matchMethod,
+        rowNumber
+      });
+    });
+
+    setReconciledData(list);
+    addLog(`Rekonsiliasi Selesai! Total ${list.length} data: ${countPaid} Sudah Bayar (Lunas), ${countUnpaid} Belum Bayar.`);
+  };
+
+  // Filtered preview data
+  const filteredPreview = useMemo(() => {
+    return reconciledData.filter(item => {
+      // Filter year
+      if (onlyYear2025 && item.year < 2025) return false;
+
+      // Filter tab
+      if (filterTab === 'paid' && !item.isPaid) return false;
+      if (filterTab === 'unpaid' && item.isPaid) return false;
+
+      // Search query
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const mNama = (item.nama_penyewa || '').toLowerCase().includes(q);
+        const mId = (item.id_sewa || '').toLowerCase().includes(q);
+        const mLok = (item.lokasi_sewa || '').toLowerCase().includes(q);
+        if (!mNama && !mId && !mLok) return false;
+      }
+
+      return true;
+    });
+  }, [reconciledData, filterTab, searchQuery, onlyYear2025]);
+
+  const stats = useMemo(() => {
+    const targetData = onlyYear2025 ? reconciledData.filter(d => d.year >= 2025) : reconciledData;
+    const paid = targetData.filter(d => d.isPaid).length;
+    const unpaid = targetData.filter(d => !d.isPaid).length;
+    return {
+      total: targetData.length,
+      paid,
+      unpaid
+    };
+  }, [reconciledData, onlyYear2025]);
+
+  // Execute Migration to Firestore
+  const handleExecuteMigration = async () => {
+    const dataToMigrate = onlyYear2025 ? reconciledData.filter(d => d.year >= 2025) : reconciledData;
+    if (dataToMigrate.length === 0) {
+      alert('Tidak ada data untuk dimigrasikan!');
+      return;
+    }
+
+    const confirmMsg = `Konfirmasi Migrasi Data:\n- Total data yang akan dimasukkan: ${dataToMigrate.length}\n- Sudah Bayar: ${stats.paid}\n- Belum Bayar: ${stats.unpaid}\n\nLanjutkan migrasi ke sistem?`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setIsProcessing(true);
+    setProgress(0);
+    addLog(`Memulai proses migrasi ${dataToMigrate.length} data ke database Firebase...`);
+
+    let countAdded = 0;
+    let countUpdated = 0;
+    let countSkipped = 0;
+
+    try {
+      for (let i = 0; i < dataToMigrate.length; i++) {
+        const item = dataToMigrate[i];
+        
+        // Data to save (exclude helper UI flags)
+        const docPayload = {
+          id_sewa: item.id_sewa,
+          tanggal_sewa: item.tanggal_sewa,
+          lokasi_sewa: item.lokasi_sewa,
+          nama_penyewa: item.nama_penyewa,
+          pic_rombongan: item.pic_rombongan,
+          no_hp_penyewa: item.no_hp_penyewa,
+          pic_kantor: item.pic_kantor,
+          keterangan: item.keterangan,
+          status_pembayaran: item.status_pembayaran,
+          tanggal_booking: item.tanggal_booking,
+          tanggal_transfer: item.tanggal_transfer,
+          bukti_transfer: item.bukti_transfer,
+          bukti_transfer_listrik: item.bukti_transfer_listrik,
+          ocr_data: item.ocr_data,
+          history_reschedule: item.history_reschedule,
+          listrik_tambahan: item.listrik_tambahan,
+          akses_upload_listrik: item.akses_upload_listrik,
+          luas_lahan: item.luas_lahan,
+          total_biaya: item.total_biaya,
+          migratedAt: new Date().toISOString()
+        };
+
+        // Check duplicate in Firestore
+        const q = query(
+          collection(db, 'sewaList'),
+          where('tanggal_sewa', '==', item.tanggal_sewa),
+          where('lokasi_sewa', '==', item.lokasi_sewa),
+          where('nama_penyewa', '==', item.nama_penyewa)
         );
         const snap = await getDocs(q);
+
         if (snap.empty) {
-            await addDoc(collection(db, 'sewaList'), newData);
-            countSuccess++;
-            if (countSuccess % 5 === 0) {
-                addLog(`Telah menambahkan ${countSuccess} data baru...`);
-            }
+          // Tambah baru
+          await addDoc(collection(db, 'sewaList'), docPayload);
+          countAdded++;
         } else {
-            countSkippedExists++;
+          // Sudah ada di DB
+          if (skipExisting) {
+            countSkipped++;
+          } else {
+            // Update status pembayaran
+            const docRef = doc(db, 'sewaList', snap.docs[0].id);
+            await updateDoc(docRef, {
+              status_pembayaran: item.status_pembayaran,
+              tanggal_transfer: item.tanggal_transfer,
+              total_biaya: item.total_biaya
+            });
+            countUpdated++;
+          }
+        }
+
+        const pct = Math.round(((i + 1) / dataToMigrate.length) * 100);
+        setProgress(pct);
+
+        if ((i + 1) % 10 === 0 || i === dataToMigrate.length - 1) {
+          addLog(`Progres: ${i + 1}/${dataToMigrate.length} data (${pct}%)`);
         }
       }
 
-      addLog(`Selesai!`);
-      addLog(`Total Berhasil Dimasukkan: ${countSuccess}`);
-      addLog(`Dilewati (Sebelum 2025 atau Format Kosong): ${countSkippedDate}`);
-      addLog(`Dilewati (Sudah ada di database): ${countSkippedExists}`);
+      addLog(`MIGRASI SELESAI!`);
+      addLog(`- Data Baru Ditambahkan: ${countAdded}`);
+      addLog(`- Data Diperbarui: ${countUpdated}`);
+      addLog(`- Data Dilewati (Sudah ada): ${countSkipped}`);
 
-  };
-
-  const [manualText, setManualText] = useState('');
-
-  const handleManualMigrate = async () => {
-      setLoading(true);
-      setLog(['Mulai proses migrasi manual...']);
-      try {
-         const lines = manualText.split('\n').map(l => l.trim()).filter(l => l);
-         if (lines.length === 0) {
-             addLog('Teks kosong.');
-             setLoading(false);
-             return;
-         }
-         // Jika baris pertama bukan header, anggap semuanya data dan tambahkan dummy header
-         if (!lines[0].toLowerCase().includes('id_sewa') && !lines[0].toLowerCase().includes('tanggal')) {
-             lines.unshift('header_dummy');
-         }
-         await processCsvLines(lines);
-      } catch (e) {
-          addLog(`Error: ${e.message}`);
-      }
-      setLoading(false);
-  };
-
-  const handleMigrate = async () => {
-    setLoading(true);
-    setLog(['Mulai proses migrasi... Membaca Google Sheet via Proxy...']);
-    
-    try {
-      const targetUrl = 'https://docs.google.com/spreadsheets/d/1vp2CK15g_ZCSBF29JB_w9kSg8DAZGLTu9Xbgt0jwBfU/export?format=csv&gid=0';
-      const res = await fetch(`https://corsproxy.io/?${encodeURIComponent(targetUrl)}`);
-      
-      if (!res.ok) throw new Error('Gagal mengunduh CSV dari Google Sheet via Proxy');
-      
-      const csvText = await res.text();
-      const lines = csvText.split('\n').map(l => l.trim()).filter(l => l);
-      addLog(`Berhasil mengunduh ${lines.length} baris data.`);
-      
-      await processCsvLines(lines);
-
-    } catch (e) {
-      addLog(`Error Auto: ${e.message}`);
-      addLog(`Silakan gunakan opsi Paste Manual di bawah jika gagal otomatis.`);
+      alert(`Migrasi Berhasil Selesai!\n- Data Baru: ${countAdded}\n- Data Dilewati: ${countSkipped}`);
+    } catch (err) {
+      console.error(err);
+      addLog(`ERROR: ${err.message}`);
+      alert(`Terjadi kesalahan saat migrasi: ${err.message}`);
+    } finally {
+      setIsProcessing(false);
     }
-    setLoading(false);
   };
 
   return (
-    <div className="p-6 md:p-8 w-full bg-white rounded-3xl shadow-lg border border-emerald-100">
-      <h2 className="text-2xl font-black mb-2 text-emerald-950">Migrasi Data Pemesanan</h2>
-      <p className="mb-6 text-emerald-700/80 font-medium">Sistem akan otomatis menyeleksi dan memasukkan pesanan yang tanggal sewanya <span className="font-bold text-rose-600">mulai dari tahun 2025</span> dan setelahnya.</p>
-      
-      <div className="flex flex-col md:flex-row gap-8">
-          <div className="flex-1 border-r border-emerald-50 pr-0 md:pr-8">
-              <h3 className="font-bold text-emerald-900 mb-3">Opsi 1: Tarik Otomatis (Auto)</h3>
-              <p className="text-xs text-slate-500 mb-4">Akan mengunduh data langsung dari tautan Google Sheet yang telah disetel. Pastikan koneksi lancar.</p>
-              <button 
-                onClick={handleMigrate}
-                disabled={loading}
-                className="w-full py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-black rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50"
-              >
-                {loading ? 'Sedang Memproses...' : 'Tarik Otomatis dari Sheet Utama'}
-              </button>
+    <div className="p-6 md:p-10 max-w-7xl mx-auto min-h-screen pb-32">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={() => onNavigate ? onNavigate('dashboard') : window.location.href = '/'}
+            className="p-3 bg-white border border-slate-200 rounded-2xl hover:bg-emerald-50 hover:text-emerald-700 transition-colors shadow-sm active:scale-95"
+            title="Kembali ke Dashboard"
+          >
+            <ChevronLeft size={22} />
+          </button>
+          <div>
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-emerald-100 text-emerald-800 rounded-xl">
+                <Database size={24} />
+              </div>
+              <h1 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight">
+                Migrasi Data Spreadsheet
+              </h1>
+            </div>
+            <p className="text-slate-500 font-medium text-sm mt-1">
+              Impor data penyewa dan otomatis rekonsiliasi dengan data yang sudah bayar dari file Excel (.xlsx).
+            </p>
           </div>
+        </div>
 
-          <div className="flex-1">
-              <h3 className="font-bold text-amber-900 mb-3">Opsi 2: Paste Manual Teks CSV</h3>
-              <p className="text-xs text-slate-500 mb-2">Jika otomatis gagal, Anda bisa mem-blok (copy) sel-sel data di Google Sheet mulai dari tahun 2025 ke bawah, lalu paste di kotak ini:</p>
-              <textarea 
-                  value={manualText}
-                  onChange={e => setManualText(e.target.value)}
-                  placeholder="Paste isi excel / google sheet disini..."
-                  className="w-full h-24 p-3 text-xs border border-amber-200 rounded-lg focus:ring-amber-500 mb-3 outline-none"
-              />
-              <button 
-                onClick={handleManualMigrate}
-                disabled={loading || manualText.trim().length === 0}
-                className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50"
-              >
-                Proses Teks Manual
-              </button>
-          </div>
+        {/* Status Stepper */}
+        <div className="hidden md:flex items-center gap-2 bg-white px-4 py-2 rounded-2xl border border-slate-200 shadow-sm text-xs font-bold">
+          <span className={`px-2.5 py-1 rounded-xl ${activeStep >= 1 ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-400'}`}>1. Upload</span>
+          <ArrowRight size={14} className="text-slate-300" />
+          <span className={`px-2.5 py-1 rounded-xl ${activeStep >= 2 ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-400'}`}>2. Pemetaan & Analisis</span>
+          <ArrowRight size={14} className="text-slate-300" />
+          <span className={`px-2.5 py-1 rounded-xl ${reconciledData.length > 0 ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-400'}`}>3. Migrasi</span>
+        </div>
       </div>
 
-      <div className="bg-slate-950 text-emerald-400 p-5 rounded-2xl h-64 overflow-auto font-mono text-xs mt-8 shadow-inner">
-        <div className="font-bold text-emerald-600 mb-2">--- LOG PROSES MIGRASI ---</div>
-        {log.map((l, i) => (
-            <div key={i} className="mb-1 border-b border-slate-800/50 pb-1">{l}</div>
-        ))}
-        {log.length === 0 && <span className="opacity-40 italic">Klik tombol di atas untuk memulai...</span>}
-      </div>
+      {/* STEP 1: UPLOAD EXCEL FILE */}
+      {activeStep === 1 && (
+        <div className="bg-white rounded-3xl p-8 md:p-12 border border-slate-200 shadow-xl shadow-slate-100 flex flex-col items-center text-center">
+          <div className="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-3xl flex items-center justify-center mb-6 shadow-inner">
+            <FileSpreadsheet size={44} />
+          </div>
+          <h2 className="text-2xl font-black text-slate-800 mb-2">Upload File Spreadsheet (.xlsx)</h2>
+          <p className="text-slate-500 max-w-lg mb-8 text-sm leading-relaxed">
+            Pilih file Excel yang memiliki <strong>Sheet Data Penyewa</strong> dan <strong>Sheet Data yang Sudah Bayar</strong>. Sistem akan membaca kedua sheet secara otomatis.
+          </p>
+
+          <label className="cursor-pointer group flex flex-col items-center justify-center w-full max-w-xl h-56 border-2 border-dashed border-emerald-300 hover:border-emerald-500 bg-emerald-50/40 hover:bg-emerald-50 rounded-3xl transition-all duration-200">
+            <Upload size={38} className="text-emerald-600 group-hover:scale-110 transition-transform mb-3" />
+            <span className="font-extrabold text-emerald-950 text-base mb-1">Klik di sini untuk memilih file Excel</span>
+            <span className="text-xs text-emerald-700/70 font-semibold">Mendukung format .xlsx atau .xls</span>
+            <input 
+              type="file" 
+              accept=".xlsx, .xls" 
+              onChange={handleFileUpload} 
+              className="hidden" 
+            />
+          </label>
+        </div>
+      )}
+
+      {/* STEP 2 & 3: MAPPING, RECONCILIATION & PREVIEW */}
+      {activeStep >= 2 && (
+        <div className="space-y-8">
+          {/* Panel Konfigurasi Sheet & Kolom */}
+          <div className="bg-white rounded-3xl p-6 md:p-8 border border-slate-200 shadow-sm">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-100 mb-6">
+              <div>
+                <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
+                  <Layers className="text-emerald-600" size={20} />
+                  Pemilihan Sheet & Pemetaan Kolom
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  File: <strong className="text-slate-700">{fileName}</strong> — Sesuaikan sheet dan kolom jika diperlukan.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <label className="cursor-pointer px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-colors flex items-center gap-2">
+                  <RefreshCw size={14} /> Ganti File Excel
+                  <input type="file" accept=".xlsx, .xls" onChange={handleFileUpload} className="hidden" />
+                </label>
+
+                <button 
+                  onClick={analyzeAndReconcile}
+                  className="px-6 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-black shadow-md shadow-emerald-700/20 flex items-center gap-2 transition-all active:scale-95"
+                >
+                  <Sparkles size={16} /> Analisis & Cocokkan Data
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Kolom Kiri: Sheet Penyewa */}
+              <div className="p-5 bg-emerald-50/50 rounded-2xl border border-emerald-100 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-extrabold text-sm text-emerald-950 flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 bg-emerald-600 rounded-full"></span>
+                    1. Sheet Data Penyewa (Reservasi)
+                  </h4>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Pilih Sheet Penyewa</label>
+                  <select 
+                    value={selectedPenyewaSheet}
+                    onChange={e => {
+                      setSelectedPenyewaSheet(e.target.value);
+                      loadSheetHeaders(workbook, e.target.value, selectedBayarSheet);
+                    }}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none"
+                  >
+                    {sheetNames.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-2">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Kolom ID Sewa *</label>
+                    <select 
+                      value={penyewaColMap.idSewa} 
+                      onChange={e => setPenyewaColMap(prev => ({ ...prev, idSewa: e.target.value }))}
+                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
+                    >
+                      <option value="">-- Pilih Kolom --</option>
+                      {penyewaHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Kolom Tanggal Sewa *</label>
+                    <select 
+                      value={penyewaColMap.tanggalSewa} 
+                      onChange={e => setPenyewaColMap(prev => ({ ...prev, tanggalSewa: e.target.value }))}
+                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
+                    >
+                      <option value="">-- Pilih Kolom --</option>
+                      {penyewaHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Kolom Lokasi Sewa *</label>
+                    <select 
+                      value={penyewaColMap.lokasiSewa} 
+                      onChange={e => setPenyewaColMap(prev => ({ ...prev, lokasiSewa: e.target.value }))}
+                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
+                    >
+                      <option value="">-- Pilih Kolom --</option>
+                      {penyewaHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Kolom Nama Penyewa *</label>
+                    <select 
+                      value={penyewaColMap.namaPenyewa} 
+                      onChange={e => setPenyewaColMap(prev => ({ ...prev, namaPenyewa: e.target.value }))}
+                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
+                    >
+                      <option value="">-- Pilih Kolom --</option>
+                      {penyewaHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Kolom No. HP</label>
+                    <select 
+                      value={penyewaColMap.noHp} 
+                      onChange={e => setPenyewaColMap(prev => ({ ...prev, noHp: e.target.value }))}
+                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
+                    >
+                      <option value="">-- Pilih Kolom --</option>
+                      {penyewaHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Kolom Keterangan</label>
+                    <select 
+                      value={penyewaColMap.keterangan} 
+                      onChange={e => setPenyewaColMap(prev => ({ ...prev, keterangan: e.target.value }))}
+                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
+                    >
+                      <option value="">-- Pilih Kolom --</option>
+                      {penyewaHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Kolom Kanan: Sheet Sudah Bayar */}
+              <div className="p-5 bg-teal-50/50 rounded-2xl border border-teal-100 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-extrabold text-sm text-teal-950 flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 bg-teal-600 rounded-full"></span>
+                    2. Sheet Data yang Sudah Bayar (Lunas)
+                  </h4>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Pilih Sheet Sudah Bayar</label>
+                  <select 
+                    value={selectedBayarSheet}
+                    onChange={e => {
+                      setSelectedBayarSheet(e.target.value);
+                      loadSheetHeaders(workbook, selectedPenyewaSheet, e.target.value);
+                    }}
+                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none"
+                  >
+                    <option value="">-- Tidak Ada (Anggap Semua Belum Bayar) --</option>
+                    {sheetNames.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 pt-2">
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">ID Sewa (Kunci Matching) *</label>
+                    <select 
+                      value={bayarColMap.idSewa} 
+                      onChange={e => setBayarColMap(prev => ({ ...prev, idSewa: e.target.value }))}
+                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
+                    >
+                      <option value="">-- Pilih Kolom --</option>
+                      {bayarHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Tanggal Transfer</label>
+                    <select 
+                      value={bayarColMap.tanggalBayar} 
+                      onChange={e => setBayarColMap(prev => ({ ...prev, tanggalBayar: e.target.value }))}
+                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
+                    >
+                      <option value="">-- Pilih Kolom --</option>
+                      {bayarHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Nominal Transfer</label>
+                    <select 
+                      value={bayarColMap.nominal} 
+                      onChange={e => setBayarColMap(prev => ({ ...prev, nominal: e.target.value }))}
+                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
+                    >
+                      <option value="">-- Pilih Kolom --</option>
+                      {bayarHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Nama Pengirim (Opsional)</label>
+                    <select 
+                      value={bayarColMap.namaPengirim} 
+                      onChange={e => setBayarColMap(prev => ({ ...prev, namaPengirim: e.target.value }))}
+                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
+                    >
+                      <option value="">-- Pilih Kolom --</option>
+                      {bayarHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* HASIL REKONSILIASI & PREVIEW DATA */}
+          {reconciledData.length > 0 && (
+            <div className="bg-white rounded-3xl p-6 md:p-8 border border-slate-200 shadow-xl shadow-slate-100/50 space-y-6">
+              {/* KPI Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="p-5 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-bold text-slate-500 uppercase">Total Data Penyewa</p>
+                    <p className="text-3xl font-black text-slate-800 mt-1">{stats.total}</p>
+                  </div>
+                  <div className="p-3 bg-slate-200/60 rounded-xl text-slate-700 font-bold">
+                    <Database size={24} />
+                  </div>
+                </div>
+
+                <div className="p-5 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-bold text-emerald-700 uppercase">Sudah Bayar (Lunas)</p>
+                    <p className="text-3xl font-black text-emerald-800 mt-1">{stats.paid}</p>
+                  </div>
+                  <div className="p-3 bg-emerald-200 text-emerald-800 rounded-xl font-bold">
+                    <CheckCircle2 size={24} />
+                  </div>
+                </div>
+
+                <div className="p-5 bg-rose-50 border border-rose-200 rounded-2xl flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-bold text-rose-700 uppercase">Belum Bayar</p>
+                    <p className="text-3xl font-black text-rose-800 mt-1">{stats.unpaid}</p>
+                  </div>
+                  <div className="p-3 bg-rose-200 text-rose-800 rounded-xl font-bold">
+                    <AlertCircle size={24} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Filter Tabs & Search Bar */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <button 
+                    onClick={() => setFilterTab('all')}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${filterTab === 'all' ? 'bg-slate-800 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                  >
+                    Semua ({stats.total})
+                  </button>
+                  <button 
+                    onClick={() => setFilterTab('paid')}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${filterTab === 'paid' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}
+                  >
+                    <CheckCircle2 size={14} /> Sudah Bayar ({stats.paid})
+                  </button>
+                  <button 
+                    onClick={() => setFilterTab('unpaid')}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${filterTab === 'unpaid' ? 'bg-rose-600 text-white shadow-sm' : 'bg-rose-50 text-rose-700 hover:bg-rose-100'}`}
+                  >
+                    <AlertCircle size={14} /> Belum Bayar ({stats.unpaid})
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-4 w-full sm:w-auto">
+                  <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={onlyYear2025} 
+                      onChange={e => setOnlyYear2025(e.target.checked)}
+                      className="rounded accent-emerald-600 w-4 h-4 cursor-pointer"
+                    />
+                    Hanya data mulai 2025 ke atas
+                  </label>
+
+                  <div className="relative flex-1 sm:w-64">
+                    <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input 
+                      type="text" 
+                      placeholder="Cari ID, nama, lokasi..."
+                      value={searchQuery}
+                      onChange={e => setSearchQuery(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs font-medium outline-none focus:border-emerald-600"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Table Preview */}
+              <div className="overflow-x-auto rounded-2xl border border-slate-200 max-h-[420px] overflow-y-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead className="bg-slate-100 text-slate-700 font-extrabold sticky top-0 z-10">
+                    <tr>
+                      <th className="py-3 px-4">Status Pembayaran</th>
+                      <th className="py-3 px-4">ID Sewa</th>
+                      <th className="py-3 px-4">Tanggal Sewa</th>
+                      <th className="py-3 px-4">Lokasi</th>
+                      <th className="py-3 px-4">Nama Penyewa</th>
+                      <th className="py-3 px-4">No. HP</th>
+                      <th className="py-3 px-4 text-right">Biaya / Transfer</th>
+                      <th className="py-3 px-4">Metode Match</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredPreview.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="py-8 text-center text-slate-400 font-medium">
+                          Tidak ada data yang sesuai filter.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredPreview.map((item, idx) => (
+                        <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                          <td className="py-2.5 px-4">
+                            {item.isPaid ? (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800">
+                                <CheckCircle2 size={12} /> SUDAH BAYAR
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-rose-100 text-rose-800">
+                                <AlertCircle size={12} /> BELUM BAYAR
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-4 font-mono font-bold text-slate-800">{item.id_sewa}</td>
+                          <td className="py-2.5 px-4 font-semibold text-slate-700">{item.tanggal_sewa}</td>
+                          <td className="py-2.5 px-4 font-bold text-slate-800">{item.lokasi_sewa}</td>
+                          <td className="py-2.5 px-4 font-bold text-slate-900">{item.nama_penyewa}</td>
+                          <td className="py-2.5 px-4 text-slate-600">{item.no_hp_penyewa}</td>
+                          <td className="py-2.5 px-4 text-right font-bold text-slate-800">
+                            Rp {new Intl.NumberFormat('id-ID').format(item.total_biaya)}
+                          </td>
+                          <td className="py-2.5 px-4 text-[11px] text-slate-500">
+                            {item.isPaid ? `Cocok via ${item.matchMethod}` : '-'}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Action Execution Section */}
+              <div className="pt-4 border-t border-slate-100 flex flex-col md:flex-row items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={skipExisting} 
+                      onChange={e => setSkipExisting(e.target.checked)}
+                      className="rounded accent-emerald-600 w-4 h-4"
+                    />
+                    Lewati jika data dengan tanggal, lokasi & nama sudah ada di database (Mencegah duplikat)
+                  </label>
+                  <p className="text-[11px] text-slate-400">
+                    Data akan dimasukkan ke koleksi <code className="bg-slate-100 px-1 py-0.5 rounded font-mono text-emerald-700">sewaList</code> Firebase dengan status pembayaran yang sesuai.
+                  </p>
+                </div>
+
+                <button 
+                  onClick={handleExecuteMigration}
+                  disabled={isProcessing || filteredPreview.length === 0}
+                  className="w-full md:w-auto px-8 py-4 bg-emerald-700 hover:bg-emerald-800 text-white font-black text-sm rounded-2xl shadow-xl shadow-emerald-700/25 flex items-center justify-center gap-3 transition-all active:scale-95 disabled:opacity-50"
+                >
+                  {isProcessing ? (
+                    <>
+                      <RefreshCw size={18} className="animate-spin" />
+                      Memproses Migrasi ({progress}%)...
+                    </>
+                  ) : (
+                    <>
+                      <Database size={18} />
+                      Migrasikan {filteredPreview.length} Data ke Sistem
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Progress bar */}
+              {isProcessing && (
+                <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
+                  <div 
+                    className="bg-emerald-600 h-3 transition-all duration-300"
+                    style={{ width: `${progress}%` }}
+                  ></div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* LOG CONSOLE */}
+          <div className="bg-slate-950 text-emerald-400 p-6 rounded-3xl h-64 overflow-auto font-mono text-xs shadow-inner border border-slate-800">
+            <div className="font-bold text-emerald-500 mb-2 flex items-center justify-between sticky top-0 bg-slate-950 py-1">
+              <span>--- LOG PROSES MIGRASI ---</span>
+              <span className="text-slate-500 text-[10px]">{log.length} baris log</span>
+            </div>
+            {log.length === 0 ? (
+              <span className="opacity-40 italic">Pilih file spreadsheet di atas untuk memulai...</span>
+            ) : (
+              log.map((l, i) => (
+                <div key={i} className="mb-1 border-b border-slate-900 pb-1 leading-relaxed">
+                  {l}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -38,7 +38,8 @@ import {
   Camera,
   Loader2,
   Pencil,
-  ShoppingCart
+  ShoppingCart,
+  Database
 } from 'lucide-react';
 import { db, storage, auth } from './firebase';
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, setDoc, getDoc } from 'firebase/firestore';
@@ -2201,7 +2202,7 @@ Terima kasih.`;
 
   if (isAuthChecking) return <div className="h-screen w-full flex items-center justify-center bg-[#F4F7F4] text-emerald-800 font-bold">Memeriksa Akses...</div>;
   
-  if (isMigrateRoute) return <MigrateData />;
+  if (isMigrateRoute) return <MigrateData onNavigate={() => { window.location.href = '/'; }} />;
 
   if (isPromoRoute) return <PublicPromoForm />;
   if (isSyncRoute) return <SyncPembayaran />;
@@ -2226,6 +2227,10 @@ Terima kasih.`;
 
   if (activeApp === 'kwitansi' && adminUser && !isPortalRoute) {
     return <CetakKwitansi onNavigate={(appId) => setActiveApp(appId)} />;
+  }
+
+  if (activeApp === 'migrate' && adminUser && !isPortalRoute) {
+    return <MigrateData onNavigate={(appId) => setActiveApp(appId || 'dashboard')} />;
   }
 
   return (
@@ -2469,6 +2474,7 @@ Terima kasih.`;
             { id: 'pembayaran', label: 'Keuangan / Pembayaran', icon: CreditCard },
             { id: 'dispensasi', label: 'Surat Dispensasi', icon: FileText },
             { id: 'kwitansi', label: 'Cetak Kwitansi', icon: Printer },
+            { id: 'migrate', label: 'Migrasi Data', icon: Database },
             { id: 'master', label: 'Master Data', icon: Settings },
             { id: 'portal', label: 'Portal Bukti', icon: Wallet }
           ].map(item => (
@@ -2531,6 +2537,7 @@ Terima kasih.`;
                 { id: 'pembayaran', label: 'Keuangan / Pembayaran', icon: CreditCard },
                 { id: 'dispensasi', label: 'Surat Dispensasi', icon: FileText },
                 { id: 'kwitansi', label: 'Cetak Kwitansi', icon: Printer },
+                { id: 'migrate', label: 'Migrasi Data', icon: Database },
                 { id: 'master', label: 'Master Data', icon: Settings },
                 { id: 'portal', label: 'Portal Bukti', icon: Wallet }
               ].map(item => (
@@ -3131,6 +3138,7 @@ Terima kasih.`;
 
             {activeTab === 'dispensasi' && <SuratDispensasi onNavigate={setActiveTab} />}
             {activeTab === 'kwitansi' && <CetakKwitansi onNavigate={setActiveTab} />}
+            {activeTab === 'migrate' && <MigrateData onNavigate={setActiveTab} />}
 
             {activeTab === 'master' && renderMasterData()}
 
