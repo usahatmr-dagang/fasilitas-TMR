@@ -2,10 +2,10 @@ import React, { useState, useMemo } from 'react';
 import { 
   Upload, FileSpreadsheet, CheckCircle2, AlertCircle, 
   ArrowRight, RefreshCw, Database, ChevronLeft, Search, Filter, 
-  Clock, Check, X, ShieldAlert, Sparkles, Layers, ArrowUpDown, ChevronDown
+  Clock, Check, X, ShieldAlert, Sparkles, Layers, ArrowUpDown, ChevronDown, RotateCcw
 } from 'lucide-react';
 import { db } from './firebase';
-import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, setDoc, writeBatch } from 'firebase/firestore';
 import ExcelJS from 'exceljs/dist/exceljs.min.js';
 
 export default function MigrateData({ onNavigate }) {
@@ -597,31 +597,34 @@ export default function MigrateData({ onNavigate }) {
 
     let updatedCount = 0;
     try {
-      for (let i = 0; i < readyItems.length; i++) {
-        const item = readyItems[i];
-        const targetRef = doc(db, 'sewaList', item.docId);
-        
-        const updatePayload = {
-          status_pembayaran: 'Sudah Transfer'
-        };
-        if (item.tanggal_bayar_excel) updatePayload.tanggal_transfer = item.tanggal_bayar_excel;
-        if (item.nominal_excel > 0) updatePayload.total_biaya = item.nominal_excel;
+      const BATCH_SIZE = 150;
+      for (let i = 0; i < readyItems.length; i += BATCH_SIZE) {
+        const chunk = readyItems.slice(i, i + BATCH_SIZE);
+        const batch = writeBatch(db);
 
-        await setDoc(targetRef, updatePayload, { merge: true });
+        chunk.forEach(item => {
+          const sewaRef = doc(db, 'sewaList', item.docId);
+          const updatePayload = {
+            status_pembayaran: 'Sudah Transfer'
+          };
+          if (item.tanggal_bayar_excel) updatePayload.tanggal_transfer = item.tanggal_bayar_excel;
+          if (item.nominal_excel > 0) updatePayload.total_biaya = item.nominal_excel;
+          batch.update(sewaRef, updatePayload);
 
-        // Update publicSewaList
-        await setDoc(doc(db, 'publicSewaList', item.docId), {
-          status_pembayaran: 'Sudah Transfer'
-        }, { merge: true });
+          const pubRef = doc(db, 'publicSewaList', item.docId);
+          const pubPayload = {
+            status_pembayaran: 'Sudah Transfer'
+          };
+          if (item.tanggal_bayar_excel) pubPayload.tanggal_transfer = item.tanggal_bayar_excel;
+          batch.update(pubRef, pubPayload);
+        });
 
-        updatedCount++;
-        const pct = Math.round(((i + 1) / readyItems.length) * 100);
+        await batch.commit();
+        updatedCount += chunk.length;
+        const pct = Math.round((updatedCount / readyItems.length) * 100);
         setProgress(pct);
-
-        if ((i + 1) % 50 === 0 || i === readyItems.length - 1) {
-          addLog(`Progres update: ${i + 1}/${readyItems.length} (${pct}%)`);
-          await new Promise(r => setTimeout(r, 10));
-        }
+        addLog(`Progres update: ${updatedCount}/${readyItems.length} (${pct}%)`);
+        await new Promise(r => setTimeout(r, 60));
       }
 
       addLog(`UPDATE PEMBAYARAN SELESAI! ${updatedCount} data berhasil diubah menjadi Sudah Transfer.`);
@@ -632,6 +635,80 @@ export default function MigrateData({ onNavigate }) {
       console.error(err);
       addLog(`ERROR: ${err.message}`);
       alert(`Terjadi kesalahan saat update pembayaran: ${err.message}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Reset all existing rentals in DB to 'Belum Transfer'
+  const handleResetAllToUnpaid = async () => {
+    const confirmation = window.prompt(
+      '⚠️ PERINGATAN RESET STATUS PEMBAYARAN:\\n\\n' +
+      'Tindakan ini akan mengubah SEMUA status pembayaran data sewa (kecuali yang Dibatalkan / Ditutup) menjadi "Belum Transfer" di database sistem.\\n\\n' +
+      'Gunakan ini jika ingin memulai ulang agar hanya data dari Excel pembayaran Anda yang berstatus Lunas / Sudah Transfer.\\n\\n' +
+      'Ketik "RESET" untuk mengonfirmasi:'
+    );
+
+    if (confirmation !== 'RESET') {
+      if (confirmation !== null) alert('Reset dibatalkan. Konfirmasi tidak sesuai.');
+      return;
+    }
+
+    setIsProcessing(true);
+    setProgress(0);
+    addLog('Memulai reset status pembayaran semua data sewa menjadi "Belum Transfer"...');
+
+    try {
+      const snap = await getDocs(collection(db, 'sewaList'));
+      const docsToReset = [];
+      snap.forEach(d => {
+        const data = d.data();
+        if (data.status_pembayaran !== 'Batal' && data.status_pembayaran !== 'Ditutup') {
+          if (data.status_pembayaran !== 'Belum Transfer') {
+            docsToReset.push({ id: d.id, id_sewa: data.id_sewa });
+          }
+        }
+      });
+
+      if (docsToReset.length === 0) {
+        addLog('Semua data sewa saat ini sudah berstatus "Belum Transfer". Tidak ada yang perlu direset.');
+        alert('Semua data sewa di database saat ini sudah berstatus "Belum Transfer".');
+        setIsProcessing(false);
+        return;
+      }
+
+      addLog(`Ditemukan ${docsToReset.length} data yang akan direset ke 'Belum Transfer'. Menulis ke database...`);
+      const BATCH_SIZE = 150;
+      for (let i = 0; i < docsToReset.length; i += BATCH_SIZE) {
+        const chunk = docsToReset.slice(i, i + BATCH_SIZE);
+        const batch = writeBatch(db);
+
+        chunk.forEach(item => {
+          batch.update(doc(db, 'sewaList', item.id), {
+            status_pembayaran: 'Belum Transfer',
+            tanggal_transfer: null,
+            bukti_transfer: null
+          });
+          batch.update(doc(db, 'publicSewaList', item.id), {
+            status_pembayaran: 'Belum Transfer',
+            tanggal_transfer: null
+          });
+        });
+
+        await batch.commit();
+        const currentProcessed = Math.min(i + BATCH_SIZE, docsToReset.length);
+        const pct = Math.round((currentProcessed / docsToReset.length) * 100);
+        setProgress(pct);
+        addLog(`Progress reset: ${currentProcessed}/${docsToReset.length} (${pct}%)`);
+        await new Promise(r => setTimeout(r, 60));
+      }
+
+      addLog(`RESET SELESAI! ${docsToReset.length} data kini berstatus 'Belum Transfer'.`);
+      alert(`Berhasil mereset ${docsToReset.length} data sewa menjadi "Belum Transfer"! Silakan lanjutkan pencocokan dengan Excel pembayaran.`);
+    } catch (err) {
+      console.error(err);
+      addLog(`ERROR: ${err.message}`);
+      alert(`Gagal mereset data: ${err.message}`);
     } finally {
       setIsProcessing(false);
     }
@@ -1200,6 +1277,37 @@ export default function MigrateData({ onNavigate }) {
                       <option value="">-- Pilih Kolom Nama (Opsional) --</option>
                       {bayarHeaders.map(h => <option key={h} value={h}>{h}</option>)}
                     </select>
+                  </div>
+                </div>
+
+                {/* Mode 2 Action Buttons & Information */}
+                <div className="pt-4 border-t border-teal-200/60 flex flex-col sm:flex-row items-center justify-between gap-3">
+                  <button
+                    type="button"
+                    onClick={handleResetAllToUnpaid}
+                    disabled={isProcessing}
+                    className="w-full sm:w-auto px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50"
+                    title="Reset semua status sewa di database menjadi Belum Transfer"
+                  >
+                    <RotateCcw size={14} />
+                    Reset Semua Status ke Belum Bayar
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={analyzePaymentOnlyAgainstDB}
+                    disabled={isProcessing || !bayarColMap.idSewa}
+                    className="w-full sm:w-auto px-6 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-black text-xs rounded-xl shadow-md shadow-emerald-700/20 flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-50"
+                  >
+                    <Sparkles size={16} />
+                    Cek & Cocokkan ID Sewa ke Database
+                  </button>
+                </div>
+
+                <div className="p-3 bg-emerald-50/80 rounded-xl border border-emerald-200 text-[11px] text-emerald-950 flex items-start gap-2.5">
+                  <CheckCircle2 size={16} className="text-emerald-700 flex-shrink-0 mt-0.5" />
+                  <div className="leading-relaxed">
+                    <strong>Kondisi Saat Ini:</strong> Semua data sewa di database telah diset ke status <strong>Belum Bayar</strong>. Ketika Anda mengupload file Excel pembayaran dan mengklik tombol <em>"Cek & Cocokkan ID Sewa ke Database"</em>, sistem akan memvalidasi ID Sewa dan mengubah hanya data yang cocok menjadi <strong>Sudah Transfer</strong>.
                   </div>
                 </div>
               </div>
