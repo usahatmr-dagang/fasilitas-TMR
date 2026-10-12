@@ -125,7 +125,7 @@ const formatMultiTanggal = (dates) => {
     return resultParts.join(', ');
 };
 
-export default function SuratDispensasi({ onNavigate }) {
+export default function SuratDispensasi({ onNavigate, initialSewaList = null }) {
   const [source, setSource] = useState('sewa'); // 'sewa' or 'promo'
   const [dataList, setDataList] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
@@ -152,8 +152,34 @@ export default function SuratDispensasi({ onNavigate }) {
   const [googleAccessToken, setGoogleAccessToken] = useState(null);
   const CLIENT_ID = '905355425334-tbtvuvufgvnom6vnlb5d0rka00ih03if.apps.googleusercontent.com';
 
-  // Fetch Data
+  // Fetch Data (Optimized with in-memory prop fallback to prevent redundant network queries)
   useEffect(() => {
+    if (source === 'sewa' && initialSewaList && initialSewaList.length > 0) {
+      const d = new Date();
+      const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+      let items = initialSewaList.map(item => ({
+        ...item,
+        normalizedDate: normalizeDateString(item.tanggal_sewa)
+      })).filter(item => !!item.normalizedDate);
+
+      items.sort((a, b) => (a.normalizedDate || '').localeCompare(b.normalizedDate || ''));
+      setDataList(items);
+
+      const upcomingItem = items.find(i => i.normalizedDate >= todayStr);
+      if (upcomingItem) {
+        setSelectedVisitDate(upcomingItem.normalizedDate);
+      } else if (items.length > 0) {
+        setSelectedVisitDate(items[0].normalizedDate);
+      } else {
+        setSelectedVisitDate(todayStr);
+      }
+
+      setSelectedItem(null);
+      setIsLoading(false);
+      return;
+    }
+
     const fetchData = async () => {
       setIsLoading(true);
       try {
@@ -202,7 +228,7 @@ export default function SuratDispensasi({ onNavigate }) {
     if (window.gapi) {
         window.gapi.load('client', () => {});
     }
-  }, [source]);
+  }, [source, initialSewaList]);
 
   const requestGoogleToken = () => {
       return new Promise((resolve, reject) => {

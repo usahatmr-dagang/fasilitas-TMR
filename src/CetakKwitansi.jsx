@@ -12,7 +12,7 @@ const getPromoDate = (item) => {
     return item.tanggalPromo || null;
 };
 
-export default function CetakKwitansi({ onNavigate }) {
+export default function CetakKwitansi({ onNavigate, initialSewaList = null }) {
   const [source, setSource] = useState('sewa'); // 'sewa' or 'promo'
   const [dataList, setDataList] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
@@ -25,8 +25,18 @@ export default function CetakKwitansi({ onNavigate }) {
   const [googleAccessToken, setGoogleAccessToken] = useState(null);
   const CLIENT_ID = '905355425334-tbtvuvufgvnom6vnlb5d0rka00ih03if.apps.googleusercontent.com';
 
-  // Fetch Data
+  // Fetch Data (Optimized with in-memory prop fallback to prevent redundant network queries)
   useEffect(() => {
+    if (source === 'sewa' && initialSewaList && initialSewaList.length > 0) {
+      let items = [...initialSewaList];
+      items.sort((a, b) => new Date(b.tanggal_sewa || 0) - new Date(a.tanggal_sewa || 0));
+      setDataList(items);
+      setFilteredData(items);
+      setSelectedItem(null);
+      setIsLoading(false);
+      return;
+    }
+
     const fetchData = async () => {
       setIsLoading(true);
       try {
@@ -55,7 +65,7 @@ export default function CetakKwitansi({ onNavigate }) {
     if (window.gapi) {
         window.gapi.load('client', () => {});
     }
-  }, [source]);
+  }, [source, initialSewaList]);
 
   const requestGoogleToken = () => {
       return new Promise((resolve, reject) => {

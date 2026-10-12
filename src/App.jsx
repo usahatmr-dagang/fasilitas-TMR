@@ -345,6 +345,14 @@ export default function App() {
   const [sidebarDateSearch, setSidebarDateSearch] = useState('');
   const [filterDatePembayaran, setFilterDatePembayaran] = useState('');
   
+  // Rendering optimization limits to prevent massive DOM freezes
+  const [sewaDisplayLimit, setSewaDisplayLimit] = useState(50);
+  const [pembayaranDisplayLimit, setPembayaranDisplayLimit] = useState(15);
+
+  useEffect(() => {
+    setSewaDisplayLimit(50);
+  }, [filterDateSewa, sewaSearchQuery, filterStatusSewa]);
+  
   const [pembayaranViewMode, setPembayaranViewMode] = useState('list');
   const [calendarMonth, setCalendarMonth] = useState(new Date()); 
   
@@ -2277,11 +2285,11 @@ Terima kasih.`;
   }
 
   if (activeApp === 'dispensasi' && adminUser && !isPortalRoute) {
-    return <SuratDispensasi onNavigate={(appId) => setActiveApp(appId)} />;
+    return <SuratDispensasi onNavigate={(appId) => setActiveApp(appId)} initialSewaList={sewaList} />;
   }
 
   if (activeApp === 'kwitansi' && adminUser && !isPortalRoute) {
-    return <CetakKwitansi onNavigate={(appId) => setActiveApp(appId)} />;
+    return <CetakKwitansi onNavigate={(appId) => setActiveApp(appId)} initialSewaList={sewaList} />;
   }
 
   return (
@@ -3003,9 +3011,9 @@ Terima kasih.`;
                          const todayStr = getTodayString();
                          let baseList = sewaList.filter(s => s.status_pembayaran !== 'Ditutup');
                          if (filterDateSewa) {
-                            baseList = baseList.filter(s => s.tanggal_sewa === filterDateSewa);
+                            baseList = baseList.filter(s => normalizeDateString(s.tanggal_sewa) === filterDateSewa);
                          } else {
-                            baseList = baseList.filter(s => s.tanggal_sewa >= todayStr);
+                            baseList = baseList.filter(s => normalizeDateString(s.tanggal_sewa) >= todayStr);
                          }
 
                          // Apply search filter if query exists
@@ -3167,7 +3175,7 @@ Terima kasih.`;
                                                           </tr>
                                                        </thead>
                                                        <tbody className="divide-y divide-slate-100 text-xs">
-                                                          {belumBayarFiltered.map((item, idx) => {
+                                                          {belumBayarFiltered.slice(0, filterDateSewa ? undefined : sewaDisplayLimit).map((item, idx) => {
                                                              const locInfo = masterLokasi.find(l => l.nama === item.lokasi_sewa);
                                                              const isLapangan = locInfo?.tipe === 'lapangan' || (item.lokasi_sewa && item.lokasi_sewa.includes('LAP'));
                                                              const Icon = isLapangan ? TreePine : Tent;
@@ -3311,7 +3319,7 @@ Terima kasih.`;
                                                           </tr>
                                                        </thead>
                                                        <tbody className="divide-y divide-slate-100 text-xs">
-                                                          {sudahBayarFiltered.map((item, idx) => {
+                                                          {sudahBayarFiltered.slice(0, filterDateSewa ? undefined : sewaDisplayLimit).map((item, idx) => {
                                                              const locInfo = masterLokasi.find(l => l.nama === item.lokasi_sewa);
                                                              const isLapangan = locInfo?.tipe === 'lapangan' || (item.lokasi_sewa && item.lokasi_sewa.includes('LAP'));
                                                              const Icon = isLapangan ? TreePine : Tent;
@@ -3432,6 +3440,18 @@ Terima kasih.`;
                                               )
                                            )
                                         )}
+
+                                         {!filterDateSewa && (belumBayarFiltered.length > sewaDisplayLimit || sudahBayarFiltered.length > sewaDisplayLimit) && (
+                                            <div className="text-center pt-3 pb-6">
+                                               <button 
+                                                  type="button"
+                                                  onClick={() => setSewaDisplayLimit(prev => prev + 50)} 
+                                                  className="px-6 py-3 bg-white hover:bg-emerald-50 text-emerald-900 border border-emerald-300 rounded-2xl font-bold text-xs shadow-sm transition-all active:scale-95 hover:border-emerald-400"
+                                               >
+                                                  Tampilkan 50 Data Berikutnya (Menampilkan maks. {sewaDisplayLimit} dari {Math.max(belumBayarFiltered.length, sudahBayarFiltered.length)} data)
+                                               </button>
+                                            </div>
+                                         )}
                                      </>
                                   )}
                                </div>
@@ -3474,7 +3494,7 @@ Terima kasih.`;
                     {groupedPembayaran.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-20 text-emerald-950/30 bg-white rounded-3xl border border-emerald-900/5 shadow-sm"><CreditCard size={48} className="mb-4 text-emerald-950/20" /><p className="font-extrabold text-sm text-emerald-950/50">Belum ada data transfer yang masuk.</p></div>
                     ) : (
-                        groupedPembayaran.map(group => {
+                        groupedPembayaran.slice(0, pembayaranDisplayLimit).map(group => {
                             const totalNominalGroup = group.data.reduce((sum, item) => sum + (item.total_biaya || 0), 0);
 
                             return (
@@ -3555,6 +3575,18 @@ Terima kasih.`;
                             </div>
                         )})
                     )}
+
+                    {groupedPembayaran.length > pembayaranDisplayLimit && (
+                        <div className="text-center py-6">
+                            <button 
+                                type="button"
+                                onClick={() => setPembayaranDisplayLimit(prev => prev + 15)} 
+                                className="px-6 py-3 bg-white hover:bg-emerald-50 text-emerald-900 border border-emerald-300 rounded-2xl font-bold text-xs shadow-sm transition-all active:scale-95 hover:border-emerald-400"
+                            >
+                                Tampilkan Lebih Banyak Tanggal ({Math.min(pembayaranDisplayLimit, groupedPembayaran.length)} dari {groupedPembayaran.length} Tanggal)
+                            </button>
+                        </div>
+                    )}
                     </>
                 )}
 
@@ -3610,8 +3642,8 @@ Terima kasih.`;
               </div>
             )}
 
-            {activeTab === 'dispensasi' && <SuratDispensasi onNavigate={setActiveTab} />}
-            {activeTab === 'kwitansi' && <CetakKwitansi onNavigate={setActiveTab} />}
+            {activeTab === 'dispensasi' && <SuratDispensasi onNavigate={setActiveTab} initialSewaList={sewaList} />}
+            {activeTab === 'kwitansi' && <CetakKwitansi onNavigate={setActiveTab} initialSewaList={sewaList} />}
 
             {activeTab === 'master' && renderMasterData()}
 
