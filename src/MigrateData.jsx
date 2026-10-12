@@ -9,6 +9,9 @@ import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
 import ExcelJS from 'exceljs/dist/exceljs.min.js';
 
 export default function MigrateData({ onNavigate }) {
+  // Mode Selection: 'full' (2 sheets) vs 'payment_only' (1 sheet rekap sudah bayar)
+  const [migrationMode, setMigrationMode] = useState('full');
+
   // Step 1: Upload, Step 2: Mapping & Preview, Step 3: Result
   const [activeStep, setActiveStep] = useState(1);
   const [fileName, setFileName] = useState('');
@@ -44,12 +47,16 @@ export default function MigrateData({ onNavigate }) {
     keterangan: ''
   });
 
-  // Reconciled Preview Data
+  // Mode 1: Reconciled Preview Data
   const [reconciledData, setReconciledData] = useState([]);
   const [filterTab, setFilterTab] = useState('all'); // 'all', 'paid', 'unpaid'
   const [searchQuery, setSearchQuery] = useState('');
   const [onlyYear2025, setOnlyYear2025] = useState(true);
   const [skipExisting, setSkipExisting] = useState(true);
+
+  // Mode 2: Payment Only Data
+  const [paymentOnlyData, setPaymentOnlyData] = useState([]);
+  const [filterPaymentTab, setFilterPaymentTab] = useState('all'); // 'all', 'ready', 'already_paid', 'not_found'
 
   // Execution states
   const [isProcessing, setIsProcessing] = useState(false);
@@ -90,7 +97,6 @@ export default function MigrateData({ onNavigate }) {
       return { ymd: `${y}-${m}-${d}`, year: y, month: val.getMonth() + 1, day: val.getDate() };
     }
     if (typeof val === 'number') {
-      // Excel serial date to JS Date
       const excelEpoch = new Date(Date.UTC(1899, 11, 30));
       const jsDate = new Date(excelEpoch.getTime() + val * 86400000);
       if (!isNaN(jsDate.getTime())) {
@@ -110,7 +116,6 @@ export default function MigrateData({ onNavigate }) {
       return { ymd: `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`, year: y, month: m, day: d };
     }
 
-    // Full JS Date string (e.g. "Sun Jun 01 2025 07:00:00 GMT+0700..." or ISO string)
     const parsedJs = new Date(str);
     if (!isNaN(parsedJs.getTime()) && (str.includes('GMT') || str.includes('T') || str.length > 18)) {
       const y = parsedJs.getFullYear();
@@ -194,17 +199,19 @@ export default function MigrateData({ onNavigate }) {
       setSheetNames(sheets);
       addLog(`File berhasil dibaca. Terdapat ${sheets.length} sheet: ${sheets.join(', ')}`);
 
-      // Auto detect Penyewa Sheet vs Bayar Sheet
+      // Auto detect sheets
       let autoPenyewa = sheets.find(s => /penyewa|sewa|booking|pesanan|reservasi/i.test(s)) || sheets[0] || '';
-      let autoBayar = sheets.find(s => /bayar|lunas|transfer|rekap|pembayaran/i.test(s) && s !== autoPenyewa);
-      if (!autoBayar && sheets.length > 1) {
-        autoBayar = sheets[1];
+      let autoBayar = sheets.find(s => /bayar|lunas|transfer|rekap|pembayaran/i.test(s)) || sheets[0] || '';
+
+      if (migrationMode === 'payment_only') {
+        setSelectedBayarSheet(autoBayar);
+        loadSheetHeaders(wb, '', autoBayar);
+      } else {
+        setSelectedPenyewaSheet(autoPenyewa);
+        setSelectedBayarSheet(autoBayar !== autoPenyewa ? autoBayar : (sheets[1] || ''));
+        loadSheetHeaders(wb, autoPenyewa, autoBayar !== autoPenyewa ? autoBayar : (sheets[1] || ''));
       }
 
-      setSelectedPenyewaSheet(autoPenyewa);
-      setSelectedBayarSheet(autoBayar || '');
-
-      loadSheetHeaders(wb, autoPenyewa, autoBayar);
       setActiveStep(2);
     } catch (err) {
       console.error(err);
@@ -223,7 +230,6 @@ export default function MigrateData({ onNavigate }) {
         pHeaders = row1.values.slice(1).map(v => getCellValue(v)).filter(v => v !== '');
         setPenyewaHeaders(pHeaders);
 
-        // Auto map penyewa columns
         setPenyewaColMap({
           idSewa: findBestHeaderMatch(pHeaders, ['id_sewa', 'id sewa', 'id', 'kode', 'no. sewa', 'no sewa']),
           tanggalSewa: findBestHeaderMatch(pHeaders, ['tanggal_sewa', 'tanggal sewa', 'tgl sewa', 'tgl', 'tanggal', 'kunjungan']),
@@ -245,30 +251,28 @@ export default function MigrateData({ onNavigate }) {
         bHeaders = row1.values.slice(1).map(v => getCellValue(v)).filter(v => v !== '');
         setBayarHeaders(bHeaders);
 
-        // Auto map bayar columns
         setBayarColMap({
-          idSewa: findBestHeaderMatch(bHeaders, ['id_sewa', 'id sewa', 'id', 'ref', 'no ref', 'kode', 'booking']),
+          idSewa: findBestHeaderMatch(bHeaders, ['id_sewa', 'id sewa', 'id', 'ref', 'no ref', 'kode', 'booking', 'nomor']),
           tanggalBayar: findBestHeaderMatch(bHeaders, ['tanggal', 'tgl', 'transfer', 'bayar', 'tgl transfer']),
-          nominal: findBestHeaderMatch(bHeaders, ['nominal', 'jumlah', 'total', 'biaya', 'rp', 'bayar']),
-          namaPengirim: findBestHeaderMatch(bHeaders, ['nama', 'pengirim', 'penyewa', 'atas nama']),
+          nominal: findBestHeaderMatch(bHeaders, ['nominal', 'jumlah', 'total', 'biaya', 'rp', 'bayar', 'uang']),
+          namaPengirim: findBestHeaderMatch(bHeaders, ['nama', 'pengirim', 'penyewa', 'atas nama', 'nama penyewa']),
           keterangan: findBestHeaderMatch(bHeaders, ['keterangan', 'ket', 'bank', 'channel'])
         });
       }
     }
   };
 
-  // Perform Analysis & Smart Matching
+  // Perform Analysis & Smart Matching for Mode 1 (Full 2 Sheets)
   const analyzeAndReconcile = () => {
     if (!workbook || !selectedPenyewaSheet) {
       alert('Pilih sheet data penyewa terlebih dahulu!');
       return;
     }
 
-    addLog('Memulai rekonsiliasi data...');
+    addLog('Memulai rekonsiliasi data 2 sheet...');
     const wsP = workbook.getWorksheet(selectedPenyewaSheet);
     const wsB = selectedBayarSheet ? workbook.getWorksheet(selectedBayarSheet) : null;
 
-    // 1. Build payment lookup table from Sheet Bayar
     const paidMapById = new Map();
     const paidMapByNameDate = new Map();
 
@@ -308,7 +312,7 @@ export default function MigrateData({ onNavigate }) {
       addLog(`Sheet Pembayaran berhasil dipetakan: ${paidMapById.size} data pembayaran teridentifikasi.`);
     }
 
-    // 2. Process Sheet Penyewa and Match
+    // Process Sheet Penyewa
     const pRow1 = wsP.getRow(1).values.slice(1).map(v => getCellValue(v));
     const pIdIdx = pRow1.indexOf(penyewaColMap.idSewa) + 1;
     const pTglIdx = pRow1.indexOf(penyewaColMap.tanggalSewa) + 1;
@@ -325,7 +329,7 @@ export default function MigrateData({ onNavigate }) {
     let countUnpaid = 0;
 
     wsP.eachRow((row, rowNumber) => {
-      if (rowNumber === 1) return; // skip header
+      if (rowNumber === 1) return;
 
       const rawId = pIdIdx > 0 ? getCellValue(row.getCell(pIdIdx)) : '';
       const rawTgl = pTglIdx > 0 ? getCellValue(row.getCell(pTglIdx)) : '';
@@ -337,7 +341,7 @@ export default function MigrateData({ onNavigate }) {
       const luasStr = pLuasIdx > 0 ? getCellValue(row.getCell(pLuasIdx)) : '';
       const biayaStr = pBiayaIdx > 0 ? getCellValue(row.getCell(pBiayaIdx)) : '';
 
-      if (!nama && !lokasi && !rawTgl) return; // skip completely empty rows
+      if (!nama && !lokasi && !rawTgl) return;
 
       const parsedTgl = parseIndoOrExcelDate(rawTgl);
       let formattedDate = '';
@@ -411,7 +415,6 @@ export default function MigrateData({ onNavigate }) {
         akses_upload_listrik: false,
         luas_lahan: luas,
         total_biaya: match?.nominal && match.nominal > 0 ? match.nominal : finalBiaya,
-        // UI helper flags
         isPaid,
         matchMethod,
         rowNumber
@@ -422,17 +425,113 @@ export default function MigrateData({ onNavigate }) {
     addLog(`Rekonsiliasi Selesai! Total ${list.length} data: ${countPaid} Sudah Bayar (Lunas), ${countUnpaid} Belum Bayar.`);
   };
 
-  // Filtered preview data
+  // Perform Analysis for Mode 2 (Payment Only against Database)
+  const analyzePaymentOnlyAgainstDB = async () => {
+    if (!workbook || !selectedBayarSheet) {
+      alert('Pilih sheet data pembayaran terlebih dahulu!');
+      return;
+    }
+    const wsB = workbook.getWorksheet(selectedBayarSheet);
+    if (!wsB) {
+      alert('Sheet pembayaran tidak ditemukan!');
+      return;
+    }
+
+    const bRow1 = wsB.getRow(1).values.slice(1).map(v => getCellValue(v));
+    const idIdx = bRow1.indexOf(bayarColMap.idSewa) + 1;
+    const tglIdx = bRow1.indexOf(bayarColMap.tanggalBayar) + 1;
+    const nomIdx = bRow1.indexOf(bayarColMap.nominal) + 1;
+    const namaIdx = bRow1.indexOf(bayarColMap.namaPengirim) + 1;
+
+    if (idIdx <= 0) {
+      alert('Mohon pilih kolom ID Sewa / No. Booking terlebih dahulu!');
+      return;
+    }
+
+    setIsProcessing(true);
+    addLog('Mengambil data sewaList dari database Firebase untuk pencocokan ID Sewa...');
+
+    try {
+      const snap = await getDocs(collection(db, 'sewaList'));
+      const dbMapById = new Map();
+      snap.docs.forEach(d => {
+        const data = d.data();
+        if (data.id_sewa) {
+          dbMapById.set(cleanKey(data.id_sewa), { docId: d.id, ...data });
+        }
+      });
+      addLog(`Terkoneksi ke database. Memeriksa kecocokan ID Sewa dengan ${snap.size} data di sistem...`);
+
+      const results = [];
+      wsB.eachRow((row, rowNumber) => {
+        if (rowNumber === 1) return;
+        const rawId = idIdx > 0 ? getCellValue(row.getCell(idIdx)) : '';
+        const rawTgl = tglIdx > 0 ? getCellValue(row.getCell(tglIdx)) : '';
+        const rawNom = nomIdx > 0 ? getCellValue(row.getCell(nomIdx)) : '';
+        const rawNama = namaIdx > 0 ? getCellValue(row.getCell(namaIdx)) : '';
+
+        if (!rawId && !rawNama && !rawNom) return;
+
+        const cleanId = cleanKey(rawId);
+        const parsedTgl = parseIndoOrExcelDate(rawTgl);
+        const nomNumeric = parseInt(String(rawNom).replace(/\D/g, ''), 10) || 0;
+
+        const dbMatch = cleanId ? dbMapById.get(cleanId) : null;
+
+        if (dbMatch) {
+          const isAlreadyPaid = ['Sudah Transfer', 'Lunas', 'Sudah Lunas'].includes(dbMatch.status_pembayaran);
+          results.push({
+            status: isAlreadyPaid ? 'already_paid' : 'ready_update',
+            id_sewa: rawId || dbMatch.id_sewa,
+            docId: dbMatch.docId,
+            nama_penyewa: dbMatch.nama_penyewa,
+            tanggal_sewa: dbMatch.tanggal_sewa,
+            lokasi_sewa: dbMatch.lokasi_sewa,
+            status_lama: dbMatch.status_pembayaran || 'Belum Transfer',
+            status_baru: 'Sudah Transfer',
+            nominal_excel: nomNumeric > 0 ? nomNumeric : (dbMatch.total_biaya || 0),
+            tanggal_bayar_excel: parsedTgl ? parsedTgl.ymd : (String(rawTgl) || ''),
+            nama_pengirim_excel: rawNama
+          });
+        } else {
+          results.push({
+            status: 'not_found',
+            id_sewa: rawId || '-',
+            docId: null,
+            nama_penyewa: rawNama || '-',
+            tanggal_sewa: parsedTgl ? parsedTgl.ymd : (String(rawTgl) || '-'),
+            lokasi_sewa: '-',
+            status_lama: 'Tidak Ada di DB',
+            status_baru: '-',
+            nominal_excel: nomNumeric,
+            tanggal_bayar_excel: parsedTgl ? parsedTgl.ymd : (String(rawTgl) || ''),
+            nama_pengirim_excel: rawNama
+          });
+        }
+      });
+
+      setPaymentOnlyData(results);
+      const readyCount = results.filter(r => r.status === 'ready_update').length;
+      const alreadyCount = results.filter(r => r.status === 'already_paid').length;
+      const notFoundCount = results.filter(r => r.status === 'not_found').length;
+
+      addLog(`Pencocokan selesai: Total ${results.length} data. Siap diupdate: ${readyCount}, Sudah lunas: ${alreadyCount}, Tidak ditemukan: ${notFoundCount}`);
+    } catch (err) {
+      console.error(err);
+      addLog(`ERROR: ${err.message}`);
+      alert(`Gagal mencocokkan data: ${err.message}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Filtered preview data for Mode 1
   const filteredPreview = useMemo(() => {
     return reconciledData.filter(item => {
-      // Filter year
       if (onlyYear2025 && item.year < 2025) return false;
-
-      // Filter tab
       if (filterTab === 'paid' && !item.isPaid) return false;
       if (filterTab === 'unpaid' && item.isPaid) return false;
 
-      // Search query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const mNama = (item.nama_penyewa || '').toLowerCase().includes(q);
@@ -440,7 +539,6 @@ export default function MigrateData({ onNavigate }) {
         const mLok = (item.lokasi_sewa || '').toLowerCase().includes(q);
         if (!mNama && !mId && !mLok) return false;
       }
-
       return true;
     });
   }, [reconciledData, filterTab, searchQuery, onlyYear2025]);
@@ -456,8 +554,90 @@ export default function MigrateData({ onNavigate }) {
     };
   }, [reconciledData, onlyYear2025]);
 
-  // Execute Migration to Firestore
-  // Fix existing dates in database that might have GMT string format
+  // Filtered preview data for Mode 2
+  const filteredPaymentPreview = useMemo(() => {
+    return paymentOnlyData.filter(item => {
+      if (filterPaymentTab === 'ready' && item.status !== 'ready_update') return false;
+      if (filterPaymentTab === 'already_paid' && item.status !== 'already_paid') return false;
+      if (filterPaymentTab === 'not_found' && item.status !== 'not_found') return false;
+
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const mNama = (item.nama_penyewa || '').toLowerCase().includes(q);
+        const mId = (item.id_sewa || '').toLowerCase().includes(q);
+        const mLok = (item.lokasi_sewa || '').toLowerCase().includes(q);
+        if (!mNama && !mId && !mLok) return false;
+      }
+      return true;
+    });
+  }, [paymentOnlyData, filterPaymentTab, searchQuery]);
+
+  const paymentStats = useMemo(() => {
+    return {
+      total: paymentOnlyData.length,
+      ready: paymentOnlyData.filter(r => r.status === 'ready_update').length,
+      alreadyPaid: paymentOnlyData.filter(r => r.status === 'already_paid').length,
+      notFound: paymentOnlyData.filter(r => r.status === 'not_found').length
+    };
+  }, [paymentOnlyData]);
+
+  // Execution: Update Payment Only to Firestore
+  const handleExecutePaymentUpdate = async () => {
+    const readyItems = paymentOnlyData.filter(r => r.status === 'ready_update');
+    if (readyItems.length === 0) {
+      alert('Tidak ada data yang perlu diupdate (semua sudah berstatus bayar atau tidak ditemukan di database).');
+      return;
+    }
+
+    if (!window.confirm(`Konfirmasi Update Pembayaran:\nSebanyak ${readyItems.length} data penyewa di database akan diubah statusnya menjadi "Sudah Transfer". Lanjutkan?`)) return;
+
+    setIsProcessing(true);
+    setProgress(0);
+    addLog(`Memulai pembaruan ${readyItems.length} data pembayaran di database...`);
+
+    let updatedCount = 0;
+    try {
+      for (let i = 0; i < readyItems.length; i++) {
+        const item = readyItems[i];
+        const targetRef = doc(db, 'sewaList', item.docId);
+        
+        const updatePayload = {
+          status_pembayaran: 'Sudah Transfer'
+        };
+        if (item.tanggal_bayar_excel) updatePayload.tanggal_transfer = item.tanggal_bayar_excel;
+        if (item.nominal_excel > 0) updatePayload.total_biaya = item.nominal_excel;
+
+        await setDoc(targetRef, updatePayload, { merge: true });
+
+        // Update publicSewaList
+        await setDoc(doc(db, 'publicSewaList', item.docId), {
+          status_pembayaran: 'Sudah Transfer'
+        }, { merge: true });
+
+        updatedCount++;
+        const pct = Math.round(((i + 1) / readyItems.length) * 100);
+        setProgress(pct);
+
+        if ((i + 1) % 50 === 0 || i === readyItems.length - 1) {
+          addLog(`Progres update: ${i + 1}/${readyItems.length} (${pct}%)`);
+          await new Promise(r => setTimeout(r, 10));
+        }
+      }
+
+      addLog(`UPDATE PEMBAYARAN SELESAI! ${updatedCount} data berhasil diubah menjadi Sudah Transfer.`);
+      alert(`Berhasil memperbarui ${updatedCount} data penyewa menjadi Sudah Transfer!`);
+      
+      setPaymentOnlyData(prev => prev.map(r => r.status === 'ready_update' ? { ...r, status: 'already_paid', status_lama: 'Sudah Transfer' } : r));
+    } catch (err) {
+      console.error(err);
+      addLog(`ERROR: ${err.message}`);
+      alert(`Terjadi kesalahan saat update pembayaran: ${err.message}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Fix existing dates in database
   const handleFixExistingDatesInDB = async () => {
     if (!window.confirm("Fitur ini akan merapikan format tanggal (GMT/Panjang) pada data sewaList yang sudah ada di database menjadi format standar YYYY-MM-DD. Lanjutkan?")) return;
     setIsProcessing(true);
@@ -486,7 +666,7 @@ export default function MigrateData({ onNavigate }) {
     }
   };
 
-  // Execute Migration to Firestore
+  // Execution: Full Migration (Mode 1)
   const handleExecuteMigration = async () => {
     const dataToMigrate = onlyYear2025 ? reconciledData.filter(d => d.year >= 2025) : reconciledData;
     if (dataToMigrate.length === 0) {
@@ -506,7 +686,6 @@ export default function MigrateData({ onNavigate }) {
     let countSkipped = 0;
 
     try {
-      // 1. Ambil data yang sudah ada di database SEKALI SAJA di awal
       addLog(`Mengambil snapshot data sewaList dari Firebase untuk verifikasi duplikat...`);
       const existingSnap = await getDocs(collection(db, 'sewaList'));
       const existingById = new Map();
@@ -524,7 +703,6 @@ export default function MigrateData({ onNavigate }) {
       });
       addLog(`Database terhubung: Ditemukan ${existingSnap.size} data di database. Melanjutkan migrasi...`);
 
-      // 2. Loop dan simpan data dengan setDoc
       for (let i = 0; i < dataToMigrate.length; i++) {
         const item = dataToMigrate[i];
 
@@ -617,7 +795,7 @@ export default function MigrateData({ onNavigate }) {
   return (
     <div className="p-6 md:p-10 max-w-7xl mx-auto min-h-screen pb-32">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
           <button 
             onClick={() => onNavigate ? onNavigate('dashboard') : window.location.href = '/'}
@@ -632,11 +810,11 @@ export default function MigrateData({ onNavigate }) {
                 <Database size={24} />
               </div>
               <h1 className="text-2xl md:text-3xl font-black text-slate-800 tracking-tight">
-                Migrasi Data Spreadsheet
+                Migrasi & Sinkronisasi Data Spreadsheet
               </h1>
             </div>
             <p className="text-slate-500 font-medium text-sm mt-1">
-              Impor data penyewa dan otomatis rekonsiliasi dengan data yang sudah bayar dari file Excel (.xlsx).
+              Impor data penyewa baru atau perbarui status pembayaran dari file Excel (.xlsx).
             </p>
           </div>
         </div>
@@ -647,8 +825,46 @@ export default function MigrateData({ onNavigate }) {
           <ArrowRight size={14} className="text-slate-300" />
           <span className={`px-2.5 py-1 rounded-xl ${activeStep >= 2 ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-400'}`}>2. Pemetaan & Analisis</span>
           <ArrowRight size={14} className="text-slate-300" />
-          <span className={`px-2.5 py-1 rounded-xl ${reconciledData.length > 0 ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-400'}`}>3. Migrasi</span>
+          <span className={`px-2.5 py-1 rounded-xl ${(reconciledData.length > 0 || paymentOnlyData.length > 0) ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-400'}`}>3. Selesai</span>
         </div>
+      </div>
+
+      {/* Mode Selector Tabs */}
+      <div className="flex bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm mb-6 max-w-2xl">
+        <button
+          type="button"
+          onClick={() => {
+            setMigrationMode('full');
+            if (workbook) loadSheetHeaders(workbook, selectedPenyewaSheet, selectedBayarSheet);
+          }}
+          className={`flex-1 py-3 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+            migrationMode === 'full' 
+              ? 'bg-emerald-800 text-white shadow-md' 
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+          }`}
+        >
+          <Layers size={16} />
+          Mode 1: Migrasi Lengkap (2 Sheet: Penyewa & Bayar)
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setMigrationMode('payment_only');
+            if (workbook) {
+              const bSheet = selectedBayarSheet || sheetNames[0] || '';
+              setSelectedBayarSheet(bSheet);
+              loadSheetHeaders(workbook, '', bSheet);
+            }
+          }}
+          className={`flex-1 py-3 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+            migrationMode === 'payment_only' 
+              ? 'bg-emerald-800 text-white shadow-md' 
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+          }`}
+        >
+          <CheckCircle2 size={16} />
+          Mode 2: Update Sudah Bayar Saja (1 Sheet: Cek ID Sewa)
+        </button>
       </div>
 
       {/* STEP 1: UPLOAD EXCEL FILE */}
@@ -657,9 +873,15 @@ export default function MigrateData({ onNavigate }) {
           <div className="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-3xl flex items-center justify-center mb-6 shadow-inner">
             <FileSpreadsheet size={44} />
           </div>
-          <h2 className="text-2xl font-black text-slate-800 mb-2">Upload File Spreadsheet (.xlsx)</h2>
+          <h2 className="text-2xl font-black text-slate-800 mb-2">
+            {migrationMode === 'full' 
+              ? 'Upload File Spreadsheet (2 Sheet)' 
+              : 'Upload File Rekap yang Sudah Bayar (1 Sheet)'}
+          </h2>
           <p className="text-slate-500 max-w-lg mb-8 text-sm leading-relaxed">
-            Pilih file Excel yang memiliki <strong>Sheet Data Penyewa</strong> dan <strong>Sheet Data yang Sudah Bayar</strong>. Sistem akan membaca kedua sheet secara otomatis.
+            {migrationMode === 'full' 
+              ? 'Pilih file Excel yang memiliki Sheet Data Penyewa dan Sheet Data yang Sudah Bayar. Sistem akan membaca kedua sheet dan melakukan rekonsiliasi otomatis.' 
+              : 'Pilih file Excel yang berisi daftar pembayaran / orang yang sudah bayar. Sistem akan membaca ID Sewa dan langsung mencocokkannya ke database untuk mengubah statusnya menjadi Sudah Transfer.'}
           </p>
 
           <label className="cursor-pointer group flex flex-col items-center justify-center w-full max-w-xl h-56 border-2 border-dashed border-emerald-300 hover:border-emerald-500 bg-emerald-50/40 hover:bg-emerald-50 rounded-3xl transition-all duration-200">
@@ -676,7 +898,7 @@ export default function MigrateData({ onNavigate }) {
         </div>
       )}
 
-      {/* STEP 2 & 3: MAPPING, RECONCILIATION & PREVIEW */}
+      {/* STEP 2 & 3: CONFIGURATION & PREVIEW */}
       {activeStep >= 2 && (
         <div className="space-y-8">
           {/* Panel Konfigurasi Sheet & Kolom */}
@@ -685,10 +907,12 @@ export default function MigrateData({ onNavigate }) {
               <div>
                 <h3 className="text-lg font-black text-slate-800 flex items-center gap-2">
                   <Layers className="text-emerald-600" size={20} />
-                  Pemilihan Sheet & Pemetaan Kolom
+                  {migrationMode === 'full' 
+                    ? 'Pemilihan Sheet & Pemetaan Kolom (2 Sheet)' 
+                    : 'Pemetaan Kolom Data yang Sudah Bayar (1 Sheet)'}
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  File: <strong className="text-slate-700">{fileName}</strong> — Sesuaikan sheet dan kolom jika diperlukan.
+                  File: <strong className="text-slate-700">{fileName}</strong> — Sesuaikan sheet dan kolom yang sesuai.
                 </p>
               </div>
 
@@ -698,193 +922,292 @@ export default function MigrateData({ onNavigate }) {
                   <input type="file" accept=".xlsx, .xls" onChange={handleFileUpload} className="hidden" />
                 </label>
 
-                <button 
-                  onClick={analyzeAndReconcile}
-                  className="px-6 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-black shadow-md shadow-emerald-700/20 flex items-center gap-2 transition-all active:scale-95"
-                >
-                  <Sparkles size={16} /> Analisis & Cocokkan Data
-                </button>
+                {migrationMode === 'full' ? (
+                  <button 
+                    onClick={analyzeAndReconcile}
+                    className="px-6 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-black shadow-md shadow-emerald-700/20 flex items-center gap-2 transition-all active:scale-95"
+                  >
+                    <Sparkles size={16} /> Analisis & Cocokkan Data
+                  </button>
+                ) : (
+                  <button 
+                    onClick={analyzePaymentOnlyAgainstDB}
+                    disabled={isProcessing}
+                    className="px-6 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-black shadow-md shadow-emerald-700/20 flex items-center gap-2 transition-all active:scale-95 disabled:opacity-50"
+                  >
+                    <Sparkles size={16} /> Cek & Cocokkan ID Sewa ke Database
+                  </button>
+                )}
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {/* Kolom Kiri: Sheet Penyewa */}
-              <div className="p-5 bg-emerald-50/50 rounded-2xl border border-emerald-100 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-extrabold text-sm text-emerald-950 flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 bg-emerald-600 rounded-full"></span>
-                    1. Sheet Data Penyewa (Reservasi)
-                  </h4>
+            {/* Form Mode 1 (Full 2 Sheets) */}
+            {migrationMode === 'full' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Kolom Kiri: Sheet Penyewa */}
+                <div className="p-5 bg-emerald-50/50 rounded-2xl border border-emerald-100 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-extrabold text-sm text-emerald-950 flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 bg-emerald-600 rounded-full"></span>
+                      1. Sheet Data Penyewa (Reservasi)
+                    </h4>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Pilih Sheet Penyewa</label>
+                    <select 
+                      value={selectedPenyewaSheet}
+                      onChange={e => {
+                        setSelectedPenyewaSheet(e.target.value);
+                        loadSheetHeaders(workbook, e.target.value, selectedBayarSheet);
+                      }}
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none"
+                    >
+                      {sheetNames.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 pt-2">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Kolom ID Sewa *</label>
+                      <select 
+                        value={penyewaColMap.idSewa} 
+                        onChange={e => setPenyewaColMap(prev => ({ ...prev, idSewa: e.target.value }))}
+                        className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
+                      >
+                        <option value="">-- Pilih Kolom --</option>
+                        {penyewaHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Kolom Tanggal Sewa *</label>
+                      <select 
+                        value={penyewaColMap.tanggalSewa} 
+                        onChange={e => setPenyewaColMap(prev => ({ ...prev, tanggalSewa: e.target.value }))}
+                        className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
+                      >
+                        <option value="">-- Pilih Kolom --</option>
+                        {penyewaHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Kolom Lokasi Sewa *</label>
+                      <select 
+                        value={penyewaColMap.lokasiSewa} 
+                        onChange={e => setPenyewaColMap(prev => ({ ...prev, lokasiSewa: e.target.value }))}
+                        className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
+                      >
+                        <option value="">-- Pilih Kolom --</option>
+                        {penyewaHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Kolom Nama Penyewa *</label>
+                      <select 
+                        value={penyewaColMap.namaPenyewa} 
+                        onChange={e => setPenyewaColMap(prev => ({ ...prev, namaPenyewa: e.target.value }))}
+                        className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
+                      >
+                        <option value="">-- Pilih Kolom --</option>
+                        {penyewaHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Kolom No. HP</label>
+                      <select 
+                        value={penyewaColMap.noHp} 
+                        onChange={e => setPenyewaColMap(prev => ({ ...prev, noHp: e.target.value }))}
+                        className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
+                      >
+                        <option value="">-- Pilih Kolom --</option>
+                        {penyewaHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Kolom Keterangan</label>
+                      <select 
+                        value={penyewaColMap.keterangan} 
+                        onChange={e => setPenyewaColMap(prev => ({ ...prev, keterangan: e.target.value }))}
+                        className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
+                      >
+                        <option value="">-- Pilih Kolom --</option>
+                        {penyewaHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                      </select>
+                    </div>
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Pilih Sheet Penyewa</label>
-                  <select 
-                    value={selectedPenyewaSheet}
-                    onChange={e => {
-                      setSelectedPenyewaSheet(e.target.value);
-                      loadSheetHeaders(workbook, e.target.value, selectedBayarSheet);
-                    }}
-                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none"
-                  >
-                    {sheetNames.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 pt-2">
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Kolom ID Sewa *</label>
-                    <select 
-                      value={penyewaColMap.idSewa} 
-                      onChange={e => setPenyewaColMap(prev => ({ ...prev, idSewa: e.target.value }))}
-                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
-                    >
-                      <option value="">-- Pilih Kolom --</option>
-                      {penyewaHeaders.map(h => <option key={h} value={h}>{h}</option>)}
-                    </select>
+                {/* Kolom Kanan: Sheet Sudah Bayar */}
+                <div className="p-5 bg-teal-50/50 rounded-2xl border border-teal-100 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-extrabold text-sm text-teal-950 flex items-center gap-2">
+                      <span className="w-2.5 h-2.5 bg-teal-600 rounded-full"></span>
+                      2. Sheet Data yang Sudah Bayar (Lunas)
+                    </h4>
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Kolom Tanggal Sewa *</label>
+                    <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Pilih Sheet Sudah Bayar</label>
                     <select 
-                      value={penyewaColMap.tanggalSewa} 
-                      onChange={e => setPenyewaColMap(prev => ({ ...prev, tanggalSewa: e.target.value }))}
-                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
+                      value={selectedBayarSheet}
+                      onChange={e => {
+                        setSelectedBayarSheet(e.target.value);
+                        loadSheetHeaders(workbook, selectedPenyewaSheet, e.target.value);
+                      }}
+                      className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none"
                     >
-                      <option value="">-- Pilih Kolom --</option>
-                      {penyewaHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                      <option value="">-- Tidak Ada (Anggap Semua Belum Bayar) --</option>
+                      {sheetNames.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                   </div>
 
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Kolom Lokasi Sewa *</label>
-                    <select 
-                      value={penyewaColMap.lokasiSewa} 
-                      onChange={e => setPenyewaColMap(prev => ({ ...prev, lokasiSewa: e.target.value }))}
-                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
-                    >
-                      <option value="">-- Pilih Kolom --</option>
-                      {penyewaHeaders.map(h => <option key={h} value={h}>{h}</option>)}
-                    </select>
-                  </div>
+                  <div className="grid grid-cols-2 gap-3 pt-2">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">ID Sewa (Kunci Matching) *</label>
+                      <select 
+                        value={bayarColMap.idSewa} 
+                        onChange={e => setBayarColMap(prev => ({ ...prev, idSewa: e.target.value }))}
+                        className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
+                      >
+                        <option value="">-- Pilih Kolom --</option>
+                        {bayarHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                      </select>
+                    </div>
 
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Kolom Nama Penyewa *</label>
-                    <select 
-                      value={penyewaColMap.namaPenyewa} 
-                      onChange={e => setPenyewaColMap(prev => ({ ...prev, namaPenyewa: e.target.value }))}
-                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
-                    >
-                      <option value="">-- Pilih Kolom --</option>
-                      {penyewaHeaders.map(h => <option key={h} value={h}>{h}</option>)}
-                    </select>
-                  </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Tanggal Transfer</label>
+                      <select 
+                        value={bayarColMap.tanggalBayar} 
+                        onChange={e => setBayarColMap(prev => ({ ...prev, tanggalBayar: e.target.value }))}
+                        className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
+                      >
+                        <option value="">-- Pilih Kolom --</option>
+                        {bayarHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                      </select>
+                    </div>
 
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Kolom No. HP</label>
-                    <select 
-                      value={penyewaColMap.noHp} 
-                      onChange={e => setPenyewaColMap(prev => ({ ...prev, noHp: e.target.value }))}
-                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
-                    >
-                      <option value="">-- Pilih Kolom --</option>
-                      {penyewaHeaders.map(h => <option key={h} value={h}>{h}</option>)}
-                    </select>
-                  </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Nominal Transfer</label>
+                      <select 
+                        value={bayarColMap.nominal} 
+                        onChange={e => setBayarColMap(prev => ({ ...prev, nominal: e.target.value }))}
+                        className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
+                      >
+                        <option value="">-- Pilih Kolom --</option>
+                        {bayarHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                      </select>
+                    </div>
 
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Kolom Keterangan</label>
-                    <select 
-                      value={penyewaColMap.keterangan} 
-                      onChange={e => setPenyewaColMap(prev => ({ ...prev, keterangan: e.target.value }))}
-                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
-                    >
-                      <option value="">-- Pilih Kolom --</option>
-                      {penyewaHeaders.map(h => <option key={h} value={h}>{h}</option>)}
-                    </select>
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Nama Pengirim (Opsional)</label>
+                      <select 
+                        value={bayarColMap.namaPengirim} 
+                        onChange={e => setBayarColMap(prev => ({ ...prev, namaPengirim: e.target.value }))}
+                        className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
+                      >
+                        <option value="">-- Pilih Kolom --</option>
+                        {bayarHeaders.map(h => <option key={h} value={h}>{h}</option>)}
+                      </select>
+                    </div>
                   </div>
                 </div>
               </div>
+            )}
 
-              {/* Kolom Kanan: Sheet Sudah Bayar */}
-              <div className="p-5 bg-teal-50/50 rounded-2xl border border-teal-100 space-y-4">
-                <div className="flex items-center justify-between">
+            {/* Form Mode 2 (Payment Only 1 Sheet) */}
+            {migrationMode === 'payment_only' && (
+              <div className="p-6 bg-teal-50/40 rounded-2xl border border-teal-100 max-w-2xl mx-auto space-y-4">
+                <div className="flex items-center justify-between pb-2 border-b border-teal-200/50">
                   <h4 className="font-extrabold text-sm text-teal-950 flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 bg-teal-600 rounded-full"></span>
-                    2. Sheet Data yang Sudah Bayar (Lunas)
+                    <CheckCircle2 size={18} className="text-emerald-700" />
+                    Pilih Sheet dan Kolom Pembayaran
                   </h4>
+                  <span className="text-xs bg-emerald-100 text-emerald-800 font-bold px-2.5 py-0.5 rounded-full">Mode Update DB</span>
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-500 uppercase mb-1">Pilih Sheet Sudah Bayar</label>
+                  <label className="block text-xs font-bold text-slate-600 uppercase mb-1.5">1. Pilih Sheet Data yang Sudah Bayar</label>
                   <select 
                     value={selectedBayarSheet}
                     onChange={e => {
                       setSelectedBayarSheet(e.target.value);
-                      loadSheetHeaders(workbook, selectedPenyewaSheet, e.target.value);
+                      loadSheetHeaders(workbook, '', e.target.value);
                     }}
-                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 outline-none"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs font-bold text-slate-800 outline-none focus:border-emerald-600"
                   >
-                    <option value="">-- Tidak Ada (Anggap Semua Belum Bayar) --</option>
                     {sheetNames.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 pt-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">ID Sewa (Kunci Matching) *</label>
+                    <label className="block text-[11px] font-extrabold text-slate-600 uppercase mb-1">
+                      2. Kolom ID Sewa / No. Booking *
+                    </label>
                     <select 
                       value={bayarColMap.idSewa} 
                       onChange={e => setBayarColMap(prev => ({ ...prev, idSewa: e.target.value }))}
-                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
+                      className="w-full bg-white border border-emerald-400 rounded-xl p-2.5 text-xs font-bold text-slate-800"
                     >
-                      <option value="">-- Pilih Kolom --</option>
+                      <option value="">-- Pilih Kolom ID Sewa --</option>
                       {bayarHeaders.map(h => <option key={h} value={h}>{h}</option>)}
                     </select>
+                    <p className="text-[10px] text-slate-500 mt-1">Kunci untuk mencari data di database.</p>
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Tanggal Transfer</label>
+                    <label className="block text-[11px] font-extrabold text-slate-600 uppercase mb-1">
+                      3. Kolom Tanggal Transfer
+                    </label>
                     <select 
                       value={bayarColMap.tanggalBayar} 
                       onChange={e => setBayarColMap(prev => ({ ...prev, tanggalBayar: e.target.value }))}
-                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
+                      className="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs font-semibold text-slate-800"
                     >
-                      <option value="">-- Pilih Kolom --</option>
+                      <option value="">-- Pilih Kolom Tanggal (Opsional) --</option>
                       {bayarHeaders.map(h => <option key={h} value={h}>{h}</option>)}
                     </select>
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Nominal Transfer</label>
+                    <label className="block text-[11px] font-extrabold text-slate-600 uppercase mb-1">
+                      4. Kolom Nominal / Jumlah Transfer
+                    </label>
                     <select 
                       value={bayarColMap.nominal} 
                       onChange={e => setBayarColMap(prev => ({ ...prev, nominal: e.target.value }))}
-                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
+                      className="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs font-semibold text-slate-800"
                     >
-                      <option value="">-- Pilih Kolom --</option>
+                      <option value="">-- Pilih Kolom Nominal (Opsional) --</option>
                       {bayarHeaders.map(h => <option key={h} value={h}>{h}</option>)}
                     </select>
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Nama Pengirim (Opsional)</label>
+                    <label className="block text-[11px] font-extrabold text-slate-600 uppercase mb-1">
+                      5. Kolom Nama Pengirim / Rekening
+                    </label>
                     <select 
                       value={bayarColMap.namaPengirim} 
                       onChange={e => setBayarColMap(prev => ({ ...prev, namaPengirim: e.target.value }))}
-                      className="w-full bg-white border border-slate-200 rounded-lg p-2 text-xs font-semibold"
+                      className="w-full bg-white border border-slate-300 rounded-xl p-2.5 text-xs font-semibold text-slate-800"
                     >
-                      <option value="">-- Pilih Kolom --</option>
+                      <option value="">-- Pilih Kolom Nama (Opsional) --</option>
                       {bayarHeaders.map(h => <option key={h} value={h}>{h}</option>)}
                     </select>
                   </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
 
-          {/* HASIL REKONSILIASI & PREVIEW DATA */}
-          {reconciledData.length > 0 && (
+          {/* MODE 1 PREVIEW: HASIL REKONSILIASI 2 SHEET */}
+          {migrationMode === 'full' && reconciledData.length > 0 && (
             <div className="bg-white rounded-3xl p-6 md:p-8 border border-slate-200 shadow-xl shadow-slate-100/50 space-y-6">
               {/* KPI Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -1070,7 +1393,208 @@ export default function MigrateData({ onNavigate }) {
                 </div>
               </div>
 
-              {/* Progress bar */}
+              {isProcessing && (
+                <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
+                  <div 
+                    className="bg-emerald-600 h-3 transition-all duration-300"
+                    style={{ width: `${progress}%` }}
+                  ></div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* MODE 2 PREVIEW: HASIL PENCOCOKAN ID SEWA KE DATABASE */}
+          {migrationMode === 'payment_only' && paymentOnlyData.length > 0 && (
+            <div className="bg-white rounded-3xl p-6 md:p-8 border border-slate-200 shadow-xl shadow-slate-100/50 space-y-6">
+              {/* KPI Cards Mode 2 */}
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                <div className="p-5 bg-slate-50 border border-slate-200 rounded-2xl flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-bold text-slate-500 uppercase">Total Data di Excel</p>
+                    <p className="text-3xl font-black text-slate-800 mt-1">{paymentStats.total}</p>
+                  </div>
+                  <div className="p-3 bg-slate-200/60 rounded-xl text-slate-700 font-bold">
+                    <FileSpreadsheet size={24} />
+                  </div>
+                </div>
+
+                <div className="p-5 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-bold text-emerald-700 uppercase">Siap Diupdate</p>
+                    <p className="text-3xl font-black text-emerald-800 mt-1">{paymentStats.ready}</p>
+                    <p className="text-[10px] text-emerald-600 font-semibold mt-0.5">Belum Bayar → Sudah Transfer</p>
+                  </div>
+                  <div className="p-3 bg-emerald-200 text-emerald-800 rounded-xl font-bold">
+                    <CheckCircle2 size={24} />
+                  </div>
+                </div>
+
+                <div className="p-5 bg-blue-50 border border-blue-200 rounded-2xl flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-bold text-blue-700 uppercase">Sudah Lunas</p>
+                    <p className="text-3xl font-black text-blue-800 mt-1">{paymentStats.alreadyPaid}</p>
+                    <p className="text-[10px] text-blue-600 font-semibold mt-0.5">Sudah Transfer sebelumnya</p>
+                  </div>
+                  <div className="p-3 bg-blue-200 text-blue-800 rounded-xl font-bold">
+                    <Check size={24} />
+                  </div>
+                </div>
+
+                <div className="p-5 bg-rose-50 border border-rose-200 rounded-2xl flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-bold text-rose-700 uppercase">Tidak Ditemukan di DB</p>
+                    <p className="text-3xl font-black text-rose-800 mt-1">{paymentStats.notFound}</p>
+                    <p className="text-[10px] text-rose-600 font-semibold mt-0.5">ID Sewa tidak terdaftar</p>
+                  </div>
+                  <div className="p-3 bg-rose-200 text-rose-800 rounded-xl font-bold">
+                    <AlertCircle size={24} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Filter Tabs & Search Bar Mode 2 */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <button 
+                    onClick={() => setFilterPaymentTab('all')}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${filterPaymentTab === 'all' ? 'bg-slate-800 text-white shadow-sm' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                  >
+                    Semua ({paymentStats.total})
+                  </button>
+                  <button 
+                    onClick={() => setFilterPaymentTab('ready')}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${filterPaymentTab === 'ready' ? 'bg-emerald-600 text-white shadow-sm' : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'}`}
+                  >
+                    <CheckCircle2 size={14} /> Siap Diupdate ({paymentStats.ready})
+                  </button>
+                  <button 
+                    onClick={() => setFilterPaymentTab('already_paid')}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${filterPaymentTab === 'already_paid' ? 'bg-blue-600 text-white shadow-sm' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}
+                  >
+                    <Check size={14} /> Sudah Lunas ({paymentStats.alreadyPaid})
+                  </button>
+                  <button 
+                    onClick={() => setFilterPaymentTab('not_found')}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${filterPaymentTab === 'not_found' ? 'bg-rose-600 text-white shadow-sm' : 'bg-rose-50 text-rose-700 hover:bg-rose-100'}`}
+                  >
+                    <AlertCircle size={14} /> Tidak Ditemukan ({paymentStats.notFound})
+                  </button>
+                </div>
+
+                <div className="relative flex-1 sm:w-72">
+                  <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input 
+                    type="text" 
+                    placeholder="Cari ID Sewa atau nama..."
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs font-medium outline-none focus:border-emerald-600"
+                  />
+                </div>
+              </div>
+
+              {/* Table Preview Mode 2 */}
+              <div className="overflow-x-auto rounded-2xl border border-slate-200 max-h-[420px] overflow-y-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead className="bg-slate-100 text-slate-700 font-extrabold sticky top-0 z-10">
+                    <tr>
+                      <th className="py-3 px-4">Status Pencocokan</th>
+                      <th className="py-3 px-4">ID Sewa (Excel)</th>
+                      <th className="py-3 px-4">Nama Penyewa di DB</th>
+                      <th className="py-3 px-4">Tanggal Sewa di DB</th>
+                      <th className="py-3 px-4">Lokasi di DB</th>
+                      <th className="py-3 px-4">Status Saat Ini</th>
+                      <th className="py-3 px-4">Status Baru</th>
+                      <th className="py-3 px-4 text-right">Nominal (Excel)</th>
+                      <th className="py-3 px-4">Tgl Transfer (Excel)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredPaymentPreview.length === 0 ? (
+                      <tr>
+                        <td colSpan={9} className="py-8 text-center text-slate-400 font-medium">
+                          Tidak ada data yang sesuai filter.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredPaymentPreview.map((item, idx) => (
+                        <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                          <td className="py-2.5 px-4">
+                            {item.status === 'ready_update' && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800">
+                                <CheckCircle2 size={12} /> SIAP DIUPDATE
+                              </span>
+                            )}
+                            {item.status === 'already_paid' && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-blue-100 text-blue-800">
+                                <Check size={12} /> SUDAH LUNAS
+                              </span>
+                            )}
+                            {item.status === 'not_found' && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black bg-rose-100 text-rose-800">
+                                <AlertCircle size={12} /> TIDAK ADA DI DB
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-4 font-mono font-bold text-slate-800">{item.id_sewa}</td>
+                          <td className="py-2.5 px-4 font-bold text-slate-900">{item.nama_penyewa}</td>
+                          <td className="py-2.5 px-4 font-semibold text-slate-700">{formatTanggalIndo(item.tanggal_sewa)}</td>
+                          <td className="py-2.5 px-4 text-slate-800 font-semibold">{item.lokasi_sewa}</td>
+                          <td className="py-2.5 px-4">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              item.status_lama === 'Sudah Transfer' ? 'bg-blue-50 text-blue-700' : 'bg-rose-50 text-rose-700'
+                            }`}>
+                              {item.status_lama}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-4 font-bold text-emerald-700">
+                            {item.status === 'ready_update' ? '→ Sudah Transfer' : (item.status === 'already_paid' ? 'Sudah Transfer' : '-')}
+                          </td>
+                          <td className="py-2.5 px-4 text-right font-bold text-slate-800">
+                            Rp {new Intl.NumberFormat('id-ID').format(item.nominal_excel)}
+                          </td>
+                          <td className="py-2.5 px-4 text-slate-600 font-medium">
+                            {formatTanggalIndo(item.tanggal_bayar_excel)}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Action Execution Mode 2 */}
+              <div className="pt-4 border-t border-slate-100 flex flex-col md:flex-row items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs font-bold text-slate-700">
+                    Siap memperbarui <strong>{paymentStats.ready}</strong> data penyewa di database menjadi <span className="text-emerald-700 font-black">"Sudah Transfer"</span>.
+                  </p>
+                  <p className="text-[11px] text-slate-400 mt-0.5">
+                    Data yang sudah berstatus lunas sebelumnya atau tidak ditemukan tidak akan diubah.
+                  </p>
+                </div>
+
+                <button 
+                  type="button"
+                  onClick={handleExecutePaymentUpdate}
+                  disabled={isProcessing || paymentStats.ready === 0}
+                  className="w-full md:w-auto px-8 py-4 bg-emerald-700 hover:bg-emerald-800 text-white font-black text-sm rounded-2xl shadow-xl shadow-emerald-700/25 flex items-center justify-center gap-3 transition-all active:scale-95 disabled:opacity-50"
+                >
+                  {isProcessing ? (
+                    <>
+                      <RefreshCw size={18} className="animate-spin" />
+                      Memproses Pembaruan ({progress}%)...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 size={18} />
+                      Terapkan {paymentStats.ready} Data Sudah Bayar ke Database
+                    </>
+                  )}
+                </button>
+              </div>
+
               {isProcessing && (
                 <div className="w-full bg-slate-100 rounded-full h-3 overflow-hidden">
                   <div 
@@ -1085,7 +1609,7 @@ export default function MigrateData({ onNavigate }) {
           {/* LOG CONSOLE */}
           <div className="bg-slate-950 text-emerald-400 p-6 rounded-3xl h-64 overflow-auto font-mono text-xs shadow-inner border border-slate-800">
             <div className="font-bold text-emerald-500 mb-2 flex items-center justify-between sticky top-0 bg-slate-950 py-1">
-              <span>--- LOG PROSES MIGRASI ---</span>
+              <span>--- LOG PROSES SISTEM ---</span>
               <span className="text-slate-500 text-[10px]">{log.length} baris log</span>
             </div>
             {log.length === 0 ? (
