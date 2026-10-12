@@ -1,11 +1,66 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { FileText, Printer, Search, Building, Users, Car, CheckCircle2, ChevronLeft, Clock, X, Loader2 } from 'lucide-react';
+import { FileText, Printer, Search, Building, Users, Car, CheckCircle2, ChevronLeft, Clock, X, Loader2, Calendar, CalendarDays } from 'lucide-react';
 import { db } from './firebase';
 import { collection, getDocs, doc, getDoc, setDoc, updateDoc, addDoc } from 'firebase/firestore';
 
 // PizZip and Docxtemplater for docx generation
 import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
+
+const normalizeDateString = (dateVal) => {
+  if (!dateVal) return '';
+  if (typeof dateVal === 'object') {
+    if (dateVal.toDate && typeof dateVal.toDate === 'function') {
+      const parsed = dateVal.toDate();
+      const y = parsed.getFullYear();
+      const m = String(parsed.getMonth() + 1).padStart(2, '0');
+      const d = String(parsed.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+    if (dateVal instanceof Date) {
+      const y = dateVal.getFullYear();
+      const m = String(dateVal.getMonth() + 1).padStart(2, '0');
+      const d = String(dateVal.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+  }
+  if (typeof dateVal !== 'string') return '';
+  const s = dateVal.trim();
+  
+  const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) {
+    return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+  }
+
+  const dmyMatch = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+  if (dmyMatch) {
+    const [, d, m, y] = dmyMatch;
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+
+  const parsed = new Date(s);
+  if (!isNaN(parsed.getTime())) {
+    const y = parsed.getFullYear();
+    const m = String(parsed.getMonth() + 1).padStart(2, '0');
+    const d = String(parsed.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  return s;
+};
+
+const formatTanggalIndo = (dateStr) => {
+  if (!dateStr) return '-';
+  try {
+    const norm = normalizeDateString(dateStr);
+    if (!norm || !/^\d{4}-\d{2}-\d{2}$/.test(norm)) return dateStr;
+    const [year, month, day] = norm.split('-');
+    const date = new Date(Number(year), Number(month) - 1, Number(day));
+    if (isNaN(date.getTime())) return dateStr;
+    return new Intl.DateTimeFormat('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(date);
+  } catch(e) {
+    return dateStr;
+  }
+};
 
 const getPromoDate = (item) => {
     if (item.selectedDates && Array.isArray(item.selectedDates) && item.selectedDates.length > 0) {
@@ -74,6 +129,7 @@ export default function SuratDispensasi({ onNavigate }) {
   const [source, setSource] = useState('sewa'); // 'sewa' or 'promo'
   const [dataList, setDataList] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
+  const [selectedVisitDate, setSelectedVisitDate] = useState('');
   const [search, setSearch] = useState('');
   const [selectedItem, setSelectedItem] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -109,22 +165,31 @@ export default function SuratDispensasi({ onNavigate }) {
         const d = new Date();
         const todayStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 
-        // Filter out past dates (keep today and future)
-        items = items.filter(item => {
-           const itemDate = source === 'sewa' ? item.tanggal_sewa : getPromoDate(item);
-           if (!itemDate) return false;
-           return itemDate >= todayStr;
-        });
-        
-        // Sort by date ascending (closest to today first)
-        items.sort((a, b) => {
-           const dateA = source === 'sewa' ? a.tanggal_sewa : getPromoDate(a);
-           const dateB = source === 'sewa' ? b.tanggal_sewa : getPromoDate(b);
-           return new Date(dateA || 0) - new Date(dateB || 0);
-        });
-        
+        // Normalize item dates
+        items = items.map(item => {
+           const raw = source === 'sewa' ? item.tanggal_sewa : getPromoDate(item);
+           const norm = normalizeDateString(raw);
+           return {
+              ...item,
+              normalizedDate: norm
+           };
+        }).filter(item => !!item.normalizedDate);
+
+        // Sort chronologically ascending
+        items.sort((a, b) => (a.normalizedDate || '').localeCompare(b.normalizedDate || ''));
+
         setDataList(items);
-        setFilteredData(items);
+
+        // Default calendar visit date: first upcoming date that has data
+        const upcomingItem = items.find(i => i.normalizedDate >= todayStr);
+        if (upcomingItem) {
+           setSelectedVisitDate(upcomingItem.normalizedDate);
+        } else if (items.length > 0) {
+           setSelectedVisitDate(items[0].normalizedDate);
+        } else {
+           setSelectedVisitDate(todayStr);
+        }
+
         setSelectedItem(null);
       } catch (err) {
         console.error("Gagal mengambil data:", err);
@@ -218,19 +283,49 @@ export default function SuratDispensasi({ onNavigate }) {
       }
   };
 
-  // Search filter
+  // Available dates with count for quick filter chips
+  const availableDatesWithCount = useMemo(() => {
+    const counts = {};
+    dataList.forEach(item => {
+      const d = item.normalizedDate;
+      if (d) {
+        counts[d] = (counts[d] || 0) + 1;
+      }
+    });
+    return Object.keys(counts).sort().map(d => ({
+      date: d,
+      count: counts[d],
+      label: formatTanggalIndo(d)
+    }));
+  }, [dataList]);
+
+  // Search & calendar visit date filter
   useEffect(() => {
-    if (!search.trim()) {
-      setFilteredData(dataList);
-    } else {
-      const lower = search.toLowerCase();
-      setFilteredData(dataList.filter(item => {
-        if (source === 'sewa') return (item.nama_penyewa || '').toLowerCase().includes(lower) || (item.lokasi_sewa || '').toLowerCase().includes(lower);
-        if (source === 'promo') return (item.namaPerusahaan || '').toLowerCase().includes(lower) || (item.namaProduk || '').toLowerCase().includes(lower);
-        return false;
-      }));
+    let result = dataList;
+
+    // Filter berdasarkan tanggal kunjungan dari kalender (jika dipilih)
+    if (selectedVisitDate) {
+      result = result.filter(item => item.normalizedDate === selectedVisitDate);
     }
-  }, [search, dataList, source]);
+
+    // Filter pencarian teks
+    if (search.trim()) {
+      const lower = search.toLowerCase();
+      result = result.filter(item => {
+        if (source === 'sewa') {
+          return (item.nama_penyewa || '').toLowerCase().includes(lower) || 
+                 (item.lokasi_sewa || '').toLowerCase().includes(lower);
+        }
+        if (source === 'promo') {
+          return (item.namaPerusahaan || '').toLowerCase().includes(lower) || 
+                 (item.namaProduk || '').toLowerCase().includes(lower);
+        }
+        return false;
+      });
+    }
+
+    setFilteredData(result);
+  }, [search, selectedVisitDate, dataList, source]);
 
   // Pre-fill data when item selected
   useEffect(() => {
@@ -238,35 +333,25 @@ export default function SuratDispensasi({ onNavigate }) {
       if (source === 'sewa') {
         setKeperluan(`Loading Barang ke ${selectedItem.lokasi_sewa || ''}`);
         
-        const singleDate = selectedItem.tanggal_sewa;
+        const singleDate = selectedItem.normalizedDate || selectedItem.tanggal_sewa;
         if (singleDate) {
-            const d = new Date(singleDate);
-            if (!isNaN(d.getTime())) {
-                setTglKunjungan(d.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }));
-            } else {
-                setTglKunjungan(singleDate);
-            }
+          setTglKunjungan(formatTanggalIndo(singleDate));
         } else {
-            setTglKunjungan('');
+          setTglKunjungan('');
         }
         
       } else {
         setKeperluan(`Loading Barang Promo (${selectedItem.namaProduk || ''})`);
         
         if (selectedItem.selectedDates && Array.isArray(selectedItem.selectedDates) && selectedItem.selectedDates.length > 0) {
-            setTglKunjungan(formatMultiTanggal(selectedItem.selectedDates));
+          setTglKunjungan(formatMultiTanggal(selectedItem.selectedDates));
         } else {
-            const singlePDate = selectedItem.tanggalPromo;
-            if (singlePDate) {
-                const d = new Date(singlePDate);
-                if (!isNaN(d.getTime())) {
-                    setTglKunjungan(d.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }));
-                } else {
-                    setTglKunjungan(singlePDate);
-                }
-            } else {
-                setTglKunjungan('');
-            }
+          const singlePDate = selectedItem.normalizedDate || selectedItem.tanggalPromo;
+          if (singlePDate) {
+            setTglKunjungan(formatTanggalIndo(singlePDate));
+          } else {
+            setTglKunjungan('');
+          }
         }
       }
     }
@@ -276,22 +361,12 @@ export default function SuratDispensasi({ onNavigate }) {
   const groupedData = useMemo(() => {
     const groups = {};
     filteredData.forEach(item => {
-      let rawDate = source === 'sewa' ? item.tanggal_sewa : getPromoDate(item);
-      if (!rawDate) rawDate = 'Tanpa Tanggal';
-      
-      let displayDate = rawDate;
-      if (rawDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
-        const d = new Date(rawDate);
-        if (!isNaN(d.getTime())) {
-          displayDate = d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
-        }
-      }
-      
+      const displayDate = item.normalizedDate ? formatTanggalIndo(item.normalizedDate) : 'Tanpa Tanggal';
       if (!groups[displayDate]) groups[displayDate] = [];
       groups[displayDate].push(item);
     });
     return groups;
-  }, [filteredData, source]);
+  }, [filteredData]);
 
   const handlePrint = async (forceUpdate = false) => {
     if (!selectedItem || !tglKunjungan || !nopol) {
@@ -347,8 +422,7 @@ export default function SuratDispensasi({ onNavigate }) {
 
       const formatTgl = (tgl) => {
           if (!tgl) return '-';
-          const tglObj = new Date(tgl);
-          return isNaN(tglObj.getTime()) ? tgl : tglObj.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+          return formatTanggalIndo(tgl);
       };
 
       docTemplater.render({
@@ -453,8 +527,7 @@ export default function SuratDispensasi({ onNavigate }) {
 
       const formatTgl = (tgl) => {
           if (!tgl) return '-';
-          const tglObj = new Date(tgl);
-          return isNaN(tglObj.getTime()) ? tgl : tglObj.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+          return formatTanggalIndo(tgl);
       };
 
       docTemplater.render({
@@ -534,6 +607,90 @@ export default function SuratDispensasi({ onNavigate }) {
               </button>
             </div>
 
+            {/* Kalender Pilihan Tanggal Kunjungan */}
+            <div className="mb-5 p-4 bg-emerald-50/70 border border-emerald-200 rounded-2xl shadow-sm">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-sm shadow-emerald-600/30">
+                    <Calendar size={18} />
+                  </div>
+                  <div>
+                    <h4 className="font-extrabold text-xs text-emerald-950 uppercase tracking-wide">
+                      Pilihan Kalender Kunjungan
+                    </h4>
+                    <p className="text-[11px] font-bold text-emerald-700 mt-0.5">
+                      {selectedVisitDate ? formatTanggalIndo(selectedVisitDate) : 'Semua Tanggal'}
+                    </p>
+                  </div>
+                </div>
+                {selectedVisitDate && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedVisitDate('')}
+                    className="text-[11px] font-bold text-emerald-700 hover:text-emerald-900 bg-white hover:bg-emerald-100/50 border border-emerald-300 px-2.5 py-1 rounded-lg transition-all shadow-sm"
+                    title="Tampilkan semua data rombongan"
+                  >
+                    Tampilkan Semua
+                  </button>
+                )}
+              </div>
+
+              {/* Input Kalender & Quick Button Hari Ini */}
+              <div className="flex items-center gap-2">
+                <input 
+                  type="date"
+                  value={selectedVisitDate}
+                  onChange={(e) => setSelectedVisitDate(e.target.value)}
+                  className="flex-1 px-3.5 py-2.5 bg-white border border-emerald-300 rounded-xl text-sm font-bold text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const today = new Date();
+                    const tStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                    setSelectedVisitDate(tStr);
+                  }}
+                  className="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-sm shadow-emerald-600/20 whitespace-nowrap"
+                >
+                  Hari Ini
+                </button>
+              </div>
+
+              {/* Quick Date Chips (Tanggal Tersedia yang ada Datanya) */}
+              {availableDatesWithCount.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-emerald-200/70">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-extrabold text-emerald-900 uppercase tracking-wider">
+                      Tanggal Rombongan Tersedia ({availableDatesWithCount.length}):
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto pr-1 custom-scrollbar">
+                    {availableDatesWithCount.map((item) => {
+                      const isSelected = selectedVisitDate === item.date;
+                      return (
+                        <button
+                          key={item.date}
+                          type="button"
+                          onClick={() => setSelectedVisitDate(item.date)}
+                          className={`text-xs font-bold px-2.5 py-1 rounded-xl border transition-all flex items-center gap-1.5 ${
+                            isSelected 
+                              ? 'bg-emerald-700 text-white border-emerald-700 shadow-sm shadow-emerald-700/30' 
+                              : 'bg-white text-emerald-950 border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300'
+                          }`}
+                        >
+                          <CalendarDays size={13} className={isSelected ? 'text-white' : 'text-emerald-600'} />
+                          <span>{item.date}</span>
+                          <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${isSelected ? 'bg-emerald-800 text-emerald-100' : 'bg-emerald-100 text-emerald-800'}`}>
+                            {item.count}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div className="relative mb-4">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
               <input 
@@ -550,13 +707,31 @@ export default function SuratDispensasi({ onNavigate }) {
                 <div className="text-center py-10 text-slate-400 font-medium">Memuat data...</div>
               ) : filteredData.length === 0 ? (
                 <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                  <p className="text-slate-400 font-semibold text-sm">Tidak ada data ditemukan</p>
+                  <CalendarDays className="mx-auto text-slate-300 mb-2" size={32} />
+                  <p className="text-slate-600 font-bold text-sm">Tidak ada rombongan ditemukan</p>
+                  <p className="text-slate-400 text-xs mt-1">
+                    {selectedVisitDate 
+                      ? `Tidak ada data pada tanggal ${formatTanggalIndo(selectedVisitDate)}` 
+                      : 'Coba ubah kata kunci pencarian'}
+                  </p>
+                  {selectedVisitDate && availableDatesWithCount.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedVisitDate(availableDatesWithCount[0].date)}
+                      className="mt-3 text-xs font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 px-3 py-1.5 rounded-lg transition-all"
+                    >
+                      Buka jadwal terdekat ({availableDatesWithCount[0].date})
+                    </button>
+                  )}
                 </div>
               ) : (
                 Object.keys(groupedData).map((dateKey) => (
                   <div key={dateKey} className="mb-4">
-                    <div className="sticky top-0 bg-[#f8faf9] z-10 py-1.5 mb-2 backdrop-blur-sm">
-                      <h4 className="text-[10px] font-black text-emerald-800 uppercase tracking-wider">{dateKey}</h4>
+                    <div className="sticky top-0 bg-[#f8faf9] z-10 py-1.5 mb-2 backdrop-blur-sm flex items-center justify-between">
+                      <h4 className="text-[11px] font-black text-emerald-800 uppercase tracking-wider">{dateKey}</h4>
+                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-full">
+                        {groupedData[dateKey].length} Rombongan
+                      </span>
                     </div>
                     <div className="space-y-3">
                       {groupedData[dateKey].map(item => (
