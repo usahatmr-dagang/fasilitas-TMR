@@ -566,11 +566,25 @@ export default function MigrateData({ onNavigate }) {
               total_biaya: item.total_biaya,
               tanggal_sewa: item.tanggal_sewa
             }, { merge: true });
+
+            await setDoc(doc(db, 'publicSewaList', existingDocId), {
+              tanggal_sewa: item.tanggal_sewa,
+              lokasi_sewa: item.lokasi_sewa,
+              status_pembayaran: item.status_pembayaran
+            }, { merge: true });
+
             countUpdated++;
           }
         } else {
           const newDocRef = doc(collection(db, 'sewaList'));
           await setDoc(newDocRef, docPayload);
+
+          await setDoc(doc(db, 'publicSewaList', newDocRef.id), {
+            tanggal_sewa: item.tanggal_sewa,
+            lokasi_sewa: item.lokasi_sewa,
+            status_pembayaran: item.status_pembayaran
+          });
+
           if (cleanId) existingById.set(cleanId, newDocRef.id);
           existingByKey.set(compositeKey, newDocRef.id);
           countAdded++;

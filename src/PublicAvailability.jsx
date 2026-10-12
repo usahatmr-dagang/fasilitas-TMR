@@ -74,18 +74,48 @@ export default function PublicAvailability() {
     return () => { unsubLokasi(); unsubSewa(); };
   }, []);
 
+  const cleanLocName = (name) => String(name || '').toLowerCase().replace(/[-_]/g, ' ').replace(/\s+/g, ' ').trim();
+
+  const normalizeDateStr = (dStr) => {
+    if (!dStr) return '';
+    const s = String(dStr).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+    if (s.includes('/')) {
+      const p = s.split('/');
+      if (p.length === 3 && p[2].length === 4) {
+        return `${p[2]}-${p[1].padStart(2, '0')}-${p[0].padStart(2, '0')}`;
+      }
+    }
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    }
+    return s;
+  };
+
   const fasilitasHarian = masterLokasi.map(lokasi => {
+    const cleanCurrentLokasi = cleanLocName(lokasi.nama);
     const booking = sewaList.find(sewa => {
-      if (sewa.tanggal_sewa !== selectedDate) return false;
-      if (!sewa.lokasi_sewa) return false;
+      if (normalizeDateStr(sewa.tanggal_sewa) !== selectedDate) return false;
+      if (sewa.status_pembayaran === 'Ditutup') return false;
       
       let lokasiArray = [];
       if (Array.isArray(sewa.lokasi_sewa)) {
-          lokasiArray = sewa.lokasi_sewa.map(s => String(s).trim().toLowerCase());
-      } else {
-          lokasiArray = String(sewa.lokasi_sewa).split(',').map(s => s.trim().toLowerCase());
+        lokasiArray = sewa.lokasi_sewa.map(cleanLocName);
+      } else if (sewa.lokasi_sewa) {
+        lokasiArray = String(sewa.lokasi_sewa).split(',').map(cleanLocName);
       }
-      return lokasiArray.includes(String(lokasi.nama).toLowerCase());
+      
+      if (Array.isArray(sewa.detail_lokasi)) {
+        sewa.detail_lokasi.forEach(det => {
+          if (det && det.nama) lokasiArray.push(cleanLocName(det.nama));
+        });
+      }
+
+      return lokasiArray.includes(cleanCurrentLokasi);
     });
     return { ...lokasi, isBooked: !!booking };
   });
