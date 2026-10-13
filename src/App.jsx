@@ -59,6 +59,8 @@ import MigrateData from './MigrateData';
 import SyncPembayaran from './SyncPembayaran';
 import SuratDispensasi from './SuratDispensasi';
 import CetakKwitansi from './CetakKwitansi';
+import CheckoutModal from './components/CheckoutModal';
+import MediaModal from './components/MediaModal';
 import { openKwitansiPrintWindow } from './utils/kwitansiHelper';
 // --- DATA LOKASI ---
 const defaultDataLokasi = [
@@ -1671,196 +1673,6 @@ Terima kasih.`;
       }
   };
 
-  // --- MODALS RENDER ---
-  const renderMediaModal = () => {
-      if (!mediaModalOpen || !selectedMediaLokasi) return null;
-      const photos = selectedMediaLokasi.photos || [null, null, null];
-      const video = selectedMediaLokasi.video || null;
-
-      return (
-          <div className="fixed inset-0 bg-[#022c22]/60 backdrop-blur-sm z-[60] flex justify-center items-center p-4 animate-fade-in" onClick={() => setMediaModalOpen(false)}>
-              <div className="bg-white rounded-3xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
-                  <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-emerald-50 text-emerald-950">
-                      <div>
-                          <h3 className="font-black text-lg tracking-tight">Kelola Media Lokasi</h3>
-                          <p className="text-xs font-bold text-emerald-600 mt-0.5">{selectedMediaLokasi.nama}</p>
-                      </div>
-                      <button type="button" onClick={() => setMediaModalOpen(false)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-full transition-all duration-200"><X size={18} /></button>
-                  </div>
-                  
-                  <div className="p-6 overflow-y-auto space-y-6 bg-slate-50 flex-1 hide-scrollbar">
-                      {uploadingMedia && (
-                          <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded-2xl flex items-center text-sm font-bold shadow-sm">
-                              <Loader2 size={18} className="animate-spin mr-3"/> {mediaUploadProgress}
-                          </div>
-                      )}
-                      
-                      <div>
-                          <h4 className="text-sm font-black text-emerald-950 flex items-center mb-4"><Image size={16} className="mr-2 text-emerald-600"/> Foto Fasilitas (Maks. 3)</h4>
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                              {[0, 1, 2].map(idx => (
-                                  <div key={idx} className="bg-white border border-slate-200 rounded-2xl p-3 flex flex-col items-center justify-between min-h-[190px] shadow-sm hover:border-emerald-300 transition-all">
-                                      {photos[idx] ? (
-                                          <>
-                                              <div className="relative w-full h-32 rounded-xl overflow-hidden bg-slate-100">
-                                                  <img src={photos[idx]} alt={`Foto ${idx+1}`} className="w-full h-full object-cover" />
-                                                  <span className="absolute top-2 left-2 px-2 py-0.5 bg-black/60 backdrop-blur-sm text-white text-[9px] font-bold rounded-md">
-                                                      Foto {idx + 1}
-                                                  </span>
-                                              </div>
-                                              <div className="flex items-center gap-2 w-full mt-3">
-                                                  <label className="flex-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[11px] font-bold py-1.5 px-2.5 rounded-xl border border-emerald-200 flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-sm">
-                                                      <Pencil size={12} className="text-emerald-700" />
-                                                      <span>Ganti Foto</span>
-                                                      <input type="file" accept="image/*" className="hidden" onClick={(e) => e.target.value = null} onChange={(e) => handleUploadMedia(e, 'photo', idx)} disabled={uploadingMedia} />
-                                                  </label>
-                                                  <button type="button" onClick={() => handleDeleteMedia('photo', idx)} className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl border border-rose-200 transition-all shadow-sm" title="Hapus Foto">
-                                                      <Trash2 size={13}/>
-                                                  </button>
-                                              </div>
-                                          </>
-                                      ) : (
-                                          <label className="flex flex-col items-center justify-center w-full h-full min-h-[160px] border-2 border-dashed border-slate-300 hover:border-emerald-400 rounded-xl cursor-pointer bg-slate-50 hover:bg-emerald-50/50 transition-colors p-4 text-center">
-                                              <div className="w-9 h-9 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mb-2">
-                                                  <Camera size={18} />
-                                              </div>
-                                              <span className="text-[10px] font-extrabold text-slate-700 uppercase">Upload Foto {idx+1}</span>
-                                              <span className="text-[9px] text-slate-400 mt-0.5">Maks 900 KB (JPG/PNG)</span>
-                                              <input type="file" accept="image/*" className="hidden" onClick={(e) => e.target.value = null} onChange={(e) => handleUploadMedia(e, 'photo', idx)} disabled={uploadingMedia} />
-                                          </label>
-                                      )}
-                                  </div>
-                              ))}
-                          </div>
-                      </div>
-
-                      <div>
-                          <div className="flex items-center justify-between mb-4">
-                              <h4 className="text-sm font-black text-emerald-950 flex items-center">
-                                  <Film size={16} className="mr-2 text-blue-600"/> Video Fasilitas (Link YouTube)
-                              </h4>
-                              {video && !isEditingVideo && (
-                                  <button 
-                                      type="button" 
-                                      onClick={() => {
-                                          setVideoInputUrl(video);
-                                          setIsEditingVideo(true);
-                                      }}
-                                      className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold rounded-xl border border-blue-200 transition-all shadow-sm"
-                                  >
-                                      <Pencil size={12} />
-                                      <span>Ganti Video</span>
-                                  </button>
-                              )}
-                          </div>
-
-                          {isEditingVideo || !video ? (
-                              <div className="bg-white border-2 border-blue-200 rounded-2xl p-4 sm:p-5 shadow-sm space-y-3">
-                                  <div className="flex items-start gap-3">
-                                      <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                          <Film size={18} />
-                                      </div>
-                                      <div className="flex-1">
-                                          <h5 className="font-extrabold text-xs text-slate-900 uppercase tracking-wide">
-                                              {video ? 'Ganti Link Video YouTube' : 'Tautkan Video YouTube'}
-                                          </h5>
-                                          <p className="text-[11px] text-slate-500 mt-0.5">
-                                              Salin dan tempel link video YouTube dari browser (contoh: https://www.youtube.com/watch?v=... atau https://youtu.be/...)
-                                          </p>
-                                      </div>
-                                  </div>
-
-                                  <div className="flex flex-col sm:flex-row gap-2 pt-1">
-                                      <input 
-                                          type="url"
-                                          value={videoInputUrl}
-                                          onChange={(e) => setVideoInputUrl(e.target.value)}
-                                          placeholder="https://www.youtube.com/watch?v=..."
-                                          className="flex-1 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
-                                          onKeyDown={(e) => {
-                                              if (e.key === 'Enter') {
-                                                  e.preventDefault();
-                                                  handleSaveVideoLink(videoInputUrl);
-                                              }
-                                          }}
-                                      />
-                                      <div className="flex items-center gap-2">
-                                          <button 
-                                              type="button"
-                                              disabled={uploadingMedia || !videoInputUrl.trim()}
-                                              onClick={() => handleSaveVideoLink(videoInputUrl)}
-                                              className="flex-1 sm:flex-none px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white rounded-xl font-bold text-xs shadow-sm transition-all flex items-center justify-center gap-1.5"
-                                          >
-                                              <Save size={13} />
-                                              <span>Simpan Video</span>
-                                          </button>
-                                          {video && (
-                                              <button 
-                                                  type="button"
-                                                  onClick={() => {
-                                                      setIsEditingVideo(false);
-                                                      setVideoInputUrl(video);
-                                                  }}
-                                                  className="px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-bold text-xs transition-all"
-                                              >
-                                                  Batal
-                                              </button>
-                                          )}
-                                      </div>
-                                  </div>
-                              </div>
-                          ) : (
-                              <div className="bg-white border border-slate-200 rounded-2xl p-3.5 shadow-sm space-y-3">
-                                  <div className="relative w-full rounded-xl overflow-hidden bg-slate-900 aspect-video max-h-[300px]">
-                                      {(() => {
-                                          const ytMatch = video.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/);
-                                          const ytId = (ytMatch && ytMatch[2].length === 11) ? ytMatch[2] : null;
-                                          return ytId ? (
-                                            <iframe src={`https://www.youtube.com/embed/${ytId}`} frameBorder="0" allowFullScreen className="w-full h-full object-cover" />
-                                          ) : (
-                                            <a href={video} target="_blank" rel="noreferrer" className="text-blue-500 font-bold underline p-4 break-all block text-center">{video}</a>
-                                          );
-                                      })()}
-                                  </div>
-
-                                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-1 border-t border-slate-100">
-                                      <div className="flex items-center gap-2 text-xs text-slate-600 truncate max-w-sm sm:max-w-md">
-                                          <span className="font-extrabold text-slate-400 uppercase text-[10px] tracking-wider">Link:</span>
-                                          <span className="truncate font-mono text-[11px] text-blue-700 font-semibold">{video}</span>
-                                      </div>
-
-                                      <div className="flex items-center gap-2 w-full sm:w-auto">
-                                          <button 
-                                              type="button" 
-                                              onClick={() => {
-                                                  setVideoInputUrl(video);
-                                                  setIsEditingVideo(true);
-                                              }}
-                                              className="flex-1 sm:flex-none px-3.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl font-bold text-xs border border-blue-200 transition-all flex items-center justify-center gap-1.5 shadow-sm"
-                                          >
-                                              <Pencil size={12} />
-                                              <span>Ganti Video</span>
-                                          </button>
-                                          <button 
-                                              type="button" 
-                                              onClick={() => handleDeleteMedia('video')} 
-                                              className="px-3 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl font-bold text-xs border border-rose-200 transition-all flex items-center justify-center gap-1.5 shadow-sm"
-                                              title="Hapus Video"
-                                          >
-                                              <Trash2 size={13} />
-                                              <span>Hapus</span>
-                                          </button>
-                                      </div>
-                                  </div>
-                              </div>
-                          )}
-                      </div>
-                  </div>
-              </div>
-          </div>
-      );
-  };
-
   const renderDetailModal = () => {
     if (!selectedRecord) return null;
 
@@ -2610,266 +2422,27 @@ Terima kasih.`;
           </div>
       )}
 
-      {/* Form Reservasi Baru (Checkout) */}
-      {isCheckoutOpen && cartLokasi.length > 0 && (
-        <div className="fixed inset-0 bg-[#022c22]/60 backdrop-blur-sm z-[50] flex justify-center items-end sm:items-center p-0 sm:p-4 pb-14 sm:pb-0 animate-fade-in">
-            <div className="bg-white rounded-t-3xl sm:rounded-3xl shadow-[0_-8px_40px_-4px_rgba(4,120,87,0.18)] sm:shadow-[0_25px_50px_-12px_rgba(4,120,87,0.15)] w-full sm:max-w-lg overflow-hidden flex flex-col max-h-[calc(94vh-3.5rem)] sm:max-h-[92vh] border border-emerald-100/50 transition-all duration-300 animate-slide-up-sheet sm:animate-none">
-                <div className="px-6 py-5 border-b border-emerald-800/10 flex items-center justify-between bg-gradient-to-r from-[#022c22] via-[#043e30] to-[#01140f] text-white shadow-md">
-                    <div>
-                        <h3 className="font-black text-lg tracking-tight bg-gradient-to-r from-white to-emerald-100 bg-clip-text text-transparent">Formulir Checkout</h3>
-                        <p className="text-[10px] text-amber-400 font-extrabold tracking-widest uppercase mt-0.5">{cartLokasi.length} Fasilitas Terpilih • {formatTanggalIndo(selectedDate)}</p>
-                    </div>
-                    <button type="button" onClick={() => { setIsCheckoutOpen(false); setIsCustomPicCheckout(false); }} className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all duration-200 hover:scale-105"><X size={18} /></button>
-                </div>
-                {/* Scrollable form fields */}
-                <div className="overflow-y-auto flex-1 visible-scrollbar bg-slate-50/50 pr-1">
-                <form id="booking-form" onSubmit={handleSubmitBooking} className="p-4 sm:p-6 space-y-4 relative z-10">
-                    
-                    {/* Ringkasan Fasilitas */}
-                    <div className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm">
-                        <label className="block text-xs font-extrabold text-emerald-950 uppercase tracking-wider mb-2">Fasilitas yang Dipesan</label>
-                        <div className="space-y-1.5 max-h-32 overflow-y-auto pr-2">
-                            {cartLokasi.map((item, idx) => (
-                                <div key={idx} className="flex justify-between items-center text-xs font-bold bg-slate-50 p-2 rounded-lg border border-slate-100 group">
-                                    <span className="text-emerald-800 flex items-center flex-1">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mr-2 shrink-0"></span>
-                                        <span className="truncate pr-2">{item.nama}</span>
-                                    </span>
-                                    <div className="flex items-center shrink-0">
-                                        <span className="text-slate-500">{item.tipe === 'lapangan' ? 'TBD' : formatRupiah(getBiayaLokasi(item.nama))}</span>
-                                        <button 
-                                            type="button" 
-                                            onClick={() => {
-                                                const newCart = cartLokasi.filter(l => l.nama !== item.nama);
-                                                setCartLokasi(newCart);
-                                                if(newCart.length === 0) setIsCheckoutOpen(false);
-                                            }}
-                                            className="ml-2.5 p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 bg-white border border-slate-200 rounded-lg transition-all shadow-[0_2px_4px_rgba(0,0,0,0.02)] active:scale-95"
-                                            title="Hapus fasilitas"
-                                        >
-                                            <Trash2 size={12} className="stroke-[2.5]" />
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* KHUSUS LAPANGAN: Input Luas Lahan (Berlaku untuk semua lapangan) */}
-                    {cartLokasi.some(l => l.tipe === 'lapangan') && (
-                        <div className="bg-emerald-50/60 border border-emerald-100 rounded-3xl p-5 shadow-sm relative overflow-hidden">
-                            <div className="absolute right-0 bottom-0 opacity-[0.04] text-emerald-850"><TreePine size={96}/></div>
-                            <label className="block text-xs font-extrabold text-emerald-950 uppercase tracking-wider mb-2">Total Luas Lahan Digunakan (Minimal 50 m²)</label>
-                            <p className="text-[10px] text-emerald-700 font-bold mb-3">Jika menyewa lebih dari 1 lapangan, luas lahan ini akan dibagi rata ke semua lapangan.</p>
-                            <div className="flex items-center space-x-3">
-                                <input required type="number" min="50" value={formData.luasLahan} onChange={(e)=>setFormData({...formData, luasLahan: e.target.value})} className="w-28 px-4 py-3 rounded-2xl border border-slate-200 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 outline-none text-base bg-white font-extrabold text-center shadow-inner" />
-                                <span className="font-bold text-emerald-800 text-sm">m² × Rp 2.000 / m²</span>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* PAKET GAZEBO SPESIAL */}
-                    {cartLokasi.some(l => l.nama === 'GAZEBO') && (
-                        <div className={`border rounded-3xl p-4 shadow-sm transition-all duration-300 cursor-pointer ${formData.isGazeboPackage ? 'border-amber-300 bg-amber-50/40 shadow-md ring-2 ring-amber-500/20' : 'border-emerald-200 bg-emerald-50/30 hover:border-emerald-300'}`}>
-                            <label className="flex items-start cursor-pointer select-none">
-                                <input type="checkbox" checked={formData.isGazeboPackage} onChange={(e)=>setFormData({...formData, isGazeboPackage: e.target.checked})} className="mt-1 w-5 h-5 text-amber-500 rounded border-slate-350 focus:ring-amber-500 cursor-pointer shrink-0" />
-                                <div className="ml-3 flex-1">
-                                    <span className="text-sm font-extrabold text-emerald-950 flex items-center">Ambil Paket Lahan Depan Gazebo</span>
-                                    <p className="text-[10px] font-bold text-slate-500 mt-1">Biaya Gazebo menjadi Total <strong className="text-amber-600">Rp 650.000</strong> (Sudah termasuk sewa lahan bagian depan gazebo)</p>
-                                </div>
-                            </label>
-                        </div>
-                    )}
-
-                    {/* Ringkasan Biaya Realtime */}
-                    <div className="bg-white border border-slate-100 rounded-3xl p-5 shadow-[0_4px_20px_rgba(4,120,87,0.02)] space-y-3">
-                        {(() => {
-                            const jumlahLapangan = cartLokasi.filter(l => l.tipe === 'lapangan').length;
-                            const isLapangan = jumlahLapangan > 0;
-                            const luas_lahan_total = isLapangan ? Math.max(Number(formData.luasLahan), 50) : null;
-                            const luas_per_lapangan = isLapangan ? (luas_lahan_total / jumlahLapangan) : null;
-                            let totalBiayaLokasi = 0;
-                            cartLokasi.forEach(lokasi => {
-                                if (lokasi.tipe === 'lapangan') {
-                                    const hargaM2 = (Number(lokasi.harga) > 0 && Number(lokasi.harga) <= 50000) ? Number(lokasi.harga) : 2000;
-                                    totalBiayaLokasi += luas_per_lapangan * hargaM2;
-                                }
-                                else if (lokasi.nama === 'GAZEBO' && formData.isGazeboPackage) totalBiayaLokasi += 650000;
-                                else totalBiayaLokasi += getBiayaLokasi(lokasi.nama);
-                            });
-                            
-                            return (
-                                <>
-                                    <div className="flex justify-between items-center text-xs text-slate-500 font-bold uppercase tracking-wider">
-                                        <span>Tarif Sewa Lokasi:</span>
-                                        <span className="font-extrabold text-emerald-950">{formatRupiah(totalBiayaLokasi)}</span>
-                                    </div>
-                                    {formData.listrikTambahan && (
-                                        <div className="flex justify-between items-center text-xs text-slate-500 font-bold uppercase tracking-wider">
-                                            <span className="flex items-center"><Zap size={14} className="mr-1 text-amber-500" /> Listrik Tambahan:</span>
-                                            <span className="font-extrabold text-amber-600">{formatRupiah(100000)}</span>
-                                        </div>
-                                    )}
-                                    <div className="flex justify-between items-center text-sm pt-3 border-t border-slate-100">
-                                        <span className="font-extrabold text-emerald-950 uppercase tracking-wider">Total Tagihan:</span>
-                                        <span className="font-black text-emerald-700 text-xl">{formatRupiah(totalBiayaLokasi + (formData.listrikTambahan ? 100000 : 0))}</span>
-                                    </div>
-                                </>
-                            );
-                        })()}
-                    </div>
-
-                    <div>
-                        <label className="block text-[10px] font-extrabold text-emerald-950 uppercase tracking-wider mb-1.5">Nama Rombongan / Instansi</label>
-                        <input required type="text" value={formData.namaRombongan} onChange={(e)=>setFormData({...formData, namaRombongan: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-2xl text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 outline-none font-semibold text-emerald-950 bg-white shadow-sm placeholder:text-slate-400" placeholder="Tuliskan nama rombongan..." />
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-[10px] font-extrabold text-emerald-950 uppercase tracking-wider mb-1.5">PIC Rombongan</label>
-                            <input required type="text" value={formData.picRombongan} onChange={(e)=>setFormData({...formData, picRombongan: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-2xl text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 outline-none font-semibold text-emerald-950 bg-white shadow-sm placeholder:text-slate-400" placeholder="Nama tamu" />
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-extrabold text-emerald-950 uppercase tracking-wider mb-1.5">No. WhatsApp</label>
-                            <input required type="tel" value={formData.noWa} onChange={(e)=>setFormData({...formData, noWa: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-2xl text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 outline-none font-semibold text-emerald-950 bg-white shadow-sm placeholder:text-slate-400" placeholder="08..." />
-                        </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-[10px] font-extrabold text-emerald-950 uppercase tracking-wider mb-1.5">Tanggal</label>
-                            <input type="text" value={formatTanggalPendek(selectedDate)} disabled className="w-full px-4 py-3 border border-slate-200 bg-slate-100 text-slate-500 text-sm font-extrabold rounded-2xl cursor-not-allowed shadow-inner" />
-                        </div>
-                        <div>
-                            <div className="flex items-center justify-between mb-1.5">
-                                <label className="block text-[10px] font-extrabold text-emerald-950 uppercase tracking-wider">PIC Kantor (TMR)</label>
-                                <button 
-                                    type="button" 
-                                    onClick={() => {
-                                        setIsCustomPicCheckout(prev => !prev);
-                                        if (isCustomPicCheckout) setFormData({ ...formData, picKantor: '' });
-                                    }} 
-                                    className="text-[10px] font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-100/70 hover:bg-emerald-100 px-2 py-0.5 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
-                                >
-                                    {isCustomPicCheckout ? '← Pilih dari List' : '➕ Input Manual (Magang)'}
-                                </button>
-                            </div>
-
-                            {isCustomPicCheckout ? (
-                                <div>
-                                    <div className="relative">
-                                        <input 
-                                            required 
-                                            type="text" 
-                                            value={formData.picKantor} 
-                                            onChange={(e) => setFormData({ ...formData, picKantor: e.target.value })} 
-                                            placeholder="Ketik nama PIC / Magang..." 
-                                            className="w-full px-4 py-3 border-2 border-emerald-400 bg-emerald-50/20 rounded-2xl text-sm focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-600 outline-none font-bold text-emerald-950 shadow-sm pr-20 placeholder:text-slate-400 placeholder:font-normal"
-                                            autoFocus
-                                        />
-                                        <button 
-                                            type="button" 
-                                            onClick={() => {
-                                                setIsCustomPicCheckout(false);
-                                                setFormData({ ...formData, picKantor: '' });
-                                            }}
-                                            className="absolute right-2 top-1/2 -translate-y-1/2 px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 text-[10px] font-extrabold rounded-xl transition-all shadow-sm"
-                                            title="Pilih dari daftar master PIC"
-                                        >
-                                            Pilih List
-                                        </button>
-                                    </div>
-                                    <p className="text-[10px] text-emerald-700 font-bold mt-1">
-                                        *Nama hanya menempel pada pesanan ini (tidak disimpan ke data master).
-                                    </p>
-                                </div>
-                            ) : (
-                                <select 
-                                    required 
-                                    value={formData.picKantor} 
-                                    onChange={(e) => {
-                                        if (e.target.value === '__custom__') {
-                                            setIsCustomPicCheckout(true);
-                                            setFormData({ ...formData, picKantor: '' });
-                                        } else {
-                                            setFormData({ ...formData, picKantor: e.target.value });
-                                        }
-                                    }} 
-                                    className="w-full px-4 py-3 border border-slate-200 rounded-2xl text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 outline-none font-semibold text-emerald-950 bg-white shadow-sm cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2310b981%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E')] bg-[right_1rem_center] bg-[length:1.25em_1.25em] bg-no-repeat pr-10"
-                                >
-                                    <option value="" disabled>Pilih Nama PIC...</option>
-                                    {picList.map((pic, idx) => <option key={pic.id || idx} value={pic.nama}>{pic.nama}</option>)}
-                                    <option value="__custom__">➕ Ketik Nama Manual / Anak Magang...</option>
-                                </select>
-                            )}
-                        </div>
-                    </div>
-                    
-                    <div>
-                        <label className="block text-[10px] font-extrabold text-emerald-950 uppercase tracking-wider mb-1.5">Catatan Tambahan (Bawa Tenda, Kursi, dll)</label>
-                        <textarea value={formData.catatan} onChange={(e)=>setFormData({...formData, catatan: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-2xl text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 outline-none font-semibold text-emerald-950 bg-white shadow-sm placeholder:text-slate-400" rows="2" placeholder="Catat jika rombongan bawa tenda / kursi..." />
-                    </div>
-
-                    <div className={`border rounded-3xl p-4 shadow-sm transition-all duration-300 cursor-pointer ${formData.listrikTambahan ? 'border-amber-300 bg-amber-50/20' : 'border-slate-100 bg-white hover:border-emerald-100'}`}>
-                        <label className="flex items-center cursor-pointer select-none">
-                            <input type="checkbox" checked={formData.listrikTambahan} onChange={(e)=>setFormData({...formData, listrikTambahan: e.target.checked})} className="w-5 h-5 text-amber-500 rounded border-slate-350 focus:ring-amber-500 cursor-pointer" />
-                            <span className="ml-3 text-sm font-extrabold text-emerald-950 flex items-center"><Zap size={16} className="text-amber-500 mr-1.5"/> Gunakan Listrik Tambahan (+Rp 100rb)</span>
-                        </label>
-                    </div>
-
-                    <div className="pt-2">
-                        <label className="block text-[10px] font-extrabold text-emerald-950 uppercase tracking-wider mb-2">Status Pendaftaran Awal</label>
-                        <div className="flex space-x-3">
-                            <label className={`flex-1 flex flex-col items-center justify-center p-4 rounded-3xl border cursor-pointer transition-all duration-250 ${formData.statusPembayaran === 'Sudah Transfer' ? 'border-emerald-500 bg-emerald-50/40 text-emerald-950 shadow-sm ring-2 ring-emerald-100/50' : 'border-slate-100 bg-white hover:border-slate-200 text-slate-500'}`}>
-                                <input type="radio" name="statusPembayaran" value="Sudah Transfer" checked={formData.statusPembayaran === 'Sudah Transfer'} onChange={(e)=>setFormData({...formData, statusPembayaran: e.target.value})} className="hidden" />
-                                <CheckCircle2 size={20} className={`mb-1.5 ${formData.statusPembayaran === 'Sudah Transfer' ? 'text-emerald-600' : 'text-slate-300'}`} />
-                                <span className="text-xs font-extrabold">Lunas di Awal</span>
-                            </label>
-                            <label className={`flex-1 flex flex-col items-center justify-center p-4 rounded-3xl border cursor-pointer transition-all duration-200 ${formData.statusPembayaran === 'Belum Transfer' ? 'border-rose-450 bg-rose-50/40 text-rose-950 shadow-sm ring-2 ring-rose-100/50' : 'border-slate-100 bg-white hover:border-slate-200 text-slate-500'}`}>
-                                <input type="radio" name="statusPembayaran" value="Belum Transfer" checked={formData.statusPembayaran === 'Belum Transfer'} onChange={(e)=>setFormData({...formData, statusPembayaran: e.target.value})} className="hidden" />
-                                <AlertCircle size={20} className={`mb-1.5 ${formData.statusPembayaran === 'Belum Transfer' ? 'text-rose-550' : 'text-slate-300'}`} />
-                                <span className="text-xs font-extrabold">Belum Transfer</span>
-                            </label>
-                        </div>
-                    </div>
-                </form>
-                </div>{/* end scrollable wrapper */}
-
-                {/* Sticky action footer — always visible, never behind bottom nav */}
-                <div
-                  className="shrink-0 bg-white border-t border-slate-100 px-4 sm:px-6 pt-4 flex space-x-2 sm:space-x-3"
-                  style={{ paddingBottom: 'max(1rem, calc(0.75rem + env(safe-area-inset-bottom, 0px)))' }}
-                >
-                    <button
-                      type="button"
-                      onClick={() => {
-                          setCartLokasi([]);
-                          setIsCheckoutOpen(false);
-                          setIsCustomPicCheckout(false);
-                          setFormData({ namaRombongan: '', picRombongan: '', noWa: '', picKantor: '', keterangan: '', catatan: '', statusPembayaran: 'Belum Transfer', listrikTambahan: false, luasLahan: 50, isGazeboPackage: false });
-                      }}
-                      className="w-1/5 sm:w-auto px-0 sm:px-4 py-4 sm:py-3.5 text-xs sm:text-sm font-bold text-rose-500 bg-rose-50 hover:bg-rose-100 rounded-2xl transition-all duration-200 active:scale-95 flex items-center justify-center flex-col sm:flex-row gap-1"
-                      title="Bersihkan Formulir & Keranjang"
-                    >
-                        <Trash2 size={16} /> <span className="hidden sm:inline">Clear</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                          setIsCheckoutOpen(false);
-                          setIsCustomPicCheckout(false);
-                      }}
-                      className="w-auto flex-1 py-4 sm:py-3.5 text-sm font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-all duration-200 active:scale-95"
-                    >Batal</button>
-                    <button
-                      type="submit"
-                      form="booking-form"
-                      className="w-auto flex-[2] py-4 sm:py-3.5 text-sm font-black text-white bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 rounded-2xl shadow-[0_8px_20px_-4px_rgba(16,185,129,0.3)] hover:shadow-[0_10px_25px_-4px_rgba(16,185,129,0.4)] transition-all duration-200 flex justify-center items-center active:scale-95"
-                    ><Save size={18} className="mr-2"/> Proses {cartLokasi.length} Fasilitas</button>
-                </div>
-            </div>
-        </div>
-      )}
+      {/* Form Reservasi Baru (Checkout Modal) */}
+      <CheckoutModal
+        isOpen={isCheckoutOpen}
+        onClose={() => {
+          setIsCheckoutOpen(false);
+          setIsCustomPicCheckout(false);
+        }}
+        selectedDate={selectedDate}
+        cartLokasi={cartLokasi}
+        setCartLokasi={setCartLokasi}
+        formData={formData}
+        setFormData={setFormData}
+        isCustomPicCheckout={isCustomPicCheckout}
+        setIsCustomPicCheckout={setIsCustomPicCheckout}
+        picList={picList}
+        handleSubmitBooking={handleSubmitBooking}
+        formatTanggalIndo={formatTanggalIndo}
+        formatTanggalPendek={formatTanggalPendek}
+        formatRupiah={formatRupiah}
+        getBiayaLokasi={getBiayaLokasi}
+      />
 
       {/* Sidebar Desktop */}
       {!isPortalRoute && (
@@ -4116,7 +3689,20 @@ Terima kasih.`;
       </main>
 
       {selectedRecord && renderDetailModal()}
-      {renderMediaModal()}
+      <MediaModal
+        isOpen={mediaModalOpen}
+        onClose={() => setMediaModalOpen(false)}
+        selectedMediaLokasi={selectedMediaLokasi}
+        uploadingMedia={uploadingMedia}
+        mediaUploadProgress={mediaUploadProgress}
+        isEditingVideo={isEditingVideo}
+        setIsEditingVideo={setIsEditingVideo}
+        videoInputUrl={videoInputUrl}
+        setVideoInputUrl={setVideoInputUrl}
+        handleUploadMedia={handleUploadMedia}
+        handleDeleteMedia={handleDeleteMedia}
+        handleSaveVideoLink={handleSaveVideoLink}
+      />
 
       {fullScreenImage && (
         <div className="fixed inset-0 z-[9999] bg-black/95 flex justify-center items-center p-4 animate-fade-in" onClick={() => setFullScreenImage(null)}>
