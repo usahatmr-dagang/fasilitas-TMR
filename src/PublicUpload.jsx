@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UploadCloud, CheckCircle2, AlertCircle, Search, ShieldCheck, Zap, Clock, Copy } from 'lucide-react';
+import { UploadCloud, CheckCircle2, AlertCircle, Search, ShieldCheck, Zap, Clock, Copy, FileText } from 'lucide-react';
 import { db } from './firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 
@@ -10,7 +10,6 @@ export default function PublicUpload() {
   const [loadingText, setLoadingText] = useState('Memproses...');
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
-  const [infoMsg, setInfoMsg] = useState('');
   
   const [uploadFile, setUploadFile] = useState(null);
   const [filePreview, setFilePreview] = useState(null);
@@ -66,21 +65,11 @@ export default function PublicUpload() {
       
       if (docSnap.exists()) {
         const data = docSnap.data();
-        const isMainPaid = data.status_pembayaran === 'Lunas' || data.status_pembayaran === 'Sudah Transfer';
-        const needsListrik = data.listrik_tambahan && data.akses_upload_listrik && !data.bukti_transfer_listrik && isMainPaid;
-        const isMainPending = data.status_pembayaran === 'Menunggu Verifikasi' || !!data.bukti_transfer;
-
         if (data.status_pembayaran === 'Batal') {
           setErrorMsg('PESANAN DIBATALKAN. Anda melebihi batas waktu pembayaran atau pesanan dibatalkan oleh Admin.');
           setBookingData(null);
         } else if (data.status_pembayaran === 'Belum Transfer' && data.batas_pembayaran && new Date() > new Date(data.batas_pembayaran)) {
           setErrorMsg('Waktu pembayaran telah habis. Pesanan Anda ditangguhkan. Silakan hubungi Admin TMR untuk perpanjangan waktu.');
-          setBookingData(null);
-        } else if (isMainPaid && !needsListrik) {
-          setInfoMsg('Transaksi ini sudah lunas atau sudah memiliki bukti transfer yang valid.');
-          setBookingData(null);
-        } else if (isMainPending && !isMainPaid) {
-          setInfoMsg('Bukti transfer Anda sudah diterima dan sedang Menunggu Verifikasi oleh Admin.');
           setBookingData(null);
         } else {
           setBookingData({ id: docSnap.id, ...data });
@@ -126,7 +115,7 @@ export default function PublicUpload() {
     const reader = new FileReader();
     reader.onloadend = () => {
       setFilePreview(reader.result);
-      setUploadFile(file); // Store the actual File object
+      setUploadFile(file);
     };
     reader.readAsDataURL(file);
   };
@@ -170,6 +159,20 @@ export default function PublicUpload() {
     });
   };
 
+  // Status helpers
+  const isMainPaid = bookingData?.status_pembayaran === 'Lunas' || bookingData?.status_pembayaran === 'Sudah Transfer' || bookingData?.status_pembayaran === 'Sudah Lunas';
+
+  let biayaLokasiMurni = 0;
+  if (Array.isArray(bookingData?.detail_lokasi) && bookingData.detail_lokasi.length > 0) {
+    biayaLokasiMurni = bookingData.detail_lokasi.reduce((acc, loc) => acc + (Number(loc.biaya) || 0), 0);
+  }
+  const totalSudahTermasukListrik = biayaLokasiMurni > 0 && (Number(bookingData?.total_biaya) >= biayaLokasiMurni + 100000);
+
+  // Perlu bukti transfer listrik terpisah hanya jika listrik belum masuk ke tagihan utama yang sudah dibayar
+  const needsListrik = Boolean(bookingData?.listrik_tambahan && bookingData?.akses_upload_listrik && !bookingData?.bukti_transfer_listrik && isMainPaid && !totalSudahTermasukListrik);
+  const isMainPending = Boolean((bookingData?.status_pembayaran === 'Menunggu Verifikasi' || bookingData?.bukti_transfer) && !isMainPaid);
+  const isBelumBayar = Boolean(bookingData?.status_pembayaran === 'Belum Transfer' && !bookingData?.bukti_transfer);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!uploadFile || !bookingData) return;
@@ -184,29 +187,25 @@ export default function PublicUpload() {
       if (uploadFile.type.startsWith('image/')) {
         finalDataUrl = await compressImage(uploadFile);
       } else {
-        // Jika PDF, gunakan file asli sebagai base64 (hati-hati batas 1MB Firestore)
         const reader = new FileReader();
         finalDataUrl = await new Promise((resolve) => {
            reader.onload = () => resolve(reader.result);
            reader.readAsDataURL(uploadFile);
         });
         
-        // Peringatan ukuran untuk PDF
         const sizeInKB = Math.round((finalDataUrl.length * 3) / 4 / 1024);
         if (sizeInKB > 900) {
            throw new Error("File PDF terlalu besar. Gunakan file berukuran maksimal 600KB, atau gunakan format Gambar (JPG/PNG).");
         }
       }
       
-      setLoadingText('Menyimpan data transaksi (2/2)...');
+      setLoadingText('Menyimpan data transaksi...');
       const inputDateStr = paymentDate || new Date().toISOString().split('T')[0];
+      const isListrikUpload = needsListrik;
 
-      const isListrikUpload = bookingData.listrik_tambahan && bookingData.akses_upload_listrik && (bookingData.status_pembayaran === 'Lunas' || bookingData.status_pembayaran === 'Sudah Transfer');
-
-      // Update Firestore directly bypassing Storage
       const docRef = doc(db, 'sewaList', bookingData.id);
       
-      // Validasi concurrency backend (mencegah double upload dari tab lain atau cache browser)
+      // Concurrency check
       const docSnap = await getDoc(docRef);
       if (docSnap.exists()) {
           const currentData = docSnap.data();
@@ -218,7 +217,7 @@ export default function PublicUpload() {
               }
           } else {
               if (currentData.status_pembayaran === 'Sudah Transfer' || currentData.status_pembayaran === 'Lunas' || currentData.status_pembayaran === 'Menunggu Verifikasi') {
-                  setErrorMsg('Bukti transfer lokasi sudah diunggah sebelumnya. Menunggu verifikasi admin.');
+                  setErrorMsg('Bukti transfer sudah diunggah sebelumnya. Menunggu verifikasi admin.');
                   setIsLoading(false);
                   return;
               }
@@ -228,7 +227,8 @@ export default function PublicUpload() {
       if (isListrikUpload) {
         await updateDoc(docRef, {
           bukti_transfer_listrik: finalDataUrl,
-          tanggal_transfer_listrik: inputDateStr
+          tanggal_transfer_listrik: inputDateStr,
+          akses_upload_listrik: false
         });
         setSuccessMsg('Bukti pembayaran listrik tambahan berhasil di-upload! Mohon tunggu verifikasi.');
       } else {
@@ -275,22 +275,8 @@ export default function PublicUpload() {
           <h2 className="text-2xl font-black text-emerald-950 mb-2 tracking-tight">Upload Berhasil!</h2>
           <p className="text-slate-600 mb-8">{successMsg}</p>
           <button onClick={() => window.location.reload()} className="bg-emerald-600 text-white font-bold py-3 px-8 rounded-xl hover:bg-emerald-700 transition-colors shadow-md">
-            Kembali
+            Muat Ulang Halaman
           </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (infoMsg) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4 font-sans">
-        <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-8 text-center border border-sky-100">
-          <div className="w-20 h-20 bg-sky-100 text-sky-600 rounded-full flex items-center justify-center mx-auto mb-6">
-            <CheckCircle2 size={40} />
-          </div>
-          <h2 className="text-2xl font-black text-sky-950 mb-2 tracking-tight">Status Dokumen</h2>
-          <p className="text-slate-600 mb-8">{infoMsg}</p>
         </div>
       </div>
     );
@@ -315,7 +301,7 @@ export default function PublicUpload() {
           {!bookingData && !isLoading && (
             <div className="p-8 text-center">
               <p className="text-slate-600 mb-6 text-sm">
-                Harap gunakan <strong>Link Upload</strong> yang dikirimkan melalui pesan WhatsApp Anda untuk mengunggah bukti pembayaran secara otomatis.
+                Harap gunakan <strong>Link Upload</strong> yang dikirimkan melalui pesan WhatsApp Anda untuk melihat status dan mengunggah bukti pembayaran secara otomatis.
               </p>
               
               <div className="relative flex items-center justify-center mb-6">
@@ -349,7 +335,7 @@ export default function PublicUpload() {
             <div className="p-6 m-4 bg-rose-50 border border-rose-200 rounded-2xl flex items-start gap-3">
               <AlertCircle className="text-rose-500 shrink-0 mt-0.5" size={20} />
               <div>
-                <h4 className="text-rose-800 font-bold mb-1">Terjadi Kesalahan</h4>
+                <h4 className="text-rose-800 font-bold mb-1">Perhatian</h4>
                 <p className="text-rose-600 text-sm">{errorMsg}</p>
                 <button onClick={() => { setErrorMsg(''); setDocId(''); }} className="mt-3 text-xs font-bold text-rose-700 underline hover:text-rose-800">Coba Lagi</button>
               </div>
@@ -357,19 +343,48 @@ export default function PublicUpload() {
           )}
 
           {bookingData && !isLoading && (
-            <div className="p-8">
-              <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-5 mb-6">
-                <div className="flex flex-col sm:flex-row justify-between items-start gap-4 sm:gap-0 mb-4">
+            <div className="p-6 sm:p-8">
+              {/* Header Informasi Transaksi */}
+              <div className="bg-emerald-50/70 border border-emerald-100 rounded-2xl p-5 mb-6">
+                <div className="flex flex-col sm:flex-row justify-between items-start gap-3 sm:gap-0 mb-4">
                   <div>
                     <p className="text-[10px] uppercase font-bold text-emerald-600 tracking-wider mb-1">ID Transaksi</p>
-                    <p className="font-black text-emerald-950 text-xl">{bookingData.id_sewa}</p>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-black text-emerald-950 text-xl tracking-tight">{bookingData.id_sewa}</p>
+                      
+                      {isMainPaid && !needsListrik && (
+                        <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 text-[11px] font-black px-2.5 py-1 rounded-full border border-emerald-300">
+                          <CheckCircle2 size={13} className="text-emerald-600" /> SUDAH LUNAS
+                        </span>
+                      )}
+                      {isMainPending && (
+                        <span className="inline-flex items-center gap-1 bg-sky-100 text-sky-800 text-[11px] font-black px-2.5 py-1 rounded-full border border-sky-300">
+                          <Clock size={13} className="text-sky-600 animate-pulse" /> MENUNGGU VERIFIKASI
+                        </span>
+                      )}
+                      {needsListrik && (
+                        <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-800 text-[11px] font-black px-2.5 py-1 rounded-full border border-amber-300">
+                          <Zap size={13} className="text-amber-600" /> PERLU BUKTI LISTRIK
+                        </span>
+                      )}
+                      {isBelumBayar && (
+                        <span className="inline-flex items-center gap-1 bg-rose-100 text-rose-800 text-[11px] font-black px-2.5 py-1 rounded-full border border-rose-300">
+                          <AlertCircle size={13} className="text-rose-600" /> BELUM BAYAR
+                        </span>
+                      )}
+                    </div>
                   </div>
+                  
                   <div className="sm:text-right">
-                    <p className="text-[10px] uppercase font-bold text-emerald-600 tracking-wider mb-1">Total Tagihan</p>
+                    <p className="text-[10px] uppercase font-bold text-emerald-600 tracking-wider mb-1">Total Biaya</p>
                     <p className="font-black text-emerald-800 text-xl">{formatRupiah(bookingData.total_biaya)}</p>
+                    {isMainPaid && !needsListrik && (
+                      <p className="text-[11px] text-emerald-600 font-bold mt-0.5">Telah Lunas Diverifikasi</p>
+                    )}
                   </div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm border-t border-emerald-200/50 pt-4 mt-2">
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm border-t border-emerald-200/50 pt-3">
                   <div>
                     <p className="text-slate-500 text-xs mb-0.5">Nama Penyewa</p>
                     <p className="font-bold text-slate-800">{bookingData.nama_penyewa}</p>
@@ -383,11 +398,98 @@ export default function PublicUpload() {
                     <p className="font-bold text-slate-800">{bookingData.lokasi_sewa}</p>
                   </div>
                 </div>
+
+                {bookingData.listrik_tambahan && (
+                  <div className="mt-3 pt-2.5 border-t border-emerald-200/40 flex items-center justify-between text-xs">
+                    <span className="text-slate-600 font-semibold flex items-center gap-1">
+                      <Zap size={14} className="text-amber-500" /> Pemakaian Listrik Tambahan:
+                    </span>
+                    <span className="font-bold text-slate-800">
+                      {totalSudahTermasukListrik || (isMainPaid && !needsListrik) ? 'Termasuk Dalam Paket (Lunas)' : 'Tambahan Listrik (+Rp 100.000)'}
+                    </span>
+                  </div>
+                )}
               </div>
 
-              {bookingData.status_pembayaran === 'Belum Transfer' && (
+              {/* KONDISI 1: SUDAH LUNAS & TERVERIFIKASI (SELESAI PENUH) */}
+              {isMainPaid && !needsListrik && (
+                <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-6 text-center my-4">
+                  <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-3 shadow-inner">
+                    <CheckCircle2 size={36} />
+                  </div>
+                  <h3 className="text-xl font-black text-emerald-950 mb-1 tracking-tight">Pembayaran Lunas & Terverifikasi</h3>
+                  <p className="text-emerald-800 text-sm font-medium leading-relaxed max-w-md mx-auto">
+                    Terima kasih! Pembayaran untuk reservasi fasilitas di Taman Margasatwa Ragunan telah diterima dan diverifikasi oleh tim Admin. Reservasi Anda telah terdaftar dan berlaku resmi.
+                  </p>
+                  
+                  {bookingData.tanggal_transfer && (
+                    <div className="inline-block mt-3 px-3 py-1 bg-white rounded-lg border border-emerald-200 text-emerald-900 text-xs font-bold">
+                      Tanggal Pembayaran: {formatTanggalIndo(bookingData.tanggal_transfer)}
+                    </div>
+                  )}
+
+                  {bookingData.bukti_transfer && (
+                    <div className="mt-5 pt-4 border-t border-emerald-200/80">
+                      <p className="text-xs font-bold text-emerald-900 mb-2">Struk Bukti Pembayaran Resmi:</p>
+                      <img 
+                        src={bookingData.bukti_transfer} 
+                        alt="Bukti Transfer" 
+                        className="max-h-64 mx-auto rounded-xl border border-emerald-200 shadow-sm object-contain bg-white"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* KONDISI 2: MENUNGGU VERIFIKASI ADMIN */}
+              {isMainPending && (
+                <div className="bg-sky-50 border border-sky-200 rounded-2xl p-6 text-center my-4">
+                  <div className="w-16 h-16 bg-sky-100 text-sky-600 rounded-full flex items-center justify-center mx-auto mb-3 shadow-inner">
+                    <Clock size={36} className="animate-pulse" />
+                  </div>
+                  <h3 className="text-xl font-black text-sky-950 mb-1 tracking-tight">Menunggu Verifikasi Admin</h3>
+                  <p className="text-sky-800 text-sm font-medium leading-relaxed max-w-md mx-auto">
+                    Bukti transfer Anda telah kami terima dan saat ini sedang dalam proses verifikasi oleh tim Admin Taman Margasatwa Ragunan. Harap cek link ini secara berkala.
+                  </p>
+                  
+                  {bookingData.tanggal_transfer && (
+                    <div className="inline-block mt-3 px-3 py-1 bg-white rounded-lg border border-sky-200 text-sky-900 text-xs font-bold">
+                      Tanggal Transfer: {formatTanggalIndo(bookingData.tanggal_transfer)}
+                    </div>
+                  )}
+
+                  {bookingData.bukti_transfer && (
+                    <div className="mt-5 pt-4 border-t border-sky-200/80">
+                      <p className="text-xs font-bold text-sky-900 mb-2">Struk Bukti Transfer yang Diunggah:</p>
+                      <img 
+                        src={bookingData.bukti_transfer} 
+                        alt="Bukti Transfer" 
+                        className="max-h-64 mx-auto rounded-xl border border-sky-200 shadow-sm object-contain bg-white"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* KONDISI 3: BUTUH UPLOAD LISTRIK TERPISAH */}
+              {needsListrik && (
+                <>
+                  <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 mb-6">
+                    <div className="flex items-center gap-2 mb-2 text-emerald-800 font-bold text-sm">
+                      <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
+                      <span>Sewa Fasilitas Utama: <strong className="text-emerald-950">LUNAS & TERVERIFIKASI</strong></span>
+                    </div>
+                    <div className="flex items-center gap-2 text-amber-900 font-bold text-sm pt-2 border-t border-amber-200/70">
+                      <Zap size={18} className="text-amber-600 shrink-0" />
+                      <span>Tagihan Tambahan Listrik: <strong className="text-amber-950">{formatRupiah(100000)}</strong></span>
+                    </div>
+                    <p className="text-xs text-amber-800 mt-2 font-medium">
+                      Admin telah mengaktifkan pemakaian listrik untuk acara Anda. Silakan transfer biaya listrik sebesar Rp 100.000 ke rekening resmi berikut dan unggah bukti transfer di bawah ini:
+                    </p>
+                  </div>
+
                   <div className="bg-sky-50 border border-sky-100 rounded-2xl p-5 mb-6 text-center">
-                    <p className="text-xs font-bold text-sky-800 mb-3">Silahkan transfer tagihan ke rekening resmi berikut:</p>
+                    <p className="text-xs font-bold text-sky-800 mb-3">Silahkan transfer biaya listrik ke rekening resmi:</p>
                     <div className="bg-white border border-sky-200 rounded-xl p-4 inline-block text-left shadow-sm w-full">
                         <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Bank Tujuan</p>
                         <p className="font-black text-sky-950 text-base mb-2">BANK JAKARTA (Cabang Pondok Labu)</p>
@@ -401,82 +503,112 @@ export default function PublicUpload() {
                             <button type="button" onClick={() => { navigator.clipboard.writeText('40142700918'); alert('Nomor rekening berhasil disalin!'); }} className="flex items-center gap-1.5 bg-sky-100 hover:bg-sky-200 text-sky-700 px-3 py-2 rounded-md font-bold text-xs transition-colors"><Copy size={14}/> Salin</button>
                         </div>
 
-                        <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider mt-3">Nominal Transfer</p>
+                        <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider mt-3">Nominal Transfer Listrik</p>
                         <div className="flex items-center justify-between bg-slate-50 rounded-lg p-3 border border-slate-200 mt-1">
-                            <p className="font-mono font-bold text-xl text-amber-600 tracking-widest select-all">{formatRupiah(bookingData.total_biaya)}</p>
-                            <button type="button" onClick={() => { navigator.clipboard.writeText(String(bookingData.total_biaya)); alert('Nominal transfer berhasil disalin!'); }} className="flex items-center gap-1.5 bg-amber-100 hover:bg-amber-200 text-amber-700 px-3 py-2 rounded-md font-bold text-xs transition-colors"><Copy size={14}/> Salin</button>
+                            <p className="font-mono font-bold text-xl text-amber-600 tracking-widest select-all">{formatRupiah(100000)}</p>
+                            <button type="button" onClick={() => { navigator.clipboard.writeText('100000'); alert('Nominal transfer berhasil disalin!'); }} className="flex items-center gap-1.5 bg-amber-100 hover:bg-amber-200 text-amber-700 px-3 py-2 rounded-md font-bold text-xs transition-colors"><Copy size={14}/> Salin</button>
                         </div>
                     </div>
-                    {timeLeft && (
-                        <div className="mt-4 flex items-center justify-center gap-2 text-rose-600 bg-white border border-rose-200 shadow-sm py-2 px-4 rounded-xl inline-flex font-bold text-sm">
-                            <Clock size={16} className="animate-pulse" /> Sisa Waktu Pembayaran: {timeLeft}
-                        </div>
-                    )}
                   </div>
+                </>
               )}
 
-              <form onSubmit={handleSubmit}>
-                <div className="mb-6">
-                  {bookingData?.listrik_tambahan && bookingData?.akses_upload_listrik && (bookingData?.status_pembayaran === 'Lunas' || bookingData?.status_pembayaran === 'Sudah Transfer') ? (
-                    <>
-                      <p className="text-sm font-black text-amber-600 flex items-center mb-1"><Zap size={16} className="mr-1" /> Bukti Pembayaran Listrik (+Rp 100.000)</p>
-                      <p className="text-[10px] text-slate-500 mb-3">Admin telah mengaktifkan pemakaian listrik. Silakan unggah bukti transfer tambahan di sini.</p>
-                    </>
-                  ) : (
-                    <p className="text-sm font-bold text-slate-700 mb-2">Pilih File Bukti Pembayaran</p>
-                  )}
-                  
-                  <div className="mb-4">
-                    <label className="block text-sm font-bold text-slate-700 mb-2">Tanggal Pembayaran <span className="text-rose-500">*</span></label>
-                    <input 
-                      type="date" 
-                      required
-                      max={new Date().toISOString().split('T')[0]}
-                      value={paymentDate}
-                      onChange={(e) => setPaymentDate(e.target.value)}
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all"
-                    />
-                  </div>
-
-                  {!filePreview ? (
-                    <label className="w-full border-2 border-dashed border-slate-300 bg-slate-50 hover:bg-emerald-50 hover:border-emerald-300 text-slate-500 hover:text-emerald-600 transition-colors py-10 rounded-2xl flex flex-col items-center justify-center cursor-pointer group">
-                      <input type="file" accept="image/jpeg, image/png, application/pdf" className="hidden" onChange={handleFileChange} />
-                      <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm mb-3 group-hover:scale-110 transition-transform">
-                        <UploadCloud size={24} />
+              {/* KONDISI 4: BELUM BAYAR (TAGIHAN AWAL) */}
+              {isBelumBayar && (
+                <div className="bg-sky-50 border border-sky-100 rounded-2xl p-5 mb-6 text-center">
+                  <p className="text-xs font-bold text-sky-800 mb-3">Silahkan transfer tagihan ke rekening resmi berikut:</p>
+                  <div className="bg-white border border-sky-200 rounded-xl p-4 inline-block text-left shadow-sm w-full">
+                      <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Bank Tujuan</p>
+                      <p className="font-black text-sky-950 text-base mb-2">BANK JAKARTA (Cabang Pondok Labu)</p>
+                      
+                      <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Atas Nama</p>
+                      <p className="font-bold text-slate-800 mb-2">TM Ragunan Penerimaan BLUD</p>
+                      
+                      <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Nomor Rekening</p>
+                      <div className="flex items-center justify-between bg-slate-50 rounded-lg p-3 border border-slate-200 mt-1">
+                          <p className="font-mono font-bold text-xl text-slate-800 tracking-widest select-all">40142700918</p>
+                          <button type="button" onClick={() => { navigator.clipboard.writeText('40142700918'); alert('Nomor rekening berhasil disalin!'); }} className="flex items-center gap-1.5 bg-sky-100 hover:bg-sky-200 text-sky-700 px-3 py-2 rounded-md font-bold text-xs transition-colors"><Copy size={14}/> Salin</button>
                       </div>
-                      <span className="font-bold">Klik untuk memilih file</span>
-                      <span className="text-xs mt-1 font-medium opacity-70">Maks. 5MB (JPG, PNG, PDF)</span>
-                    </label>
-                  ) : (
-                    <div className="relative">
-                      {uploadFile?.type?.startsWith('image/') ? (
-                        <img src={filePreview} alt="Preview" className="w-full max-h-[500px] object-contain bg-slate-100 rounded-2xl border border-slate-200 shadow-sm" />
-                      ) : (
-                        <div className="w-full h-48 bg-slate-100 rounded-2xl border border-slate-200 flex flex-col items-center justify-center text-slate-500">
-                           <CheckCircle2 size={40} className="text-emerald-500 mb-2" />
-                           <p className="font-bold text-slate-700">{uploadFile.name}</p>
-                           <p className="text-xs mt-1">Dokumen PDF Terpilih</p>
-                        </div>
-                      )}
-                      <button 
-                        type="button" 
-                        onClick={() => { setFilePreview(null); setUploadFile(null); }}
-                        className="absolute top-3 right-3 bg-white/90 backdrop-blur text-rose-600 text-xs font-bold px-3 py-1.5 rounded-lg shadow hover:bg-rose-50 transition-colors"
-                      >
-                        Ganti File
-                      </button>
-                    </div>
+
+                      <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider mt-3">Nominal Transfer</p>
+                      <div className="flex items-center justify-between bg-slate-50 rounded-lg p-3 border border-slate-200 mt-1">
+                          <p className="font-mono font-bold text-xl text-amber-600 tracking-widest select-all">{formatRupiah(bookingData.total_biaya)}</p>
+                          <button type="button" onClick={() => { navigator.clipboard.writeText(String(bookingData.total_biaya)); alert('Nominal transfer berhasil disalin!'); }} className="flex items-center gap-1.5 bg-amber-100 hover:bg-amber-200 text-amber-700 px-3 py-2 rounded-md font-bold text-xs transition-colors"><Copy size={14}/> Salin</button>
+                      </div>
+                  </div>
+                  {timeLeft && (
+                      <div className="mt-4 flex items-center justify-center gap-2 text-rose-600 bg-white border border-rose-200 shadow-sm py-2 px-4 rounded-xl inline-flex font-bold text-sm">
+                          <Clock size={16} className="animate-pulse" /> Sisa Waktu Pembayaran: {timeLeft}
+                      </div>
                   )}
                 </div>
+              )}
 
-                <button 
-                  type="submit" 
-                  disabled={!filePreview || !paymentDate || isLoading}
-                  className="w-full bg-emerald-600 text-white font-bold py-4 rounded-xl shadow-lg shadow-emerald-600/30 hover:bg-emerald-700 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:shadow-none"
-                >
-                  Kirim Bukti Pembayaran
-                </button>
-              </form>
+              {/* FORM UPLOAD HANYA DITAMPILKAN JIKA MEMANG PERLU MENGUNGGAH (BELUM BAYAR ATAU NEEDS LISTRIK) */}
+              {(isBelumBayar || needsListrik) && (
+                <form onSubmit={handleSubmit}>
+                  <div className="mb-6">
+                    {needsListrik ? (
+                      <>
+                        <p className="text-sm font-black text-amber-600 flex items-center mb-1"><Zap size={16} className="mr-1" /> Unggah Bukti Pembayaran Listrik (+Rp 100.000)</p>
+                        <p className="text-[11px] text-slate-500 mb-3">Silakan pilih file bukti transfer biaya listrik Anda di bawah ini.</p>
+                      </>
+                    ) : (
+                      <p className="text-sm font-bold text-slate-700 mb-2">Pilih File Bukti Pembayaran</p>
+                    )}
+                    
+                    <div className="mb-4">
+                      <label className="block text-sm font-bold text-slate-700 mb-2">Tanggal Pembayaran <span className="text-rose-500">*</span></label>
+                      <input 
+                        type="date" 
+                        required
+                        max={new Date().toISOString().split('T')[0]}
+                        value={paymentDate}
+                        onChange={(e) => setPaymentDate(e.target.value)}
+                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all font-semibold"
+                      />
+                    </div>
+
+                    {!filePreview ? (
+                      <label className="w-full border-2 border-dashed border-slate-300 bg-slate-50 hover:bg-emerald-50 hover:border-emerald-300 text-slate-500 hover:text-emerald-600 transition-colors py-10 rounded-2xl flex flex-col items-center justify-center cursor-pointer group">
+                        <input type="file" accept="image/jpeg, image/png, application/pdf" className="hidden" onChange={handleFileChange} />
+                        <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm mb-3 group-hover:scale-110 transition-transform">
+                          <UploadCloud size={24} />
+                        </div>
+                        <span className="font-bold">Klik untuk memilih file</span>
+                        <span className="text-xs mt-1 font-medium opacity-70">Maks. 5MB (JPG, PNG, PDF)</span>
+                      </label>
+                    ) : (
+                      <div className="relative">
+                        {uploadFile?.type?.startsWith('image/') ? (
+                          <img src={filePreview} alt="Preview" className="w-full max-h-[500px] object-contain bg-slate-100 rounded-2xl border border-slate-200 shadow-sm" />
+                        ) : (
+                          <div className="w-full h-48 bg-slate-100 rounded-2xl border border-slate-200 flex flex-col items-center justify-center text-slate-500">
+                             <CheckCircle2 size={40} className="text-emerald-500 mb-2" />
+                             <p className="font-bold text-slate-700">{uploadFile.name}</p>
+                             <p className="text-xs mt-1">Dokumen PDF Terpilih</p>
+                          </div>
+                        )}
+                        <button 
+                          type="button" 
+                          onClick={() => { setFilePreview(null); setUploadFile(null); }}
+                          className="absolute top-3 right-3 bg-white/90 backdrop-blur text-rose-600 text-xs font-bold px-3 py-1.5 rounded-lg shadow hover:bg-rose-50 transition-colors"
+                        >
+                          Ganti File
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <button 
+                    type="submit" 
+                    disabled={!filePreview || !paymentDate || isLoading}
+                    className="w-full bg-emerald-600 text-white font-bold py-4 rounded-xl shadow-lg shadow-emerald-600/30 hover:bg-emerald-700 hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0 disabled:shadow-none"
+                  >
+                    Kirim Bukti Pembayaran
+                  </button>
+                </form>
+              )}
             </div>
           )}
         </div>

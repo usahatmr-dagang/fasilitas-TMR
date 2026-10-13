@@ -795,7 +795,7 @@ export default function App() {
       catatan: formData.catatan || '-',
       status_pembayaran: formData.statusPembayaran || 'Belum Transfer',
       listrik_tambahan: formData.listrikTambahan || false,
-      akses_upload_listrik: formData.listrikTambahan ? true : false, 
+      akses_upload_listrik: false, 
       luas_lahan: luas_lahan_total,
       total_biaya: totalBiaya,
       tanggal_booking: currentDateTime,
@@ -935,7 +935,7 @@ Terima kasih.`;
         ...selectedRecord, 
         ...editFormData,
         detail_lokasi: detailLokasiUpdate,
-        akses_upload_listrik: editFormData.listrik_tambahan ? true : false,
+        akses_upload_listrik: (editFormData.listrik_tambahan && !selectedRecord.listrik_tambahan && (selectedRecord.status_pembayaran === 'Sudah Transfer' || selectedRecord.status_pembayaran === 'Lunas')) ? true : (editFormData.akses_upload_listrik || false),
         total_biaya: biayaLokasi + biayaListrik 
     };
 
@@ -2079,7 +2079,7 @@ Terima kasih.`;
                             <span className={`px-3 py-1.5 rounded-xl text-[11px] font-extrabold ${getStatusBadgeClass(selectedRecord.status_pembayaran)}`}>{selectedRecord.status_pembayaran}</span>
                          </div>
                          {selectedRecord.status_pembayaran === 'Menunggu Verifikasi' && selectedRecord.bukti_transfer && (
-                             <button type="button" onClick={() => handleUpdateRecordInline(selectedRecord, { status_pembayaran: 'Sudah Transfer' }, 'Pembayaran berhasil diverifikasi!')} className="w-full bg-emerald-600 text-white font-bold py-3 rounded-xl hover:bg-emerald-700 shadow-md hover:shadow-lg transition-all duration-200 mb-3 flex justify-center items-center"><CheckCircle2 size={16} className="mr-2"/> Verifikasi Valid</button>
+                             <button type="button" onClick={() => handleUpdateRecordInline(selectedRecord, { status_pembayaran: 'Sudah Transfer', akses_upload_listrik: false }, 'Pembayaran berhasil diverifikasi!')} className="w-full bg-emerald-600 text-white font-bold py-3 rounded-xl hover:bg-emerald-700 shadow-md hover:shadow-lg transition-all duration-200 mb-3 flex justify-center items-center"><CheckCircle2 size={16} className="mr-2"/> Verifikasi Valid</button>
                          )}
                          {selectedRecord.bukti_transfer && (
                              <div className="mt-2 space-y-3">
