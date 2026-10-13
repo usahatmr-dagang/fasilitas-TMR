@@ -1,5 +1,5 @@
 /* eslint-disable */
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { 
   LayoutDashboard, 
   Users, 
@@ -383,9 +383,17 @@ export default function App() {
     return () => { unsubLokasi(); unsubSewa(); unsubPic(); };
   }, [adminUser]);
 
-  const getBiayaLokasi = (namaLokasi, luasLahan = 50) => {
+  const masterLokasiMap = useMemo(() => {
+    const map = new Map();
+    for (const l of masterLokasi) {
+      if (l.nama) map.set(l.nama, l);
+    }
+    return map;
+  }, [masterLokasi]);
+
+  const getBiayaLokasi = useCallback((namaLokasi, luasLahan = 50) => {
     if (!namaLokasi) return 0;
-    const lokasiObj = masterLokasi.find(l => l.nama === namaLokasi);
+    const lokasiObj = masterLokasiMap.get(namaLokasi) || masterLokasi.find(l => l.nama === namaLokasi);
     
     const isLapangan = lokasiObj?.tipe === 'lapangan' || (!lokasiObj && namaLokasi.startsWith('LAP '));
 
@@ -403,7 +411,7 @@ export default function App() {
     }
     
     return hargaSewa;
-  };
+  }, [masterLokasiMap, masterLokasi]);
 
   const [newMasterLokasiNama, setNewMasterLokasiNama] = useState('');
   const [newMasterLokasiTipe, setNewMasterLokasiTipe] = useState('pendopo');
@@ -591,7 +599,35 @@ export default function App() {
       });
       return { ...lokasi, status: booking ? 'Disewa' : 'Tersedia', bookingInfo: booking || null };
     });
-  }, [selectedDate, filterTipe, sewaList]);
+  }, [selectedDate, filterTipe, sewaList, masterLokasi]);
+
+  const { fasilitasTersedia, listSudahBayar, listBelumBayar, listDitutup } = useMemo(() => {
+    const tersedia = [];
+    const sudahBayar = [];
+    const belumBayar = [];
+    const ditutup = [];
+
+    for (const f of fasilitasHarian) {
+      if (f.status === 'Tersedia') {
+        tersedia.push(f);
+      } else {
+        const status = f.bookingInfo?.status_pembayaran;
+        if (status === 'Ditutup') {
+          ditutup.push(f);
+        } else if (status === 'Sudah Transfer' || status === 'Sudah Lunas' || status === 'Menunggu Verifikasi') {
+          sudahBayar.push(f);
+        } else {
+          belumBayar.push(f);
+        }
+      }
+    }
+    return {
+      fasilitasTersedia: tersedia,
+      listSudahBayar: sudahBayar,
+      listBelumBayar: belumBayar,
+      listDitutup: ditutup
+    };
+  }, [fasilitasHarian]);
 
   const availableLokasiForReschedule = useMemo(() => {
     if (!rescheduleData.tanggal || !selectedRecord) return [];
@@ -601,31 +637,6 @@ export default function App() {
         return s.lokasi_sewa === l.nama || (s.lokasi_sewa && s.lokasi_sewa.split(', ').includes(l.nama));
     }));
   }, [rescheduleData.tanggal, sewaList, selectedRecord, masterLokasi]);
-
-  const groupedSewa = useMemo(() => {
-    const todayStr = getTodayString();
-    let dataYangDitampilkan = sewaList.filter(sewa => sewa.status_pembayaran !== 'Ditutup');
-    if (filterDateSewa !== '') {
-      dataYangDitampilkan = dataYangDitampilkan.filter(sewa => normalizeDateString(sewa.tanggal_sewa) === filterDateSewa);
-    } else {
-      dataYangDitampilkan = dataYangDitampilkan.filter(sewa => normalizeDateString(sewa.tanggal_sewa) >= todayStr);
-    }
-    
-    if (filterStatusSewa === 'Sudah Bayar') {
-       dataYangDitampilkan = dataYangDitampilkan.filter(sewa => sewa.status_pembayaran === 'Sudah Transfer' || sewa.status_pembayaran === 'Menunggu Verifikasi');
-    } else if (filterStatusSewa === 'Belum Bayar') {
-       dataYangDitampilkan = dataYangDitampilkan.filter(sewa => sewa.status_pembayaran === 'Belum Transfer');
-    }
-
-    const groups = dataYangDitampilkan.reduce((acc, curr) => {
-      const normDate = normalizeDateString(curr.tanggal_sewa);
-      if (!normDate) return acc;
-      if (!acc[normDate]) acc[normDate] = [];
-      acc[normDate].push(curr);
-      return acc;
-    }, {});
-    return Object.keys(groups).sort((a, b) => new Date(a) - new Date(b)).map(date => ({ date, data: groups[date] }));
-  }, [sewaList, filterDateSewa, filterStatusSewa]);
 
   const availableDatesList = useMemo(() => {
     const todayStr = getTodayString();
@@ -691,8 +702,7 @@ export default function App() {
     });
   }, [availableDatesList, sidebarDateSearch]);
 
-  const groupedPembayaran = useMemo(() => {
-    const todayStr = getTodayString();
+  const { groupedPembayaran, pembayaranMap } = useMemo(() => {
     let dataBayar = sewaList.filter(sewa => {
       return ['Sudah Transfer', 'Lunas', 'Sudah Lunas', 'Menunggu Verifikasi'].includes(sewa.status_pembayaran);
     });
@@ -705,7 +715,8 @@ export default function App() {
       acc[date].push(curr);
       return acc;
     }, {});
-    return Object.keys(groups).sort((a, b) => new Date(b) - new Date(a)).map(date => ({ date, data: groups[date] }));
+    const list = Object.keys(groups).sort((a, b) => new Date(b) - new Date(a)).map(date => ({ date, data: groups[date] }));
+    return { groupedPembayaran: list, pembayaranMap: groups };
   }, [sewaList, filterDatePembayaran]);
 
   const calendarYear = calendarMonth.getFullYear();
@@ -716,15 +727,64 @@ export default function App() {
   const blanks = Array(firstDay).fill(null);
   const calendarDays = Array.from({length: daysInMonth}, (_, i) => i + 1);
 
-  const getTransferDataForDate = (day) => {
+  const getTransferDataForDate = useCallback((day) => {
       const dateStr = `${calendarYear}-${String(calendarMonthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      const group = groupedPembayaran.find(g => g.date === dateStr);
-      return group ? group.data : [];
-  };
+      return pembayaranMap[dateStr] || [];
+  }, [calendarYear, calendarMonthIndex, pembayaranMap]);
 
   const totalFasilitas = masterLokasi.length;
-  const jumlahDisewa = sewaList.filter(sewa => sewa.tanggal_sewa === selectedDate && sewa.status_pembayaran !== 'Ditutup').length;
-  const persentaseSewa = Math.round((jumlahDisewa / totalFasilitas) * 100);
+  const jumlahDisewa = useMemo(() => {
+    return sewaList.filter(sewa => sewa.tanggal_sewa === selectedDate && sewa.status_pembayaran !== 'Ditutup').length;
+  }, [sewaList, selectedDate]);
+  const persentaseSewa = useMemo(() => {
+    return totalFasilitas > 0 ? Math.round((jumlahDisewa / totalFasilitas) * 100) : 0;
+  }, [jumlahDisewa, totalFasilitas]);
+
+  const sewaTableData = useMemo(() => {
+    const todayStr = getTodayString();
+    const targetDateNorm = filterDateSewa ? normalizeDateString(filterDateSewa) : null;
+    let baseList = sewaList.filter(s => s.status_pembayaran !== 'Ditutup');
+    if (targetDateNorm) {
+      baseList = baseList.filter(s => normalizeDateString(s.tanggal_sewa) === targetDateNorm);
+    } else {
+      baseList = baseList.filter(s => normalizeDateString(s.tanggal_sewa) >= todayStr);
+    }
+
+    const totalCount = baseList.length;
+    const belumBayarAll = baseList.filter(s => s.status_pembayaran === 'Belum Transfer');
+    const sudahBayarAll = baseList.filter(s => ['Sudah Transfer', 'Menunggu Verifikasi', 'Sudah Lunas', 'Lunas'].includes(s.status_pembayaran));
+
+    // Filter status tab
+    let statusFiltered = baseList;
+    if (filterStatusSewa === 'Belum Bayar') {
+      statusFiltered = belumBayarAll;
+    } else if (filterStatusSewa === 'Sudah Bayar') {
+      statusFiltered = sudahBayarAll;
+    }
+
+    // Apply search filter if query exists
+    let dataFiltered = statusFiltered;
+    if (sewaSearchQuery.trim()) {
+      const q = sewaSearchQuery.toLowerCase().trim();
+      dataFiltered = dataFiltered.filter(s => {
+        const mNama = (s.nama_penyewa || '').toLowerCase().includes(q);
+        const mLok = (s.lokasi_sewa || '').toLowerCase().includes(q);
+        const mId = (s.id_sewa || '').toLowerCase().includes(q);
+        const mHp = (s.no_hp_penyewa || '').toLowerCase().includes(q);
+        const mKet = (s.keterangan || '').toLowerCase().includes(q);
+        const mPic = (s.pic_kantor || s.pic_rombongan || '').toLowerCase().includes(q);
+        return mNama || mLok || mId || mHp || mKet || mPic;
+      });
+    }
+
+    return {
+      targetDateNorm,
+      totalCount,
+      belumBayarCount: belumBayarAll.length,
+      sudahBayarCount: sudahBayarAll.length,
+      dataFiltered
+    };
+  }, [sewaList, filterDateSewa, filterStatusSewa, sewaSearchQuery]);
 
   const getIconData = (tipe) => {
     switch(tipe) {
@@ -2675,7 +2735,7 @@ Terima kasih.`;
                       <span className="w-2 h-2 rounded-full bg-emerald-500 mr-2"></span> Fasilitas Tersedia
                     </h3>
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 gap-3 sm:gap-3.5 relative z-10">
-                      {fasilitasHarian.filter(f => f.status === 'Tersedia').map(fasilitas => {
+                      {fasilitasTersedia.map(fasilitas => {
                         const { icon: IconComponent, color, bg } = getIconData(fasilitas.tipe);
                         const isTersedia = true;
                         const isDitutup = false;
@@ -2727,13 +2787,7 @@ Terima kasih.`;
                   </div>
 
                   {/* Tersewa Section */}
-                  {(() => {
-                    const unavailable = fasilitasHarian.filter(f => f.status !== 'Tersedia');
-                    if (unavailable.length === 0) return null;
-                    
-                    const listSudahBayar = unavailable.filter(f => f.bookingInfo?.status_pembayaran === 'Sudah Transfer' || f.bookingInfo?.status_pembayaran === 'Sudah Lunas' || f.bookingInfo?.status_pembayaran === 'Menunggu Verifikasi');
-                    const listBelumBayar = unavailable.filter(f => !f.bookingInfo || f.bookingInfo?.status_pembayaran === 'Belum Transfer');
-                    const listDitutup = unavailable.filter(f => f.bookingInfo?.status_pembayaran === 'Ditutup');
+                  {(listSudahBayar.length > 0 || listBelumBayar.length > 0 || listDitutup.length > 0) && (() => {
 
                     const renderCard = (fasilitas) => {
                       const { icon: IconComponent, color, bg } = getIconData(fasilitas.tipe);
@@ -2963,44 +3017,7 @@ Terima kasih.`;
                    {/* Right Area: Unified Data Table (AppSheet / Gambar 2 style) */}
                    <div className="flex-1 bg-white rounded-2xl border border-slate-200/90 shadow-xs flex flex-col h-full overflow-hidden min-h-[400px]">
                       {(() => {
-                         const todayStr = getTodayString();
-                         const targetDateNorm = filterDateSewa ? normalizeDateString(filterDateSewa) : null;
-                         let baseList = sewaList.filter(s => s.status_pembayaran !== 'Ditutup');
-                         if (targetDateNorm) {
-                            baseList = baseList.filter(s => normalizeDateString(s.tanggal_sewa) === targetDateNorm);
-                         } else {
-                            baseList = baseList.filter(s => normalizeDateString(s.tanggal_sewa) >= todayStr);
-                         }
-
-                         const totalCount = baseList.length;
-                         const belumBayarAll = baseList.filter(s => s.status_pembayaran === 'Belum Transfer');
-                         const sudahBayarAll = baseList.filter(s => ['Sudah Transfer', 'Menunggu Verifikasi', 'Sudah Lunas', 'Lunas'].includes(s.status_pembayaran));
-
-                         // Filter status tab
-                         let statusFiltered = baseList;
-                         if (filterStatusSewa === 'Belum Bayar') {
-                            statusFiltered = belumBayarAll;
-                         } else if (filterStatusSewa === 'Sudah Bayar') {
-                            statusFiltered = sudahBayarAll;
-                         }
-
-                         // Apply search filter if query exists
-                         let dataFiltered = statusFiltered;
-                         if (targetDateNorm) {
-                            dataFiltered = dataFiltered.filter(s => normalizeDateString(s.tanggal_sewa) === targetDateNorm);
-                         }
-                         if (sewaSearchQuery.trim()) {
-                            const q = sewaSearchQuery.toLowerCase().trim();
-                            dataFiltered = dataFiltered.filter(s => {
-                               const mNama = (s.nama_penyewa || '').toLowerCase().includes(q);
-                               const mLok = (s.lokasi_sewa || '').toLowerCase().includes(q);
-                               const mId = (s.id_sewa || '').toLowerCase().includes(q);
-                               const mHp = (s.no_hp_penyewa || '').toLowerCase().includes(q);
-                               const mKet = (s.keterangan || '').toLowerCase().includes(q);
-                               const mPic = (s.pic_kantor || s.pic_rombongan || '').toLowerCase().includes(q);
-                               return mNama || mLok || mId || mHp || mKet || mPic;
-                            });
-                         }
+                         const { targetDateNorm, totalCount, belumBayarCount, sudahBayarCount, dataFiltered } = sewaTableData;
 
                          return (
                             <>
@@ -3043,7 +3060,7 @@ Terima kasih.`;
                                            }`}
                                         >
                                            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 inline-block"></span>
-                                           Belum Bayar ({belumBayarAll.length})
+                                           Belum Bayar ({belumBayarCount})
                                         </button>
                                         <button
                                            type="button"
@@ -3055,7 +3072,7 @@ Terima kasih.`;
                                            }`}
                                         >
                                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>
-                                           Lunas ({sudahBayarAll.length})
+                                           Lunas ({sudahBayarCount})
                                         </button>
                                      </div>
                                   </div>
@@ -3111,14 +3128,14 @@ Terima kasih.`;
                                      onClick={() => setFilterStatusSewa('Belum Bayar')}
                                      className={`px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap ${filterStatusSewa === 'Belum Bayar' ? 'bg-rose-500 text-white font-black' : 'text-slate-600'}`}
                                   >
-                                     Belum Bayar ({belumBayarAll.length})
+                                     Belum Bayar ({belumBayarCount})
                                   </button>
                                   <button
                                      type="button"
                                      onClick={() => setFilterStatusSewa('Sudah Bayar')}
                                      className={`px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap ${filterStatusSewa === 'Sudah Bayar' ? 'bg-emerald-600 text-white font-black' : 'text-slate-600'}`}
                                   >
-                                     Lunas ({sudahBayarAll.length})
+                                     Lunas ({sudahBayarCount})
                                   </button>
                                </div>
 
@@ -3153,10 +3170,8 @@ Terima kasih.`;
                                            </tr>
                                         </thead>
                                         <tbody key={targetDateNorm || 'all'} className="divide-y divide-slate-100 text-slate-700">
-                                           {dataFiltered
-                                              .filter(item => !targetDateNorm || normalizeDateString(item.tanggal_sewa) === targetDateNorm)
-                                              .map((item, idx) => {
-                                              const locInfo = masterLokasi.find(l => l.nama === item.lokasi_sewa);
+                                           {dataFiltered.map((item, idx) => {
+                                              const locInfo = masterLokasiMap.get(item.lokasi_sewa) || masterLokasi.find(l => l.nama === item.lokasi_sewa);
                                               const isLapangan = locInfo?.tipe === 'lapangan' || (item.lokasi_sewa && item.lokasi_sewa.includes('LAP'));
                                               const isPaid = ['Sudah Transfer', 'Lunas', 'Sudah Lunas'].includes(item.status_pembayaran);
                                               const isPending = item.status_pembayaran === 'Menunggu Verifikasi';
@@ -3356,7 +3371,7 @@ Terima kasih.`;
                                           </thead>
                                           <tbody className="divide-y divide-emerald-900/5 text-xs">
                                             {group.data.map((item, idx) => {
-                                              const locInfo = masterLokasi.find(l => l.nama === item.lokasi_sewa);
+                                              const locInfo = masterLokasiMap.get(item.lokasi_sewa) || masterLokasi.find(l => l.nama === item.lokasi_sewa);
                                               const isLapangan = locInfo?.tipe === 'lapangan' || (item.lokasi_sewa && item.lokasi_sewa.includes('LAP'));
                                               return (
                                               <tr key={idx} className="hover:bg-slate-50/50 transition-all duration-200 group/row">
