@@ -3270,20 +3270,20 @@ Terima kasih.`;
             
             {/* FLOATING CART BUTTON */}
             {cartLokasi.length > 0 && !isCheckoutOpen && activeTab === 'reservasi' && (
-                <div className="fixed bottom-6 right-6 lg:bottom-10 lg:right-10 z-[49] animate-fade-in-up">
+                <div className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] sm:bottom-24 lg:bottom-10 right-4 sm:right-6 lg:right-10 z-[56] animate-fade-in-up">
                     <button 
                         onClick={() => setIsCheckoutOpen(true)}
-                        className="bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white px-6 py-4 rounded-full shadow-[0_10px_25px_-5px_rgba(16,185,129,0.5)] flex items-center space-x-4 transition-all duration-300 hover:scale-105 active:scale-95 border-2 border-white/20 hover:border-white/40 group"
+                        className="bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-700 hover:to-teal-800 text-white px-4 sm:px-6 py-3 sm:py-4 rounded-full shadow-[0_12px_28px_-4px_rgba(4,120,87,0.5)] flex items-center space-x-3 sm:space-x-4 transition-all duration-300 hover:scale-105 active:scale-95 border-2 border-white/30 hover:border-white/50 group"
                     >
                         <div className="relative">
-                            <ShoppingCart size={24} className="group-hover:animate-bounce" />
-                            <span className="absolute -top-3 -right-3 bg-amber-500 text-white text-[11px] font-black w-6 h-6 flex items-center justify-center rounded-full border-2 border-white shadow-sm ring-2 ring-emerald-600">
+                            <ShoppingCart size={22} className="sm:w-6 sm:h-6 group-hover:animate-bounce" />
+                            <span className="absolute -top-2.5 -right-2.5 bg-amber-500 text-white text-[11px] font-black w-5 h-5 sm:w-6 sm:h-6 flex items-center justify-center rounded-full border-2 border-white shadow-sm ring-2 ring-emerald-600">
                                 {cartLokasi.length}
                             </span>
                         </div>
-                        <div className="flex flex-col items-start border-l border-white/20 pl-4">
-                            <span className="text-[10px] font-bold text-emerald-100 uppercase tracking-widest mb-0.5 opacity-80">Checkout Sekarang</span>
-                            <span className="text-sm font-black leading-none">{cartLokasi.length} Fasilitas Terpilih</span>
+                        <div className="flex flex-col items-start border-l border-white/20 pl-3 sm:pl-4">
+                            <span className="text-[10px] font-bold text-emerald-100 uppercase tracking-widest mb-0.5 opacity-90">Checkout Sekarang</span>
+                            <span className="text-xs sm:text-sm font-black leading-none">{cartLokasi.length} Fasilitas Terpilih</span>
                         </div>
                     </button>
                 </div>
