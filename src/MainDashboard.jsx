@@ -17,7 +17,10 @@ export default function MainDashboard({ onNavigate }) {
         <LogOut size={16} /> Keluar
       </button>
 
-      <div className="text-center mb-12">
+      <div className="text-center mb-12 flex flex-col items-center">
+        <div className="w-20 h-20 bg-white rounded-3xl p-3 shadow-lg shadow-emerald-900/10 border border-emerald-100 mb-4 flex items-center justify-center">
+          <img src="/logo-ragunan.png" alt="Logo Ragunan" className="w-full h-full object-contain" />
+        </div>
         <h1 className="text-3xl md:text-4xl font-black text-emerald-950 mb-2">Master Menu Admin</h1>
         <p className="text-emerald-700/70 font-semibold">Sistem Informasi Manajemen Fasilitas TMR</p>
       </div>

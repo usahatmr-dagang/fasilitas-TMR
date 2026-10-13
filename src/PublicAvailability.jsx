@@ -175,7 +175,10 @@ export default function PublicAvailability() {
     <div className="min-h-screen bg-[#F4F7F4] font-sans selection:bg-amber-200 selection:text-emerald-900 pb-20">
       <div className="bg-gradient-to-r from-[#022c22] via-[#043e30] to-[#01140f] pt-12 pb-24 px-6 relative overflow-hidden">
         <div className="absolute top-0 left-0 w-full h-full opacity-10 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-emerald-100 via-transparent to-transparent"></div>
-        <div className="max-w-4xl mx-auto relative z-10 text-center">
+        <div className="max-w-4xl mx-auto relative z-10 text-center flex flex-col items-center">
+            <div className="w-16 h-16 bg-white/10 backdrop-blur-md rounded-2xl p-2 border border-white/20 mb-3 shadow-lg flex items-center justify-center">
+              <img src="/logo-ragunan.png" alt="Logo Ragunan" className="w-full h-full object-contain" />
+            </div>
             <h1 className="text-3xl md:text-5xl font-black text-white mb-4 tracking-tight">Ketersediaan Fasilitas TMR</h1>
             <p className="text-emerald-100/80 font-medium max-w-xl mx-auto">Silakan pilih tanggal untuk melihat daftar fasilitas yang masih tersedia untuk disewa.</p>
         </div>

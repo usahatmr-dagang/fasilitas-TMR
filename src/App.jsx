@@ -2514,9 +2514,9 @@ Terima kasih.`;
         
         <div className="px-6 py-7 relative z-10">
           <div className="flex items-center justify-between mb-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-amber-400 to-amber-500 rounded-2xl flex items-center justify-center shadow-[0_4px_20px_rgba(245,158,11,0.25)] border border-amber-300/30 relative group cursor-pointer transition-all duration-300 hover:scale-105 hover:rotate-3">
+            <div className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center p-1.5 shadow-[0_4px_20px_rgba(4,120,87,0.25)] border border-emerald-400/30 relative group cursor-pointer transition-all duration-300 hover:scale-105 hover:rotate-3">
               <div className="absolute inset-0 bg-white/15 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
-              <Leaf className="text-white drop-shadow-md" size={24} strokeWidth={2.5} />
+              <img src="/logo-ragunan.png" alt="Logo TMR" className="w-full h-full object-contain drop-shadow" />
             </div>
             <button 
               type="button" 
@@ -2586,8 +2586,8 @@ Terima kasih.`;
             <div className="absolute -top-24 -right-24 w-64 h-64 bg-emerald-600/10 rounded-full blur-3xl pointer-events-none"></div>
             
             <div className="px-6 py-9 relative z-10">
-              <div className="w-12 h-12 bg-gradient-to-br from-amber-400 to-amber-500 rounded-2xl mb-5 flex items-center justify-center shadow-[0_4px_20px_rgba(245,158,11,0.25)] border border-amber-300/30 relative">
-                <Leaf className="text-white drop-shadow-md" size={24} strokeWidth={2.5} />
+              <div className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-2xl mb-5 flex items-center justify-center p-1.5 shadow-[0_4px_20px_rgba(4,120,87,0.25)] border border-emerald-400/30 relative">
+                <img src="/logo-ragunan.png" alt="Logo TMR" className="w-full h-full object-contain drop-shadow" />
               </div>
               <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-emerald-100 to-teal-300 tracking-tight">TMR System</h1>
               <p className="text-[9px] font-extrabold text-emerald-400/60 mt-1 tracking-[0.25em] uppercase">Fasilitas Ragunan</p>
@@ -2658,8 +2658,8 @@ Terima kasih.`;
             <div className="h-5 w-[1px] bg-emerald-800/60 hidden sm:block"></div>
 
             <div className="flex items-center space-x-2">
-              <div className="w-7 h-7 bg-gradient-to-br from-amber-400 to-amber-500 rounded-lg flex items-center justify-center shadow-sm">
-                <Leaf className="text-white" size={15} strokeWidth={2.5} />
+              <div className="w-7 h-7 bg-white/10 rounded-lg flex items-center justify-center p-0.5 shadow-sm border border-emerald-500/20">
+                <img src="/logo-ragunan.png" alt="Logo TMR" className="w-full h-full object-contain" />
               </div>
               <span className="font-black text-white text-sm tracking-tight">TMR System</span>
               <span className="hidden md:inline text-[10px] text-emerald-400 font-bold ml-1 uppercase tracking-wider">

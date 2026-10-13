@@ -290,8 +290,8 @@ export default function PublicUpload() {
 
       <div className="max-w-xl w-full">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center p-3 bg-emerald-600 rounded-2xl text-white mb-4 shadow-lg shadow-emerald-600/30">
-            <ShieldCheck size={32} />
+          <div className="inline-flex items-center justify-center p-3 bg-white rounded-2xl mb-4 shadow-lg shadow-emerald-900/10 border border-emerald-100">
+            <img src="/logo-ragunan.png" alt="Logo Ragunan" className="w-12 h-12 object-contain" />
           </div>
           <h1 className="text-3xl font-black text-slate-800 tracking-tight mb-2">Portal Bukti Pembayaran</h1>
           <p className="text-slate-500 font-medium text-sm">Taman Margasatwa Ragunan - Layanan Publik Aman</p>
