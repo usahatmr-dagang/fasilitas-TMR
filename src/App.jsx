@@ -171,7 +171,32 @@ const formatTanggalPendek = (dateStr) => {
 };
 
 const getMonthColorClass = (dateStr) => {
-  return 'text-slate-700';
+  if (!dateStr) return 'text-slate-700';
+  try {
+    const norm = normalizeDateString(dateStr);
+    if (!norm) return 'text-slate-700';
+    const parts = norm.split('-');
+    if (parts.length < 2) return 'text-slate-700';
+    const mNum = parseInt(parts[1], 10);
+    // Warna font unik dan kontras untuk tiap bulan agar mudah dibedakan:
+    const monthColors = {
+      1: 'text-sky-700',      // Jan - Biru Langit
+      2: 'text-pink-700',     // Feb - Pink / Magenta
+      3: 'text-emerald-700',  // Mar - Hijau Zamrud
+      4: 'text-amber-600',    // Apr - Kuning Emas
+      5: 'text-indigo-700',   // Mei - Nila / Indigo
+      6: 'text-teal-700',     // Jun - Toska
+      7: 'text-orange-700',   // Jul - Oranye Cerah
+      8: 'text-rose-700',     // Agu - Merah Rose
+      9: 'text-purple-700',   // Sep - Ungu / Violet
+      10: 'text-blue-700',    // Okt - Biru Pekat
+      11: 'text-amber-800',   // Nov - Cokelat / Bronze
+      12: 'text-red-700'      // Des - Merah Tua / Crimson
+    };
+    return monthColors[mNum] || 'text-slate-700';
+  } catch(e) {
+    return 'text-slate-700';
+  }
 };
 
 const formatRupiah = (angka) => {
@@ -3156,7 +3181,7 @@ Terima kasih.`;
               <div className="w-full h-full flex flex-col flex-1 overflow-hidden min-h-[500px]">
                 <div className="flex flex-col md:flex-row gap-3 h-full flex-1 overflow-hidden">
                    {/* Left Date Column - Compact AppSheet Style */}
-                   <div className="w-full md:w-48 lg:w-52 flex-shrink-0 bg-white rounded-2xl border border-slate-200/90 shadow-xs flex flex-col h-full overflow-hidden max-h-[220px] md:max-h-full">
+                   <div className="w-full md:w-56 lg:w-60 flex-shrink-0 bg-white rounded-2xl border border-slate-200/90 shadow-xs flex flex-col h-full overflow-hidden max-h-[220px] md:max-h-full">
                       {/* Top search & All header */}
                       <div className="p-2.5 border-b border-slate-100 bg-slate-50/70 space-y-2 flex-shrink-0">
                          {/* Search Tanggal */}
@@ -3217,16 +3242,28 @@ Terima kasih.`;
                                      onClick={() => setFilterDateSewa(d.date)}
                                      className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center justify-between group cursor-pointer ${
                                         isSelected 
-                                          ? 'bg-emerald-100 text-emerald-950 font-bold ring-1 ring-emerald-300 shadow-xs' 
+                                          ? 'bg-emerald-100 ring-1 ring-emerald-300 shadow-xs' 
                                           : 'text-slate-700 hover:bg-slate-100'
                                      }`}
                                   >
-                                     <span className="truncate text-xs">
-                                        {formatAppSheetDate(d.date)}
-                                     </span>
-                                     <span className={`text-[10px] font-black px-1.5 py-0.2 rounded-full ${
+                                     <div className="flex items-center gap-1.5 min-w-0 pr-1">
+                                        <span className={`text-xs font-black whitespace-nowrap ${getMonthColorClass(d.date)}`}>
+                                           {formatAppSheetDate(d.date)}
+                                        </span>
+                                        <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-md whitespace-nowrap ${
+                                           d.isWeekend 
+                                             ? 'bg-amber-100 text-amber-800' 
+                                             : isSelected 
+                                               ? 'bg-emerald-200/90 text-emerald-950 font-black' 
+                                               : 'bg-slate-100 text-slate-600'
+                                        }`}>
+                                           {d.hari}
+                                        </span>
+                                     </div>
+
+                                     <span className={`text-[10px] font-black px-1.5 py-0.2 rounded-full flex-shrink-0 ${
                                         isSelected 
-                                          ? 'bg-emerald-200 text-emerald-950' 
+                                          ? 'bg-emerald-200 text-emerald-950 ring-1 ring-emerald-300' 
                                           : d.belumCount > 0 
                                             ? 'bg-rose-100 text-rose-700' 
                                             : 'bg-slate-200/70 text-slate-600'
@@ -3525,7 +3562,7 @@ Terima kasih.`;
                                                     </td>
 
                                                     {/* Column 8: Tanggal Penyewaan */}
-                                                    <td className="py-2 px-3 font-medium text-slate-700">
+                                                    <td className={`py-2 px-3 font-bold ${getMonthColorClass(item.tanggal_sewa)}`}>
                                                        {formatAppSheetDate(item.tanggal_sewa)}
                                                     </td>
 
