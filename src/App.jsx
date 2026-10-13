@@ -41,7 +41,11 @@ import {
   ShoppingCart,
   Database,
   Clock,
-  LogOut
+  LogOut,
+  Plus,
+  Eye,
+  PanelLeftClose,
+  PanelLeft
 } from 'lucide-react';
 import { db, storage, auth } from './firebase';
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, setDoc, getDoc } from 'firebase/firestore';
@@ -173,6 +177,51 @@ const getMonthColorClass = (dateStr) => {
 const formatRupiah = (angka) => {
     if (angka === undefined || angka === null || isNaN(angka)) return '-';
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka);
+};
+
+const formatAppSheetDate = (dateStr) => {
+  if (!dateStr) return '-';
+  try {
+    const norm = normalizeDateString(dateStr);
+    if (!norm) return dateStr;
+    const [y, m, d] = norm.split('-');
+    const date = new Date(Number(y), Number(m) - 1, Number(d));
+    if (isNaN(date.getTime())) return dateStr;
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    return `${months[date.getMonth()]} ${String(d).padStart(2, '0')}, ${y}`;
+  } catch(e) {
+    return dateStr;
+  }
+};
+
+const formatAppSheetDay = (dateStr) => {
+  if (!dateStr) return '-';
+  try {
+    const norm = normalizeDateString(dateStr);
+    if (!norm) return '-';
+    const [y, m, d] = norm.split('-');
+    const date = new Date(Number(y), Number(m) - 1, Number(d));
+    if (isNaN(date.getTime())) return '-';
+    const days = ['MING..', 'SENIN', 'SELASA', 'RABU', 'KAMIS', 'JUMAT', 'SABTU'];
+    return days[date.getDay()];
+  } catch(e) {
+    return '-';
+  }
+};
+
+const formatBookingDateShort = (bookingStr) => {
+  if (!bookingStr) return '-';
+  try {
+    const str = String(bookingStr).trim();
+    const datePart = str.split(',')[0].trim();
+    const norm = normalizeDateString(datePart);
+    if (norm && /^\d{4}-\d{2}-\d{2}$/.test(norm)) {
+      return formatAppSheetDate(norm);
+    }
+    return datePart || bookingStr;
+  } catch(e) {
+    return bookingStr;
+  }
 };
 
 const CLIENT_ID = '905355425334-tbtvuvufgvnom6vnlb5d0rka00ih03if.apps.googleusercontent.com';
@@ -360,8 +409,17 @@ export default function App() {
   
   const [cartLokasi, setCartLokasi] = useState([]);
 
-  // Mobile navigation state
+  // Navigation & Sidebar state (Burger Menu)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState(true);
+
+  const toggleSidebar = () => {
+    if (window.innerWidth >= 1024) {
+      setIsDesktopSidebarOpen(prev => !prev);
+    } else {
+      setIsMobileMenuOpen(prev => !prev);
+    }
+  };
 
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -2680,16 +2738,26 @@ Terima kasih.`;
 
       {/* Sidebar Desktop */}
       {!isPortalRoute && (
-      <aside className="hidden lg:flex inset-y-0 left-0 z-30 w-[280px] bg-gradient-to-b from-[#022c22] via-[#041e17] to-[#01140f] border-r border-emerald-800/20 flex-col shadow-2xl relative overflow-hidden">
+      <aside className={`hidden ${isDesktopSidebarOpen ? 'lg:flex w-[270px]' : 'lg:hidden w-0'} inset-y-0 left-0 z-30 bg-gradient-to-b from-[#022c22] via-[#041e17] to-[#01140f] border-r border-emerald-800/20 flex-col shadow-2xl relative overflow-hidden transition-all duration-300 flex-shrink-0`}>
         {/* Subtle decorative background elements */}
         <div className="absolute top-0 left-0 w-full h-72 bg-gradient-to-b from-emerald-500/10 to-transparent pointer-events-none"></div>
         <div className="absolute -top-24 -right-24 w-64 h-64 bg-emerald-600/10 rounded-full blur-3xl pointer-events-none"></div>
         <div className="absolute -bottom-16 -left-16 w-48 h-48 bg-teal-500/5 rounded-full blur-2xl pointer-events-none"></div>
         
-        <div className="px-6 py-9 relative z-10">
-          <div className="w-12 h-12 bg-gradient-to-br from-amber-400 to-amber-500 rounded-2xl mb-5 flex items-center justify-center shadow-[0_4px_20px_rgba(245,158,11,0.25)] border border-amber-300/30 relative group cursor-pointer transition-all duration-300 hover:scale-105 hover:rotate-3">
-            <div className="absolute inset-0 bg-white/15 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
-            <Leaf className="text-white drop-shadow-md" size={24} strokeWidth={2.5} />
+        <div className="px-6 py-7 relative z-10">
+          <div className="flex items-center justify-between mb-4">
+            <div className="w-12 h-12 bg-gradient-to-br from-amber-400 to-amber-500 rounded-2xl flex items-center justify-center shadow-[0_4px_20px_rgba(245,158,11,0.25)] border border-amber-300/30 relative group cursor-pointer transition-all duration-300 hover:scale-105 hover:rotate-3">
+              <div className="absolute inset-0 bg-white/15 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              <Leaf className="text-white drop-shadow-md" size={24} strokeWidth={2.5} />
+            </div>
+            <button 
+              type="button" 
+              onClick={() => setIsDesktopSidebarOpen(false)}
+              className="hidden lg:flex p-2 text-emerald-300/70 hover:text-white hover:bg-white/10 rounded-xl transition-colors cursor-pointer"
+              title="Sembunyikan Menu (Burger Menu)"
+            >
+              <PanelLeftClose size={18} />
+            </button>
           </div>
           <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-emerald-100 to-teal-300 tracking-tight">TMR System</h1>
           <p className="text-[9px] font-extrabold text-emerald-400/60 mt-1 tracking-[0.25em] uppercase">Fasilitas Ragunan</p>
@@ -2803,24 +2871,51 @@ Terima kasih.`;
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
         <div className="absolute inset-0 opacity-[0.015] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#10b981 1.5px, transparent 1.5px)', backgroundSize: '24px 24px' }}></div>
-        <header className="bg-emerald-950/95 backdrop-blur-md px-5 py-3.5 flex items-center justify-between z-[45] lg:hidden sticky top-0 border-b border-emerald-900/30 shadow-md">
-          <div className="flex items-center space-x-2.5">
+        <header className="bg-emerald-950 text-white px-4 sm:px-6 py-2.5 flex items-center justify-between z-[45] sticky top-0 border-b border-emerald-900/40 shadow-sm flex-shrink-0">
+          <div className="flex items-center space-x-3">
             {!isPortalRoute && (
-              <button onClick={() => setIsMobileMenuOpen(true)} className="p-1.5 -ml-2 mr-1 text-emerald-100 hover:text-white hover:bg-emerald-900/50 rounded-lg transition-colors">
-                 <Menu size={20} />
+              <button 
+                type="button"
+                onClick={toggleSidebar} 
+                className="p-1.5 -ml-1 text-emerald-100 hover:text-white hover:bg-emerald-900/60 rounded-xl transition-colors flex items-center gap-2 group cursor-pointer"
+                title={isDesktopSidebarOpen ? "Sembunyikan Menu (Burger Menu)" : "Tampilkan Menu (Burger Menu)"}
+              >
+                <Menu size={20} className="group-hover:scale-105 transition-transform" />
+                <span className="text-xs font-bold hidden sm:inline text-emerald-200/90 group-hover:text-white">
+                  {isDesktopSidebarOpen ? "Tutup Menu" : "Menu"}
+                </span>
               </button>
             )}
-            <div className="w-8 h-8 bg-gradient-to-br from-amber-400 to-amber-500 rounded-lg flex items-center justify-center shadow-md"><Leaf className="text-white" size={16} strokeWidth={2.5} /></div>
-            <span className="font-extrabold text-white text-base tracking-tight">TMR System</span>
+
+            <div className="h-5 w-[1px] bg-emerald-800/60 hidden sm:block"></div>
+
+            <div className="flex items-center space-x-2">
+              <div className="w-7 h-7 bg-gradient-to-br from-amber-400 to-amber-500 rounded-lg flex items-center justify-center shadow-sm">
+                <Leaf className="text-white" size={15} strokeWidth={2.5} />
+              </div>
+              <span className="font-black text-white text-sm tracking-tight">TMR System</span>
+              <span className="hidden md:inline text-[10px] text-emerald-400 font-bold ml-1 uppercase tracking-wider">
+                • Fasilitas Ragunan
+              </span>
+            </div>
           </div>
-          {!isPortalRoute && (
-             <button onClick={() => setActiveApp('dashboard')} className="flex items-center justify-center p-2 bg-emerald-900/40 hover:bg-emerald-800/60 border border-emerald-700/30 rounded-xl text-emerald-100 transition-colors" title="Kembali ke Master Menu">
-               <ArrowLeft size={16} />
-             </button>
-          )}
+
+          <div className="flex items-center space-x-2">
+            {!isPortalRoute && (
+              <button 
+                type="button"
+                onClick={() => setActiveApp('dashboard')} 
+                className="flex items-center space-x-1.5 px-3 py-1.5 bg-emerald-900/40 hover:bg-emerald-800/60 border border-emerald-700/30 rounded-xl text-emerald-100 hover:text-white text-xs font-bold transition-colors cursor-pointer" 
+                title="Kembali ke Master Menu"
+              >
+                <ArrowLeft size={14} />
+                <span className="hidden sm:inline">Master Menu</span>
+              </button>
+            )}
+          </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-10 pb-20 relative z-10 bg-[#f8faf9]">
+        <div className={`flex-1 relative z-10 bg-[#f8faf9] ${activeTab === 'sewa' ? 'p-2 sm:p-3 overflow-hidden flex flex-col' : 'overflow-y-auto px-4 sm:px-6 lg:px-10 pb-20'}`}>
             {activeTab === 'reservasi' && (
               <div className="max-w-[90rem] mx-auto pb-32 lg:pb-12">
                 <div className="sticky top-0 z-[40] bg-[#f8faf9]/80 backdrop-blur-md pt-4 pb-3 mb-6 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10 border-b border-emerald-100/50">
@@ -3058,115 +3153,86 @@ Terima kasih.`;
                     </button>
                 </div>
             )}            {activeTab === 'sewa' && (
-              <div className="max-w-[100rem] mx-auto pb-32 lg:pb-12 pt-4 h-full flex flex-col min-h-[600px] lg:h-[calc(100vh-100px)]">
-                <div className="flex flex-col md:flex-row gap-5 h-full">
-                   {/* Sidebar Tanggal */}
-                   <div className="w-full md:w-72 lg:w-80 flex-shrink-0 bg-white rounded-3xl border border-slate-200/90 shadow-sm flex flex-col h-full overflow-hidden max-h-[460px] md:max-h-full">
-                      <div className="p-4 border-b border-slate-100 bg-slate-50/70 flex-shrink-0 space-y-3">
-                         <div className="flex items-center justify-between">
-                            <h3 className="font-extrabold text-xs text-slate-900 tracking-wide uppercase flex items-center gap-2">
-                               <Users size={16} className="text-emerald-700" />
-                               Jadwal Pengunjung
-                            </h3>
-                            <span className="text-[11px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded-full border border-slate-200">
-                               {availableDatesList.total} Reservasi
-                            </span>
-                         </div>
-                         
-                         <button
-                            onClick={() => setFilterDateSewa('')}
-                            className={`w-full text-left px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center justify-between ${
-                               !filterDateSewa 
-                                 ? 'bg-emerald-700 text-white shadow-md shadow-emerald-700/20' 
-                                 : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200/80'
-                            }`}
-                         >
-                            <span className="flex items-center gap-2">
-                               <Calendar size={14} className={!filterDateSewa ? 'text-emerald-200' : 'text-slate-400'} />
-                               Semua Jadwal (Ke Depan)
-                            </span>
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-                               !filterDateSewa ? 'bg-white/25 text-white' : 'bg-slate-100 text-slate-600'
-                            }`}>
-                               {availableDatesList.total}
-                            </span>
-                         </button>
-
+              <div className="w-full h-full flex flex-col flex-1 overflow-hidden min-h-[500px]">
+                <div className="flex flex-col md:flex-row gap-3 h-full flex-1 overflow-hidden">
+                   {/* Left Date Column - Compact AppSheet Style */}
+                   <div className="w-full md:w-48 lg:w-52 flex-shrink-0 bg-white rounded-2xl border border-slate-200/90 shadow-xs flex flex-col h-full overflow-hidden max-h-[220px] md:max-h-full">
+                      {/* Top search & All header */}
+                      <div className="p-2.5 border-b border-slate-100 bg-slate-50/70 space-y-2 flex-shrink-0">
                          {/* Search Tanggal */}
                          <div className="relative">
-                            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                            <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
                             <input
                                type="text"
-                               placeholder="Cari hari atau tanggal..."
+                               placeholder="Cari tanggal..."
                                value={sidebarDateSearch}
                                onChange={e => setSidebarDateSearch(e.target.value)}
-                               className="w-full bg-white border border-slate-200 rounded-xl pl-8 pr-7 py-1.5 text-xs text-slate-800 placeholder-slate-400 outline-none focus:border-emerald-600 transition-colors"
+                               className="w-full bg-white border border-slate-200 rounded-lg pl-7 pr-6 py-1 text-xs text-slate-800 placeholder-slate-400 outline-none focus:border-emerald-600 transition-colors"
                             />
                             {sidebarDateSearch && (
                                <button 
                                   onClick={() => setSidebarDateSearch('')} 
-                                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                                >
-                                  <X size={12} />
+                                  <X size={11} />
                                </button>
                             )}
                          </div>
+
+                         {/* All option */}
+                         <button
+                            type="button"
+                            onClick={() => setFilterDateSewa('')}
+                            className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center justify-between cursor-pointer ${
+                               !filterDateSewa 
+                                 ? 'bg-emerald-100 text-emerald-950 font-black ring-1 ring-emerald-300 shadow-xs' 
+                                 : 'text-slate-700 hover:bg-slate-100'
+                            }`}
+                         >
+                            <span className="flex items-center gap-1.5">
+                               <Calendar size={13} className={!filterDateSewa ? 'text-emerald-700' : 'text-slate-400'} />
+                               <span>All</span>
+                            </span>
+                            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                               !filterDateSewa ? 'bg-emerald-200 text-emerald-900' : 'bg-slate-200/70 text-slate-600'
+                            }`}>
+                               {availableDatesList.total}
+                            </span>
+                         </button>
                       </div>
 
-                      {/* List Tanggal */}
-                      <div className="overflow-y-auto flex-1 p-2 space-y-1.5 custom-scrollbar">
+                      {/* List Tanggal Compact */}
+                      <div className="overflow-y-auto flex-1 p-1.5 space-y-1 custom-scrollbar">
                          {filteredSidebarDates.length === 0 ? (
-                            <div className="p-6 text-center text-xs text-slate-400 font-medium">
-                               Tidak ada tanggal yang sesuai pencarian.
+                            <div className="p-4 text-center text-xs text-slate-400 font-medium">
+                               Tidak ada tanggal sesuai.
                             </div>
                          ) : (
                             filteredSidebarDates.map(d => {
                                const isSelected = filterDateSewa === d.date;
                                return (
                                   <button
+                                     type="button"
                                      key={d.date}
                                      onClick={() => setFilterDateSewa(d.date)}
-                                     className={`w-full text-left px-3.5 py-2.5 rounded-2xl text-xs font-bold transition-all flex items-center justify-between group ${
+                                     className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center justify-between group cursor-pointer ${
                                         isSelected 
-                                          ? 'bg-emerald-700 text-white shadow-md shadow-emerald-700/25 ring-2 ring-emerald-600/30' 
-                                          : 'hover:bg-slate-50 text-slate-700 border border-transparent hover:border-slate-200/60'
+                                          ? 'bg-emerald-100 text-emerald-950 font-bold ring-1 ring-emerald-300 shadow-xs' 
+                                          : 'text-slate-700 hover:bg-slate-100'
                                      }`}
                                   >
-                                     <div className="flex flex-col min-w-0 pr-2">
-                                        <div className="flex items-center gap-1.5">
-                                           <span className={`font-black text-xs ${isSelected ? 'text-white' : 'text-slate-900 group-hover:text-emerald-800'}`}>
-                                              {d.hari}
-                                           </span>
-                                           {d.isWeekend && (
-                                              <span className={`text-[9px] px-1.5 py-0.2 rounded font-extrabold uppercase tracking-wide ${
-                                                 isSelected ? 'bg-amber-400 text-amber-950' : 'bg-amber-100 text-amber-800'
-                                              }`}>
-                                                 Weekend
-                                              </span>
-                                           )}
-                                        </div>
-                                        <span className={`text-[11px] font-semibold mt-0.5 truncate ${
-                                           isSelected ? 'text-emerald-100' : 'text-slate-500'
-                                        }`}>
-                                           {d.tanggalPendek}
-                                        </span>
-                                     </div>
-
-                                     <div className="flex items-center gap-1.5 flex-shrink-0">
-                                        {d.belumCount > 0 ? (
-                                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-black flex items-center gap-1 ${
-                                              isSelected ? 'bg-rose-500 text-white' : 'bg-rose-50 text-rose-700 border border-rose-200/60'
-                                           }`} title={`${d.belumCount} belum bayar`}>
-                                              <AlertCircle size={10} /> {d.count}
-                                           </span>
-                                        ) : (
-                                           <span className={`px-2 py-0.5 rounded-full text-[10px] font-black flex items-center gap-1 ${
-                                              isSelected ? 'bg-emerald-800 text-white' : 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
-                                           }`} title="Semua lunas">
-                                              <CheckCircle2 size={10} /> {d.count}
-                                           </span>
-                                        )}
-                                     </div>
+                                     <span className="truncate text-xs">
+                                        {formatAppSheetDate(d.date)}
+                                     </span>
+                                     <span className={`text-[10px] font-black px-1.5 py-0.2 rounded-full ${
+                                        isSelected 
+                                          ? 'bg-emerald-200 text-emerald-950' 
+                                          : d.belumCount > 0 
+                                            ? 'bg-rose-100 text-rose-700' 
+                                            : 'bg-slate-200/70 text-slate-600'
+                                     }`}>
+                                        {d.count}
+                                     </span>
                                   </button>
                                );
                             })
@@ -3174,8 +3240,8 @@ Terima kasih.`;
                       </div>
                    </div>
 
-                   {/* Main Content */}
-                   <div className="flex-1 bg-white rounded-3xl border border-slate-200/90 shadow-sm flex flex-col h-full overflow-hidden min-h-[500px]">
+                   {/* Right Area: Unified Data Table (AppSheet / Gambar 2 style) */}
+                   <div className="flex-1 bg-white rounded-2xl border border-slate-200/90 shadow-xs flex flex-col h-full overflow-hidden min-h-[400px]">
                       {(() => {
                          const todayStr = getTodayString();
                          let baseList = sewaList.filter(s => s.status_pembayaran !== 'Ditutup');
@@ -3185,8 +3251,20 @@ Terima kasih.`;
                             baseList = baseList.filter(s => normalizeDateString(s.tanggal_sewa) >= todayStr);
                          }
 
+                         const totalCount = baseList.length;
+                         const belumBayarAll = baseList.filter(s => s.status_pembayaran === 'Belum Transfer');
+                         const sudahBayarAll = baseList.filter(s => ['Sudah Transfer', 'Menunggu Verifikasi', 'Sudah Lunas', 'Lunas'].includes(s.status_pembayaran));
+
+                         // Filter status tab
+                         let statusFiltered = baseList;
+                         if (filterStatusSewa === 'Belum Bayar') {
+                            statusFiltered = belumBayarAll;
+                         } else if (filterStatusSewa === 'Sudah Bayar') {
+                            statusFiltered = sudahBayarAll;
+                         }
+
                          // Apply search filter if query exists
-                         let dataFiltered = baseList;
+                         let dataFiltered = statusFiltered;
                          if (sewaSearchQuery.trim()) {
                             const q = sewaSearchQuery.toLowerCase().trim();
                             dataFiltered = dataFiltered.filter(s => {
@@ -3195,433 +3273,286 @@ Terima kasih.`;
                                const mId = (s.id_sewa || '').toLowerCase().includes(q);
                                const mHp = (s.no_hp_penyewa || '').toLowerCase().includes(q);
                                const mKet = (s.keterangan || '').toLowerCase().includes(q);
-                               return mNama || mLok || mId || mHp || mKet;
+                               const mPic = (s.pic_kantor || s.pic_rombongan || '').toLowerCase().includes(q);
+                               return mNama || mLok || mId || mHp || mKet || mPic;
                             });
                          }
 
-                         const totalCount = baseList.length;
-                         const belumBayarAll = baseList.filter(s => s.status_pembayaran === 'Belum Transfer');
-                         const sudahBayarAll = baseList.filter(s => ['Sudah Transfer', 'Menunggu Verifikasi', 'Sudah Lunas', 'Lunas'].includes(s.status_pembayaran));
-
-                         const belumBayarFiltered = dataFiltered.filter(s => s.status_pembayaran === 'Belum Transfer');
-                         const sudahBayarFiltered = dataFiltered.filter(s => ['Sudah Transfer', 'Menunggu Verifikasi', 'Sudah Lunas', 'Lunas'].includes(s.status_pembayaran));
-
                          return (
                             <>
-                               {/* Modern Header Banner */}
-                               <div className="p-5 md:p-6 border-b border-slate-100 bg-gradient-to-r from-emerald-950 via-teal-950 to-slate-900 text-white flex-shrink-0">
-                                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                               {/* Top Bar Header (Gambar 2 Style) */}
+                               <div className="px-4 py-2.5 border-b border-slate-200/80 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 flex-shrink-0">
+                                  {/* Left: Title & Subtitle */}
+                                  <div className="flex items-center gap-3">
                                      <div>
-                                        <div className="flex items-center gap-2 mb-1.5">
-                                           <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                                              {filterDateSewa ? 'Jadwal Acara' : 'Semua Jadwal'}
+                                        <h2 className="text-xs sm:text-sm font-black text-slate-800 tracking-wider uppercase flex items-center gap-1.5">
+                                           <span>DATA PENYEWA</span>
+                                           <span className="text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full lowercase">
+                                              {dataFiltered.length} data
                                            </span>
-                                        </div>
-                                        <h2 className="text-xl md:text-2xl font-black text-white tracking-tight flex items-center gap-2.5">
-                                           <Calendar size={22} className="text-emerald-400 flex-shrink-0" />
-                                           {filterDateSewa ? formatTanggalIndo(filterDateSewa) : 'Semua Jadwal Reservasi Mendatang'}
                                         </h2>
+                                        <p className="text-[11px] text-slate-500 font-semibold truncate max-w-xs sm:max-w-md">
+                                           {filterDateSewa ? formatTanggalIndo(filterDateSewa) : 'Semua Jadwal Mendatang'}
+                                        </p>
                                      </div>
 
-                                     {/* KPI Chips */}
-                                     <div className="flex items-center gap-2 flex-wrap">
-                                        <div className="px-3.5 py-2 bg-white/10 backdrop-blur-md rounded-2xl border border-white/15 text-center min-w-[75px]">
-                                           <p className="text-[10px] text-emerald-200/80 font-bold uppercase tracking-wider">Total</p>
-                                           <p className="text-lg font-black text-white">{totalCount}</p>
-                                        </div>
-                                        <div className="px-3.5 py-2 bg-rose-500/20 backdrop-blur-md rounded-2xl border border-rose-500/30 text-center min-w-[85px]">
-                                           <p className="text-[10px] text-rose-200 font-bold uppercase tracking-wider">Belum Bayar</p>
-                                           <p className="text-lg font-black text-rose-300">{belumBayarAll.length}</p>
-                                        </div>
-                                        <div className="px-3.5 py-2 bg-emerald-500/20 backdrop-blur-md rounded-2xl border border-emerald-500/30 text-center min-w-[75px]">
-                                           <p className="text-[10px] text-emerald-200 font-bold uppercase tracking-wider">Lunas</p>
-                                           <p className="text-lg font-black text-emerald-300">{sudahBayarAll.length}</p>
-                                        </div>
-                                     </div>
-                                  </div>
-
-                                  {/* Filter & Search Bar */}
-                                  <div className="mt-5 pt-4 border-t border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                                     <div className="flex items-center gap-1.5 flex-wrap">
+                                     {/* Filter Tabs */}
+                                     <div className="hidden lg:flex items-center gap-1 bg-slate-100 p-0.5 rounded-xl border border-slate-200">
                                         <button
+                                           type="button"
                                            onClick={() => setFilterStatusSewa('Semua')}
-                                           className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                                           className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                                               filterStatusSewa === 'Semua' 
-                                                ? 'bg-white text-emerald-950 shadow-sm font-black' 
-                                                : 'bg-white/10 text-emerald-100 hover:bg-white/20'
+                                                ? 'bg-white text-emerald-950 font-black shadow-xs' 
+                                                : 'text-slate-600 hover:text-slate-900'
                                            }`}
                                         >
                                            Semua ({totalCount})
                                         </button>
                                         <button
+                                           type="button"
                                            onClick={() => setFilterStatusSewa('Belum Bayar')}
-                                           className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                                           className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
                                               filterStatusSewa === 'Belum Bayar' 
-                                                ? 'bg-rose-500 text-white shadow-sm font-black' 
-                                                : 'bg-white/10 text-emerald-100 hover:bg-white/20'
+                                                ? 'bg-rose-500 text-white font-black shadow-xs' 
+                                                : 'text-slate-600 hover:text-rose-700'
                                            }`}
                                         >
-                                           <AlertCircle size={13} /> Belum Bayar ({belumBayarAll.length})
+                                           <span className="w-1.5 h-1.5 rounded-full bg-rose-500 inline-block"></span>
+                                           Belum Bayar ({belumBayarAll.length})
                                         </button>
                                         <button
+                                           type="button"
                                            onClick={() => setFilterStatusSewa('Sudah Bayar')}
-                                           className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+                                           className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
                                               filterStatusSewa === 'Sudah Bayar' 
-                                                ? 'bg-emerald-500 text-white shadow-sm font-black' 
-                                                : 'bg-white/10 text-emerald-100 hover:bg-white/20'
+                                                ? 'bg-emerald-600 text-white font-black shadow-xs' 
+                                                : 'text-slate-600 hover:text-emerald-800'
                                            }`}
                                         >
-                                           <CheckCircle2 size={13} /> Lunas ({sudahBayarAll.length})
+                                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>
+                                           Lunas ({sudahBayarAll.length})
                                         </button>
                                      </div>
+                                  </div>
 
-                                     <div className="relative w-full sm:w-72">
-                                        <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-emerald-300/70" />
+                                  {/* Right: Search & Green + INPUT DATA Button */}
+                                  <div className="flex items-center gap-2">
+                                     <div className="relative w-full sm:w-56 md:w-64">
+                                        <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
                                         <input
                                            type="text"
-                                           placeholder="Cari fasilitas, nama penyewa..."
+                                           placeholder="Search DATA PENYEWA..."
                                            value={sewaSearchQuery}
                                            onChange={e => setSewaSearchQuery(e.target.value)}
-                                           className="w-full bg-white/15 border border-white/20 rounded-xl pl-9 pr-8 py-1.5 text-xs text-white placeholder-emerald-200/60 outline-none focus:bg-white/25 focus:border-emerald-400 transition-all"
+                                           className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-8 pr-7 py-1.5 text-xs text-slate-800 placeholder-slate-400 outline-none focus:bg-white focus:border-emerald-600 transition-all"
                                         />
                                         {sewaSearchQuery && (
-                                           <button onClick={() => setSewaSearchQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/60 hover:text-white">
-                                              <X size={13} />
+                                           <button 
+                                              onClick={() => setSewaSearchQuery('')} 
+                                              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                                           >
+                                              <X size={12} />
                                            </button>
                                         )}
                                      </div>
+
+                                     {/* Green + INPUT DATA Button (Gambar 2) */}
+                                     <button
+                                        type="button"
+                                        onClick={() => {
+                                           if (filterDateSewa) setSelectedDate(filterDateSewa);
+                                           setActiveTab('reservasi');
+                                        }}
+                                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl shadow-xs transition-all flex items-center gap-1 whitespace-nowrap active:scale-95 cursor-pointer"
+                                        title="Tambah Reservasi / Input Data"
+                                     >
+                                        <Plus size={14} />
+                                        <span className="tracking-wide uppercase">+ INPUT DATA</span>
+                                     </button>
                                   </div>
                                </div>
 
-                               {/* Content Area */}
-                               <div className="flex-1 overflow-y-auto custom-scrollbar bg-slate-50/70 p-4 sm:p-6 space-y-6">
-                                  {baseList.length === 0 ? (
-                                     <div className="flex flex-col items-center justify-center py-24 bg-white rounded-3xl border border-slate-200/80">
-                                        <div className="p-4 bg-emerald-50 rounded-full mb-3 text-emerald-600">
-                                           <Users size={40} className="stroke-[1.5]" />
+                               {/* Mobile Filter Tabs if screen is small */}
+                               <div className="flex lg:hidden px-4 py-1.5 bg-slate-50 border-b border-slate-200 items-center gap-1 overflow-x-auto">
+                                  <button
+                                     type="button"
+                                     onClick={() => setFilterStatusSewa('Semua')}
+                                     className={`px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap ${filterStatusSewa === 'Semua' ? 'bg-white text-emerald-950 font-black shadow-xs' : 'text-slate-600'}`}
+                                  >
+                                     Semua ({totalCount})
+                                  </button>
+                                  <button
+                                     type="button"
+                                     onClick={() => setFilterStatusSewa('Belum Bayar')}
+                                     className={`px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap ${filterStatusSewa === 'Belum Bayar' ? 'bg-rose-500 text-white font-black' : 'text-slate-600'}`}
+                                  >
+                                     Belum Bayar ({belumBayarAll.length})
+                                  </button>
+                                  <button
+                                     type="button"
+                                     onClick={() => setFilterStatusSewa('Sudah Bayar')}
+                                     className={`px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap ${filterStatusSewa === 'Sudah Bayar' ? 'bg-emerald-600 text-white font-black' : 'text-slate-600'}`}
+                                  >
+                                     Lunas ({sudahBayarAll.length})
+                                  </button>
+                               </div>
+
+                               {/* High Density Table Body (Gambar 2 Layout) */}
+                               <div className="flex-1 overflow-x-auto overflow-y-auto custom-scrollbar">
+                                  {dataFiltered.length === 0 ? (
+                                     <div className="flex flex-col items-center justify-center py-20 text-center px-4">
+                                        <div className="p-3 bg-emerald-50 rounded-full mb-2 text-emerald-600">
+                                           <Users size={32} className="stroke-[1.5]" />
                                         </div>
-                                        <p className="font-extrabold text-sm text-slate-800">
-                                           {filterDateSewa ? `Tidak ada jadwal di ${formatTanggalIndo(filterDateSewa)}` : 'Belum ada riwayat data pengunjung.'}
+                                        <p className="font-extrabold text-xs text-slate-800">
+                                           {sewaSearchQuery ? `Tidak ada hasil untuk "${sewaSearchQuery}"` : filterDateSewa ? `Tidak ada data sewa pada ${formatTanggalIndo(filterDateSewa)}` : 'Tidak ada data sewa.'}
                                         </p>
-                                        <p className="text-xs text-slate-400 mt-1">Pilih tanggal lain pada menu di sebelah kiri.</p>
-                                     </div>
-                                  ) : dataFiltered.length === 0 ? (
-                                     <div className="p-8 text-center bg-white rounded-3xl border border-slate-200/80">
-                                        <p className="font-extrabold text-sm text-slate-700">Tidak ada data yang cocok dengan pencarian "{sewaSearchQuery}".</p>
-                                        <button onClick={() => setSewaSearchQuery('')} className="mt-2 text-xs font-bold text-emerald-700 underline">
-                                           Reset Pencarian
-                                        </button>
+                                        <p className="text-[11px] text-slate-400 mt-0.5">Pilih tanggal lain atau bersihkan kata kunci pencarian.</p>
                                      </div>
                                   ) : (
-                                     <>
-                                        {/* SECTION 1: BELUM BAYAR */}
-                                        {(filterStatusSewa === 'Semua' || filterStatusSewa === 'Belum Bayar') && (
-                                           belumBayarFiltered.length > 0 ? (
-                                              <div className="bg-white rounded-3xl border border-rose-200/80 shadow-[0_4px_20px_rgba(244,63,94,0.04)] overflow-hidden">
-                                                 <div className="px-5 py-3.5 bg-rose-50/80 border-b border-rose-100 flex items-center justify-between text-rose-900">
-                                                    <div className="flex items-center gap-2.5">
-                                                       <AlertCircle size={16} className="text-rose-600" />
-                                                       <h3 className="font-black text-xs uppercase tracking-wider">Belum Bayar</h3>
-                                                       <span className="bg-rose-200/70 text-rose-800 font-black px-2 py-0.5 rounded-full text-xs shadow-sm">
-                                                          {belumBayarFiltered.length}
-                                                       </span>
-                                                    </div>
-                                                    <span className="text-[11px] font-semibold text-rose-700/80 hidden sm:inline">
-                                                       Klik baris untuk memproses atau melihat detail
-                                                    </span>
-                                                 </div>
+                                     <table className="min-w-full border-collapse text-left text-xs whitespace-nowrap">
+                                        <thead className="sticky top-0 bg-slate-100/95 backdrop-blur-sm border-b border-slate-200 z-10 text-[11px] font-black text-slate-600 uppercase tracking-wider">
+                                           <tr>
+                                              <th className="py-2.5 px-3 text-center w-14">Aksi</th>
+                                              <th className="py-2.5 px-3">Fasilitas</th>
+                                              <th className="py-2.5 px-3 text-center">Luas Laha..</th>
+                                              <th className="py-2.5 px-3">Status Pembayar..</th>
+                                              <th className="py-2.5 px-3">Hari</th>
+                                              <th className="py-2.5 px-3">Nama Penyewa</th>
+                                              <th className="py-2.5 px-3">keterang..</th>
+                                              <th className="py-2.5 px-3">Tanggal Penyewaan</th>
+                                              <th className="py-2.5 px-3">No.HP Penyewa</th>
+                                              <th className="py-2.5 px-3">Tanggal Pemesanan..</th>
+                                              <th className="py-2.5 px-3">PIC</th>
+                                              <th className="py-2.5 px-3 text-right">Biaya</th>
+                                           </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100 text-slate-700">
+                                           {dataFiltered.map((item, idx) => {
+                                              const locInfo = masterLokasi.find(l => l.nama === item.lokasi_sewa);
+                                              const isLapangan = locInfo?.tipe === 'lapangan' || (item.lokasi_sewa && item.lokasi_sewa.includes('LAP'));
+                                              const isPaid = ['Sudah Transfer', 'Lunas', 'Sudah Lunas'].includes(item.status_pembayaran);
+                                              const isPending = item.status_pembayaran === 'Menunggu Verifikasi';
 
-                                                 <div className="overflow-x-auto">
-                                                    <table className="w-full text-left border-collapse">
-                                                       <thead className="bg-slate-50/80 border-b border-slate-100 text-slate-500 uppercase text-[10px] font-black tracking-wider">
-                                                          <tr>
-                                                             <th className="py-3 px-4 sm:px-5">Fasilitas / Lokasi</th>
-                                                             <th className="py-3 px-4 sm:px-5">Data Penyewa</th>
-                                                             <th className="py-3 px-4 sm:px-5">Status</th>
-                                                             {!filterDateSewa && <th className="py-3 px-4 sm:px-5">Tanggal Acara</th>}
-                                                             <th className="py-3 px-4 sm:px-5">Keterangan</th>
-                                                             <th className="py-3 px-4 sm:px-5 text-right">Aksi</th>
-                                                          </tr>
-                                                       </thead>
-                                                       <tbody className="divide-y divide-slate-100 text-xs">
-                                                          {belumBayarFiltered.slice(0, filterDateSewa ? undefined : sewaDisplayLimit).map((item, idx) => {
-                                                             const locInfo = masterLokasi.find(l => l.nama === item.lokasi_sewa);
-                                                             const isLapangan = locInfo?.tipe === 'lapangan' || (item.lokasi_sewa && item.lokasi_sewa.includes('LAP'));
-                                                             const Icon = isLapangan ? TreePine : Tent;
+                                              return (
+                                                 <tr 
+                                                    key={item.id_sewa || idx} 
+                                                    onClick={() => handleOpenDetail(item)}
+                                                    className="even:bg-slate-50/40 hover:bg-emerald-50/50 cursor-pointer transition-colors group"
+                                                 >
+                                                    {/* Column 1: Aksi Icons */}
+                                                    <td className="py-2 px-3 text-center" onClick={e => e.stopPropagation()}>
+                                                       <div className="flex items-center justify-center gap-1.5 text-slate-400">
+                                                          <button 
+                                                             type="button"
+                                                             onClick={() => handleOpenDetail(item)}
+                                                             className="p-1 hover:text-emerald-700 hover:bg-emerald-100/50 rounded transition-all cursor-pointer"
+                                                             title="Detail"
+                                                          >
+                                                             <Eye size={13} />
+                                                          </button>
+                                                          <button 
+                                                             type="button"
+                                                             onClick={() => {
+                                                                handleOpenDetail(item);
+                                                             }}
+                                                             className="p-1 hover:text-slate-800 hover:bg-slate-200/60 rounded transition-all cursor-pointer"
+                                                             title="Kwitansi"
+                                                          >
+                                                             <Printer size={13} />
+                                                          </button>
+                                                          {item.bukti_transfer && (
+                                                             <span title="Ada Bukti Transfer" className="text-blue-500">
+                                                                <Image size={13} />
+                                                             </span>
+                                                          )}
+                                                       </div>
+                                                    </td>
 
-                                                             return (
-                                                                <tr 
-                                                                   key={idx} 
-                                                                   onClick={() => handleOpenDetail(item)}
-                                                                   className="hover:bg-rose-50/30 cursor-pointer transition-colors group"
-                                                                >
-                                                                   <td className="py-3.5 px-4 sm:px-5">
-                                                                      <div className="flex items-start gap-3">
-                                                                         <div className={`p-2 rounded-xl mt-0.5 flex-shrink-0 ${
-                                                                            isLapangan ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
-                                                                         }`}>
-                                                                            <Icon size={16} />
-                                                                         </div>
-                                                                         <div>
-                                                                            <p className="font-black text-sm text-slate-900 group-hover:text-emerald-800 transition-colors">
-                                                                               {item.lokasi_sewa}
-                                                                            </p>
-                                                                            <div className="flex items-center gap-2 mt-0.5">
-                                                                               <span className="text-[10px] font-mono font-bold text-slate-400">
-                                                                                  {item.id_sewa}
-                                                                               </span>
-                                                                               {item.luas_lahan && (
-                                                                                  <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded">
-                                                                                     {item.luas_lahan} m²
-                                                                                  </span>
-                                                                               )}
-                                                                            </div>
-                                                                         </div>
-                                                                      </div>
-                                                                   </td>
+                                                    {/* Column 2: Fasilitas */}
+                                                    <td className="py-2 px-3">
+                                                       <div className="flex items-center gap-1.5">
+                                                          {isLapangan ? (
+                                                             <TreePine size={13} className="text-emerald-600 flex-shrink-0" />
+                                                          ) : (
+                                                             <Tent size={13} className="text-blue-600 flex-shrink-0" />
+                                                          )}
+                                                          <span className="font-bold text-slate-900 group-hover:text-emerald-900 transition-colors">
+                                                             {item.lokasi_sewa}
+                                                          </span>
+                                                       </div>
+                                                    </td>
 
-                                                                   <td className="py-3.5 px-4 sm:px-5">
-                                                                      <p className="font-extrabold text-slate-900 text-xs">
-                                                                         {item.nama_penyewa}
-                                                                      </p>
-                                                                      <div className="text-[11px] text-slate-500 font-medium mt-0.5 flex items-center gap-2">
-                                                                         {item.no_hp_penyewa ? (
-                                                                            <span className="font-mono text-slate-600">{item.no_hp_penyewa}</span>
-                                                                         ) : (
-                                                                            <span className="italic text-slate-400">Tanpa HP</span>
-                                                                         )}
-                                                                         {item.pic_rombongan && item.pic_rombongan !== item.nama_penyewa && (
-                                                                            <span className="text-slate-400">• PIC: {item.pic_rombongan}</span>
-                                                                         )}
-                                                                      </div>
-                                                                   </td>
+                                                    {/* Column 3: Luas Lahan */}
+                                                    <td className="py-2 px-3 text-center font-medium text-slate-700">
+                                                       {item.luas_lahan ? `${item.luas_lahan}` : '-'}
+                                                    </td>
 
-                                                                   <td className="py-3.5 px-4 sm:px-5">
-                                                                      <div className="flex flex-col items-start gap-1">
-                                                                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-200">
-                                                                            <AlertCircle size={11} className="text-rose-600" />
-                                                                            BELUM TRANSFER
-                                                                         </span>
-                                                                         {item.total_biaya > 0 && (
-                                                                            <span className="text-[11px] font-bold text-slate-700">
-                                                                               Rp {new Intl.NumberFormat('id-ID').format(item.total_biaya)}
-                                                                            </span>
-                                                                         )}
-                                                                      </div>
-                                                                   </td>
+                                                    {/* Column 4: Status Pembayaran */}
+                                                    <td className="py-2 px-3">
+                                                       {isPaid ? (
+                                                          <span className="inline-flex items-center gap-1 font-bold text-emerald-700">
+                                                             <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block"></span>
+                                                             LUNAS
+                                                          </span>
+                                                       ) : isPending ? (
+                                                          <span className="inline-flex items-center gap-1 font-bold text-amber-600">
+                                                             <span className="w-2 h-2 rounded-full bg-amber-500 inline-block animate-pulse"></span>
+                                                             Verifikasi
+                                                          </span>
+                                                       ) : (
+                                                          <span className="inline-flex items-center gap-1 font-bold text-rose-600">
+                                                             <span className="w-2 h-2 rounded-full bg-rose-500 inline-block"></span>
+                                                             Belum Bayar
+                                                          </span>
+                                                       )}
+                                                    </td>
 
-                                                                   {!filterDateSewa && (
-                                                                      <td className="py-3.5 px-4 sm:px-5 text-slate-700 font-semibold">
-                                                                         <span className="text-xs">{formatTanggalIndo(item.tanggal_sewa)}</span>
-                                                                      </td>
-                                                                   )}
+                                                    {/* Column 5: Hari */}
+                                                    <td className="py-2 px-3 font-semibold text-slate-700 uppercase">
+                                                       {formatAppSheetDay(item.tanggal_sewa)}
+                                                    </td>
 
-                                                                   <td className="py-3.5 px-4 sm:px-5">
-                                                                      <div className="max-w-[200px]">
-                                                                         {item.listrik_tambahan && (
-                                                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black bg-amber-100 text-amber-900 mb-1">
-                                                                               <Zap size={10} /> Listrik
-                                                                            </span>
-                                                                         )}
-                                                                         <p className="text-[11px] text-slate-600 truncate font-medium">
-                                                                            {item.keterangan || '-'}
-                                                                         </p>
-                                                                      </div>
-                                                                   </td>
+                                                    {/* Column 6: Nama Penyewa */}
+                                                    <td className="py-2 px-3 font-bold text-slate-900">
+                                                       {item.nama_penyewa}
+                                                    </td>
 
-                                                                   <td className="py-3.5 px-4 sm:px-5 text-right">
-                                                                      <button
-                                                                         type="button"
-                                                                         onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            handleOpenDetail(item);
-                                                                         }}
-                                                                         className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-rose-600 hover:text-white text-slate-700 font-bold text-xs transition-all inline-flex items-center gap-1 group-hover:bg-rose-600 group-hover:text-white shadow-sm"
-                                                                      >
-                                                                         Detail
-                                                                         <ChevronRight size={13} />
-                                                                      </button>
-                                                                   </td>
-                                                                </tr>
-                                                             );
-                                                          })}
-                                                       </tbody>
-                                                    </table>
-                                                 </div>
-                                              </div>
-                                           ) : (
-                                              filterStatusSewa === 'Belum Bayar' && (
-                                                 <div className="p-8 text-center bg-white rounded-3xl border border-slate-200/80">
-                                                    <p className="font-extrabold text-sm text-emerald-800">🎉 Tidak ada pesanan yang belum bayar pada tanggal ini!</p>
-                                                 </div>
-                                              )
-                                           )
-                                        )}
+                                                    {/* Column 7: Keterangan */}
+                                                    <td className="py-2 px-3 text-slate-600 max-w-[150px] truncate" title={item.keterangan}>
+                                                       {item.keterangan || '-'}
+                                                    </td>
 
-                                        {/* SECTION 2: LUNAS */}
-                                        {(filterStatusSewa === 'Semua' || filterStatusSewa === 'Sudah Bayar') && (
-                                           sudahBayarFiltered.length > 0 ? (
-                                              <div className="bg-white rounded-3xl border border-emerald-200/80 shadow-[0_4px_20px_rgba(4,120,87,0.04)] overflow-hidden">
-                                                 <div className="px-5 py-3.5 bg-emerald-50/80 border-b border-emerald-100 flex items-center justify-between text-emerald-950">
-                                                    <div className="flex items-center gap-2.5">
-                                                       <CheckCircle2 size={16} className="text-emerald-600" />
-                                                       <h3 className="font-black text-xs uppercase tracking-wider">Sudah Lunas</h3>
-                                                       <span className="bg-emerald-200/70 text-emerald-800 font-black px-2 py-0.5 rounded-full text-xs shadow-sm">
-                                                          {sudahBayarFiltered.length}
-                                                       </span>
-                                                    </div>
-                                                    <span className="text-[11px] font-semibold text-emerald-700/80 hidden sm:inline">
-                                                       Pembayaran terverifikasi • Siap digunakan
-                                                    </span>
-                                                 </div>
+                                                    {/* Column 8: Tanggal Penyewaan */}
+                                                    <td className="py-2 px-3 font-medium text-slate-700">
+                                                       {formatAppSheetDate(item.tanggal_sewa)}
+                                                    </td>
 
-                                                 <div className="overflow-x-auto">
-                                                    <table className="w-full text-left border-collapse">
-                                                       <thead className="bg-slate-50/80 border-b border-slate-100 text-slate-500 uppercase text-[10px] font-black tracking-wider">
-                                                          <tr>
-                                                             <th className="py-3 px-4 sm:px-5">Fasilitas / Lokasi</th>
-                                                             <th className="py-3 px-4 sm:px-5">Data Penyewa</th>
-                                                             <th className="py-3 px-4 sm:px-5">Status</th>
-                                                             {!filterDateSewa && <th className="py-3 px-4 sm:px-5">Tanggal Acara</th>}
-                                                             <th className="py-3 px-4 sm:px-5">Keterangan</th>
-                                                             <th className="py-3 px-4 sm:px-5 text-right">Aksi</th>
-                                                          </tr>
-                                                       </thead>
-                                                       <tbody className="divide-y divide-slate-100 text-xs">
-                                                          {sudahBayarFiltered.slice(0, filterDateSewa ? undefined : sewaDisplayLimit).map((item, idx) => {
-                                                             const locInfo = masterLokasi.find(l => l.nama === item.lokasi_sewa);
-                                                             const isLapangan = locInfo?.tipe === 'lapangan' || (item.lokasi_sewa && item.lokasi_sewa.includes('LAP'));
-                                                             const Icon = isLapangan ? TreePine : Tent;
-                                                             const isVerification = item.status_pembayaran === 'Menunggu Verifikasi';
+                                                    {/* Column 9: No.HP Penyewa */}
+                                                    <td className="py-2 px-3 font-mono text-slate-700">
+                                                       {item.no_hp_penyewa || '-'}
+                                                    </td>
 
-                                                             return (
-                                                                <tr 
-                                                                   key={idx} 
-                                                                   onClick={() => handleOpenDetail(item)}
-                                                                   className="hover:bg-emerald-50/30 cursor-pointer transition-colors group"
-                                                                >
-                                                                   <td className="py-3.5 px-4 sm:px-5">
-                                                                      <div className="flex items-start gap-3">
-                                                                         <div className={`p-2 rounded-xl mt-0.5 flex-shrink-0 ${
-                                                                            isLapangan ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
-                                                                         }`}>
-                                                                            <Icon size={16} />
-                                                                         </div>
-                                                                         <div>
-                                                                            <p className="font-black text-sm text-slate-900 group-hover:text-emerald-800 transition-colors">
-                                                                               {item.lokasi_sewa}
-                                                                            </p>
-                                                                            <div className="flex items-center gap-2 mt-0.5">
-                                                                               <span className="text-[10px] font-mono font-bold text-slate-400">
-                                                                                  {item.id_sewa}
-                                                                               </span>
-                                                                               {item.luas_lahan && (
-                                                                                  <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded">
-                                                                                     {item.luas_lahan} m²
-                                                                                  </span>
-                                                                               )}
-                                                                            </div>
-                                                                         </div>
-                                                                      </div>
-                                                                   </td>
+                                                    {/* Column 10: Tanggal Pemesanan */}
+                                                    <td className="py-2 px-3 text-slate-500">
+                                                       {formatBookingDateShort(item.tanggal_booking)}
+                                                    </td>
 
-                                                                   <td className="py-3.5 px-4 sm:px-5">
-                                                                      <p className="font-extrabold text-slate-900 text-xs">
-                                                                         {item.nama_penyewa}
-                                                                      </p>
-                                                                      <div className="text-[11px] text-slate-500 font-medium mt-0.5 flex items-center gap-2">
-                                                                         {item.no_hp_penyewa ? (
-                                                                            <span className="font-mono text-slate-600">{item.no_hp_penyewa}</span>
-                                                                         ) : (
-                                                                            <span className="italic text-slate-400">Tanpa HP</span>
-                                                                         )}
-                                                                         {item.pic_rombongan && item.pic_rombongan !== item.nama_penyewa && (
-                                                                            <span className="text-slate-400">• PIC: {item.pic_rombongan}</span>
-                                                                         )}
-                                                                      </div>
-                                                                   </td>
+                                                    {/* Column 11: PIC */}
+                                                    <td className="py-2 px-3 font-semibold text-slate-700 uppercase">
+                                                       {item.pic_kantor && item.pic_kantor !== '-' ? item.pic_kantor : (item.pic_rombongan || '-')}
+                                                    </td>
 
-                                                                   <td className="py-3.5 px-4 sm:px-5">
-                                                                      <div className="flex flex-col items-start gap-1">
-                                                                         {isVerification ? (
-                                                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-black bg-blue-100 text-blue-800 border border-blue-200 animate-pulse">
-                                                                               <Clock size={11} className="text-blue-600" />
-                                                                               VERIFIKASI
-                                                                            </span>
-                                                                         ) : (
-                                                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-black bg-emerald-100 text-emerald-800 border border-emerald-200">
-                                                                               <CheckCircle2 size={11} className="text-emerald-600" />
-                                                                               LUNAS
-                                                                            </span>
-                                                                         )}
-                                                                         {item.total_biaya > 0 && (
-                                                                            <span className="text-[11px] font-bold text-slate-700">
-                                                                               Rp {new Intl.NumberFormat('id-ID').format(item.total_biaya)}
-                                                                            </span>
-                                                                         )}
-                                                                      </div>
-                                                                   </td>
-
-                                                                   {!filterDateSewa && (
-                                                                      <td className="py-3.5 px-4 sm:px-5 text-slate-700 font-semibold">
-                                                                         <span className="text-xs">{formatTanggalIndo(item.tanggal_sewa)}</span>
-                                                                      </td>
-                                                                   )}
-
-                                                                   <td className="py-3.5 px-4 sm:px-5">
-                                                                      <div className="max-w-[200px]">
-                                                                         {item.listrik_tambahan && (
-                                                                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black bg-amber-100 text-amber-900 mb-1">
-                                                                               <Zap size={10} /> Listrik
-                                                                            </span>
-                                                                         )}
-                                                                         <p className="text-[11px] text-slate-600 truncate font-medium">
-                                                                            {item.keterangan || '-'}
-                                                                         </p>
-                                                                      </div>
-                                                                   </td>
-
-                                                                   <td className="py-3.5 px-4 sm:px-5 text-right">
-                                                                      <button
-                                                                         type="button"
-                                                                         onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            handleOpenDetail(item);
-                                                                         }}
-                                                                         className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-emerald-600 hover:text-white text-slate-700 font-bold text-xs transition-all inline-flex items-center gap-1 group-hover:bg-emerald-600 group-hover:text-white shadow-sm"
-                                                                      >
-                                                                         Detail
-                                                                         <ChevronRight size={13} />
-                                                                      </button>
-                                                                   </td>
-                                                                </tr>
-                                                             );
-                                                          })}
-                                                       </tbody>
-                                                    </table>
-                                                 </div>
-                                              </div>
-                                           ) : (
-                                              filterStatusSewa === 'Sudah Bayar' && (
-                                                 <div className="p-8 text-center bg-white rounded-3xl border border-slate-200/80">
-                                                    <p className="font-extrabold text-sm text-slate-500">Belum ada pesanan yang lunas pada filter ini.</p>
-                                                 </div>
-                                              )
-                                           )
-                                        )}
-
-                                         {!filterDateSewa && (belumBayarFiltered.length > sewaDisplayLimit || sudahBayarFiltered.length > sewaDisplayLimit) && (
-                                            <div className="text-center pt-3 pb-6">
-                                               <button 
-                                                  type="button"
-                                                  onClick={() => setSewaDisplayLimit(prev => prev + 50)} 
-                                                  className="px-6 py-3 bg-white hover:bg-emerald-50 text-emerald-900 border border-emerald-300 rounded-2xl font-bold text-xs shadow-sm transition-all active:scale-95 hover:border-emerald-400"
-                                               >
-                                                  Tampilkan 50 Data Berikutnya (Menampilkan maks. {sewaDisplayLimit} dari {Math.max(belumBayarFiltered.length, sudahBayarFiltered.length)} data)
-                                               </button>
-                                            </div>
-                                         )}
-                                     </>
+                                                    {/* Column 12: Biaya */}
+                                                    <td className="py-2 px-3 font-mono font-bold text-slate-900 text-right">
+                                                       {new Intl.NumberFormat('id-ID').format(item.total_biaya || 0)}
+                                                    </td>
+                                                 </tr>
+                                              );
+                                           })}
+                                        </tbody>
+                                     </table>
                                   )}
                                </div>
                             </>
