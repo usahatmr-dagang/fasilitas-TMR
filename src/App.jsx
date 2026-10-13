@@ -45,7 +45,8 @@ import {
   Plus,
   Eye,
   PanelLeftClose,
-  PanelLeft
+  PanelLeft,
+  Bell
 } from 'lucide-react';
 import { db, storage, auth } from './firebase';
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, setDoc, getDoc } from 'firebase/firestore';
@@ -931,6 +932,59 @@ Terima kasih.`;
     document.body.removeChild(link);
   };
 
+  const handleKirimWAReminder = (recordToRemind = null) => {
+    const record = recordToRemind || selectedRecord;
+    if (!record) return;
+
+    const biayaLokasi = getBiayaLokasi(record.lokasi_sewa, record.luas_lahan);
+    const biayaListrik = record.listrik_tambahan ? 100000 : 0;
+    const totalBayar = record.total_biaya !== undefined ? record.total_biaya : (biayaLokasi + biayaListrik);
+    const isLapangan = masterLokasi.find(l => l.nama === record.lokasi_sewa)?.tipe === 'lapangan';
+    const luasText = isLapangan ? `\nLuas Lahan: ${record.luas_lahan} m²` : '';
+    const batasText = record.batas_pembayaran ? formatTanggalIndo(record.batas_pembayaran) : 'besok';
+
+    const msg = `Halo Bapak/Ibu *${record.nama_penyewa}*,
+
+Mengingatkan kembali mengenai reservasi fasilitas di *Taman Margasatwa Ragunan*:
+
+📌 *ID Sewa:* ${record.id_sewa}
+📍 *Lokasi:* ${record.lokasi_sewa}${luasText}
+📅 *Tanggal Kunjungan:* ${formatTanggalPendek(record.tanggal_sewa)}
+💰 *Total Biaya:* ${formatRupiah(totalBayar)}
+
+⏰ *PENTING - BATAS WAKTU TERSISA 1 HARI:*
+Batas akhir pembayaran & unggah bukti transfer adalah besok, *${batasText} pukul 23:59 WIB*.
+
+Mengingat tingginya antrean reservasi lokasi, apabila pembayaran dan bukti transfer belum diunggah melewati batas waktu tersebut, maka *sistem akan otomatis membatalkan pesanan dan mengalihkan lokasi ini ke pengunjung lain*.
+
+💳 *Lihat No. Rekening & Unggah Bukti Transfer di sini:*
+https://${window.location.host}/upload/${record.docId}
+
+*(Jika Bapak/Ibu sudah melakukan transfer, mohon segera unggah buktinya melalui link di atas agar pesanan segera diverifikasi petugas. Abaikan pesan ini jika sudah mengunggah).*
+
+Terima kasih,
+*Unit Pengelola Taman Margasatwa Ragunan*`;
+
+    const rawPhone = String(record.no_hp_penyewa || '');
+    let phone = rawPhone.replace(/\D/g, ''); 
+    if (phone.startsWith('0')) phone = '62' + phone.substring(1);
+    
+    if (!phone) {
+      showToast('Nomor WhatsApp penyewa tidak valid atau kosong!', 'error');
+      return;
+    }
+
+    const url = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+    const link = document.createElement('a');
+    link.href = url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast('Membuka WhatsApp untuk mengirim Reminder H-1...');
+  };
+
   const handlePerpanjangWaktu = async (record) => {
       const d = new Date();
       d.setDate(d.getDate() + 3);
@@ -1790,19 +1844,49 @@ Terima kasih.`;
 
              {detailMode === 'view' && (
                   <>
-                      {selectedRecord.status_pembayaran === 'Belum Transfer' && selectedRecord.batas_pembayaran && new Date() > new Date(selectedRecord.batas_pembayaran) ? (
-                          <div className="bg-rose-50 border border-rose-200 rounded-3xl p-4 mb-4 text-center">
-                              <p className="text-[10px] font-black text-rose-800 uppercase tracking-widest mb-3">Pesanan Kedaluwarsa</p>
-                              <div className="flex gap-2">
-                                  <button type="button" onClick={() => handlePerpanjangWaktu(selectedRecord)} className="flex-1 bg-white hover:bg-rose-100 text-rose-700 font-bold py-2.5 rounded-xl border border-rose-200 transition-all duration-200 shadow-sm text-[10px]">
-                                      Perpanjang 3 Hari
-                                  </button>
-                                  <button type="button" onClick={() => handleKirimWABatal(selectedRecord)} className="flex-1 bg-rose-600 hover:bg-rose-700 text-white font-bold py-2.5 rounded-xl transition-all duration-200 shadow-sm text-[10px]">
-                                      Batalkan & Kirim WA
+                      {selectedRecord.status_pembayaran === 'Belum Transfer' && (
+                          selectedRecord.batas_pembayaran && new Date() > new Date(selectedRecord.batas_pembayaran) ? (
+                              <div className="bg-rose-50 border border-rose-200 rounded-3xl p-4 mb-4 text-center">
+                                  <p className="text-[10px] font-black text-rose-800 uppercase tracking-widest mb-3">Pesanan Kedaluwarsa</p>
+                                  <div className="flex gap-2">
+                                      <button type="button" onClick={() => handlePerpanjangWaktu(selectedRecord)} className="flex-1 bg-white hover:bg-rose-100 text-rose-700 font-bold py-2.5 rounded-xl border border-rose-200 transition-all duration-200 shadow-sm text-[10px]">
+                                          Perpanjang 3 Hari
+                                      </button>
+                                      <button type="button" onClick={() => handleKirimWABatal(selectedRecord)} className="flex-1 bg-rose-600 hover:bg-rose-700 text-white font-bold py-2.5 rounded-xl transition-all duration-200 shadow-sm text-[10px]">
+                                          Batalkan & Kirim WA
+                                      </button>
+                                  </div>
+                              </div>
+                          ) : (
+                              <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/80 rounded-3xl p-4 mb-4 shadow-sm">
+                                  <div className="flex items-center justify-between mb-2.5">
+                                      <div className="flex items-center gap-2.5">
+                                          <div className="w-8 h-8 rounded-2xl bg-amber-500/15 flex items-center justify-center text-amber-700 shrink-0">
+                                              <Bell size={15} className="animate-bounce" />
+                                          </div>
+                                          <div>
+                                              <p className="text-[10px] font-black text-amber-950 uppercase tracking-wider">Menunggu Pembayaran / Bukti</p>
+                                              <p className="text-[11px] font-bold text-amber-800">
+                                                  {selectedRecord.batas_pembayaran ? `Batas: ${formatTanggalIndo(selectedRecord.batas_pembayaran)}` : 'Belum diunggah'}
+                                              </p>
+                                          </div>
+                                      </div>
+                                      <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 border border-amber-300">
+                                          PENGINGAT H-1
+                                      </span>
+                                  </div>
+                                  <button 
+                                      type="button" 
+                                      onClick={() => handleKirimWAReminder(selectedRecord)}
+                                      className="w-full bg-gradient-to-r from-amber-500 via-amber-600 to-amber-700 hover:from-amber-600 hover:to-amber-800 text-white font-black py-2.5 px-4 rounded-2xl shadow-sm transition-all flex items-center justify-center gap-2 text-xs active:scale-95 cursor-pointer"
+                                      title="Kirim pesan WhatsApp pengingat H-1 batas pembayaran"
+                                  >
+                                      <Send size={13} />
+                                      <span>Kirim Reminder WA (H-1)</span>
                                   </button>
                               </div>
-                          </div>
-                      ) : null}
+                          )
+                      )}
                       <div className="grid grid-cols-5 gap-2">
                          <button type="button" onClick={handleKirimWA} className="flex flex-col items-center justify-center bg-emerald-500/10 hover:bg-emerald-500 hover:text-white text-emerald-800 p-3 rounded-2xl text-[10px] font-bold border border-emerald-500/20 transition-all duration-200 shadow-sm text-center leading-tight hover:-translate-y-0.5">
                              <Send size={16} className="mb-1.5" /> Kirim WA
@@ -3193,6 +3277,16 @@ Terima kasih.`;
                                                           >
                                                              <Eye size={13} />
                                                           </button>
+                                                          {item.status_pembayaran === 'Belum Transfer' && (
+                                                             <button 
+                                                                type="button"
+                                                                onClick={(e) => { e.stopPropagation(); handleKirimWAReminder(item); }}
+                                                                className="p-1 text-amber-600 hover:text-amber-800 hover:bg-amber-100/80 rounded transition-all cursor-pointer"
+                                                                title="Kirim Reminder WA (H-1)"
+                                                             >
+                                                                <Bell size={13} />
+                                                             </button>
+                                                          )}
                                                           <button 
                                                              type="button"
                                                              onClick={() => {
@@ -3402,9 +3496,21 @@ Terima kasih.`;
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-4.5 text-center">
-                                                    <button onClick={() => handleOpenDetail(item)} className="mx-auto bg-white border border-emerald-900/15 text-emerald-800 hover:text-emerald-950 hover:bg-emerald-50 hover:border-emerald-500/35 px-3.5 py-2 rounded-xl text-[10px] font-extrabold shadow-sm transition-all duration-200 flex items-center gap-1.5">
-                                                        <FileText size={12} className="text-emerald-600"/> Cek Struk / Validasi
-                                                    </button>
+                                                    <div className="flex items-center justify-center gap-1.5">
+                                                      <button onClick={() => handleOpenDetail(item)} className="bg-white border border-emerald-900/15 text-emerald-800 hover:text-emerald-950 hover:bg-emerald-50 hover:border-emerald-500/35 px-3 py-2 rounded-xl text-[10px] font-extrabold shadow-sm transition-all duration-200 flex items-center gap-1.5">
+                                                          <FileText size={12} className="text-emerald-600"/> Cek Struk / Validasi
+                                                      </button>
+                                                      {item.status_pembayaran === 'Belum Transfer' && (
+                                                          <button 
+                                                              type="button"
+                                                              onClick={(e) => { e.stopPropagation(); handleKirimWAReminder(item); }}
+                                                              className="bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300/80 px-2.5 py-2 rounded-xl text-[10px] font-extrabold shadow-sm transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                                                              title="Kirim Reminder WA (H-1)"
+                                                          >
+                                                              <Bell size={11} className="text-amber-600"/> Reminder H-1
+                                                          </button>
+                                                      )}
+                                                    </div>
                                                 </td>
                                               </tr>
                                             )})}
