@@ -39,7 +39,9 @@ import {
   Loader2,
   Pencil,
   ShoppingCart,
-  Database
+  Database,
+  Clock,
+  LogOut
 } from 'lucide-react';
 import { db, storage, auth } from './firebase';
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, setDoc, getDoc } from 'firebase/firestore';
@@ -865,7 +867,7 @@ Terima kasih.`;
     const newHistory = [...(selectedRecord.history_reschedule || []), historyItem];
     
     const locInfo = masterLokasi.find(l => l.nama === rescheduleData.lokasi);
-    const isLapanganReschedule = locInfo?.tipe === 'lapangan' || rescheduleData.lokasi.includes('LAP');
+    const isLapanganReschedule = locInfo?.tipe === 'lapangan' || (rescheduleData.lokasi && rescheduleData.lokasi.includes('LAP'));
     const luas_lahan_reschedule = isLapanganReschedule ? Math.max(Number(selectedRecord.luas_lahan || 50), 50) : null;
     
     const biayaLokasiBaru = getBiayaLokasi(rescheduleData.lokasi, luas_lahan_reschedule);
@@ -1659,7 +1661,7 @@ Terima kasih.`;
     if (!selectedRecord) return null;
 
     const locInfo = masterLokasi.find(l => l.nama === selectedRecord.lokasi_sewa);
-    const isLapangan = locInfo?.tipe === 'lapangan' || selectedRecord.lokasi_sewa.includes('LAP');
+    const isLapangan = locInfo?.tipe === 'lapangan' || (selectedRecord.lokasi_sewa && selectedRecord.lokasi_sewa.includes('LAP'));
     const viewBiayaLokasi = getBiayaLokasi(selectedRecord.lokasi_sewa, selectedRecord.luas_lahan);
     const viewBiayaListrik = selectedRecord.listrik_tambahan ? 100000 : 0;
     const viewTotalBiaya = selectedRecord.total_biaya !== undefined ? selectedRecord.total_biaya : (viewBiayaLokasi + viewBiayaListrik);
@@ -3581,7 +3583,7 @@ Terima kasih.`;
                                           <tbody className="divide-y divide-emerald-900/5 text-xs">
                                             {group.data.map((item, idx) => {
                                               const locInfo = masterLokasi.find(l => l.nama === item.lokasi_sewa);
-                                              const isLapangan = locInfo?.tipe === 'lapangan' || item.lokasi_sewa.includes('LAP');
+                                              const isLapangan = locInfo?.tipe === 'lapangan' || (item.lokasi_sewa && item.lokasi_sewa.includes('LAP'));
                                               return (
                                               <tr key={idx} className="hover:bg-slate-50/50 transition-all duration-200 group/row">
                                                 <td className="px-6 py-4.5 font-black text-emerald-950 group-hover/row:text-emerald-700 transition-colors">{item.id_sewa}</td>
