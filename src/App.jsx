@@ -3281,9 +3281,10 @@ Terima kasih.`;
                    <div className="flex-1 bg-white rounded-2xl border border-slate-200/90 shadow-xs flex flex-col h-full overflow-hidden min-h-[400px]">
                       {(() => {
                          const todayStr = getTodayString();
+                         const targetDateNorm = filterDateSewa ? normalizeDateString(filterDateSewa) : null;
                          let baseList = sewaList.filter(s => s.status_pembayaran !== 'Ditutup');
-                         if (filterDateSewa) {
-                            baseList = baseList.filter(s => normalizeDateString(s.tanggal_sewa) === filterDateSewa);
+                         if (targetDateNorm) {
+                            baseList = baseList.filter(s => normalizeDateString(s.tanggal_sewa) === targetDateNorm);
                          } else {
                             baseList = baseList.filter(s => normalizeDateString(s.tanggal_sewa) >= todayStr);
                          }
@@ -3302,6 +3303,9 @@ Terima kasih.`;
 
                          // Apply search filter if query exists
                          let dataFiltered = statusFiltered;
+                         if (targetDateNorm) {
+                            dataFiltered = dataFiltered.filter(s => normalizeDateString(s.tanggal_sewa) === targetDateNorm);
+                         }
                          if (sewaSearchQuery.trim()) {
                             const q = sewaSearchQuery.toLowerCase().trim();
                             dataFiltered = dataFiltered.filter(s => {
@@ -3448,7 +3452,7 @@ Terima kasih.`;
                                         <p className="text-[11px] text-slate-400 mt-0.5">Pilih tanggal lain atau bersihkan kata kunci pencarian.</p>
                                      </div>
                                   ) : (
-                                     <table className="min-w-full border-collapse text-left text-xs whitespace-nowrap">
+                                     <table key={targetDateNorm || 'all'} className="min-w-full border-collapse text-left text-xs whitespace-nowrap">
                                         <thead className="sticky top-0 bg-slate-100/95 backdrop-blur-sm border-b border-slate-200 z-10 text-[11px] font-black text-slate-600 uppercase tracking-wider">
                                            <tr>
                                               <th className="py-2.5 px-3 text-center w-14">Aksi</th>
@@ -3465,8 +3469,10 @@ Terima kasih.`;
                                               <th className="py-2.5 px-3 text-right">Biaya</th>
                                            </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-slate-100 text-slate-700">
-                                           {dataFiltered.map((item, idx) => {
+                                        <tbody key={targetDateNorm || 'all'} className="divide-y divide-slate-100 text-slate-700">
+                                           {dataFiltered
+                                              .filter(item => !targetDateNorm || normalizeDateString(item.tanggal_sewa) === targetDateNorm)
+                                              .map((item, idx) => {
                                               const locInfo = masterLokasi.find(l => l.nama === item.lokasi_sewa);
                                               const isLapangan = locInfo?.tipe === 'lapangan' || (item.lokasi_sewa && item.lokasi_sewa.includes('LAP'));
                                               const isPaid = ['Sudah Transfer', 'Lunas', 'Sudah Lunas'].includes(item.status_pembayaran);
@@ -3474,7 +3480,7 @@ Terima kasih.`;
 
                                               return (
                                                  <tr 
-                                                    key={item.id_sewa || idx} 
+                                                    key={item.docId || item.id || `${item.id_sewa || 'item'}_${idx}`} 
                                                     onClick={() => handleOpenDetail(item)}
                                                     className="even:bg-slate-50/40 hover:bg-emerald-50/50 cursor-pointer transition-colors group"
                                                  >
