@@ -1,8 +1,70 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { FileText, Printer, Search, Building, CheckCircle2, ChevronLeft, Download } from 'lucide-react';
+import { FileText, Printer, Search, Building, CheckCircle2, ChevronLeft, Download, Calendar, CalendarDays, X, RotateCcw } from 'lucide-react';
 import { db } from './firebase';
 import { collection, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { openKwitansiPrintWindow, downloadKwitansiExcel, generateKwitansiExcelBlob } from './utils/kwitansiHelper';
+
+const normalizeDateString = (dateVal) => {
+  if (!dateVal) return '';
+  if (typeof dateVal === 'object') {
+    if (dateVal.toDate && typeof dateVal.toDate === 'function') {
+      const parsed = dateVal.toDate();
+      const y = parsed.getFullYear();
+      const m = String(parsed.getMonth() + 1).padStart(2, '0');
+      const d = String(parsed.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+    if (dateVal instanceof Date) {
+      const y = dateVal.getFullYear();
+      const m = String(dateVal.getMonth() + 1).padStart(2, '0');
+      const d = String(dateVal.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+    if (dateVal.seconds !== undefined) {
+      const parsed = new Date(dateVal.seconds * 1000);
+      const y = parsed.getFullYear();
+      const m = String(parsed.getMonth() + 1).padStart(2, '0');
+      const d = String(parsed.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
+  }
+  if (typeof dateVal !== 'string') return '';
+  const s = dateVal.trim();
+  
+  const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) {
+    return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
+  }
+
+  const dmyMatch = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+  if (dmyMatch) {
+    const [, d, m, y] = dmyMatch;
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+
+  const parsed = new Date(s);
+  if (!isNaN(parsed.getTime())) {
+    const y = parsed.getFullYear();
+    const m = String(parsed.getMonth() + 1).padStart(2, '0');
+    const d = String(parsed.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  return s;
+};
+
+const formatTanggalIndo = (dateStr) => {
+  if (!dateStr) return '-';
+  try {
+    const norm = normalizeDateString(dateStr);
+    if (!norm || !/^\d{4}-\d{2}-\d{2}$/.test(norm)) return dateStr;
+    const [year, month, day] = norm.split('-');
+    const date = new Date(Number(year), Number(month) - 1, Number(day));
+    if (isNaN(date.getTime())) return dateStr;
+    return new Intl.DateTimeFormat('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(date);
+  } catch(e) {
+    return dateStr;
+  }
+};
 
 const getPromoDate = (item) => {
     if (item.selectedDates && Array.isArray(item.selectedDates) && item.selectedDates.length > 0) {
@@ -12,11 +74,36 @@ const getPromoDate = (item) => {
     return item.tanggalPromo || null;
 };
 
+const getItemDates = (item, isPromo) => {
+  if (!isPromo) {
+    const d = normalizeDateString(item.tanggal_sewa);
+    return d ? [d] : [];
+  }
+  const dates = [];
+  if (item.selectedDates && Array.isArray(item.selectedDates)) {
+    item.selectedDates.forEach(sd => {
+      const raw = typeof sd === 'object' && sd !== null ? sd.date : sd;
+      const norm = normalizeDateString(raw);
+      if (norm && !dates.includes(norm)) dates.push(norm);
+    });
+  }
+  const primary = normalizeDateString(getPromoDate(item));
+  if (primary && !dates.includes(primary)) dates.push(primary);
+  return dates;
+};
+
+const isItemOnDate = (item, targetDate, isPromo) => {
+  if (!targetDate) return true;
+  const dates = getItemDates(item, isPromo);
+  return dates.includes(targetDate);
+};
+
 export default function CetakKwitansi({ onNavigate, initialSewaList = null }) {
   const [source, setSource] = useState('sewa'); // 'sewa' or 'promo'
   const [dataList, setDataList] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [search, setSearch] = useState('');
+  const [selectedVisitDate, setSelectedVisitDate] = useState('');
   const [selectedItem, setSelectedItem] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -145,19 +232,51 @@ export default function CetakKwitansi({ onNavigate, initialSewaList = null }) {
       }
   };
 
-  // Search filter
+  // Available dates with count for quick filter chips
+  const availableDatesWithCount = useMemo(() => {
+    const counts = {};
+    const isPromo = source === 'promo';
+    dataList.forEach(item => {
+      const dates = getItemDates(item, isPromo);
+      dates.forEach(d => {
+        counts[d] = (counts[d] || 0) + 1;
+      });
+    });
+    return Object.keys(counts).sort((a, b) => new Date(b) - new Date(a)).map(d => ({
+      date: d,
+      count: counts[d],
+      label: formatTanggalIndo(d)
+    }));
+  }, [dataList, source]);
+
+  // Search & calendar visit date filter
   useEffect(() => {
-    if (!search.trim()) {
-      setFilteredData(dataList);
-    } else {
-      const lower = search.toLowerCase();
-      setFilteredData(dataList.filter(item => {
-        if (source === 'sewa') return (item.nama_penyewa || '').toLowerCase().includes(lower) || (item.id_sewa || '').toLowerCase().includes(lower);
-        if (source === 'promo') return (item.namaPerusahaan || '').toLowerCase().includes(lower) || (item.namaProduk || '').toLowerCase().includes(lower);
-        return false;
-      }));
+    let result = dataList;
+
+    // Filter berdasarkan tanggal kunjungan dari kalender (jika dipilih)
+    if (selectedVisitDate) {
+      result = result.filter(item => isItemOnDate(item, selectedVisitDate, source === 'promo'));
     }
-  }, [search, dataList, source]);
+
+    // Filter pencarian teks
+    if (search.trim()) {
+      const lower = search.toLowerCase();
+      result = result.filter(item => {
+        if (source === 'sewa') {
+          return (item.nama_penyewa || '').toLowerCase().includes(lower) || 
+                 (item.id_sewa || '').toLowerCase().includes(lower) ||
+                 (item.lokasi_sewa || '').toLowerCase().includes(lower);
+        }
+        if (source === 'promo') {
+          return (item.namaPerusahaan || '').toLowerCase().includes(lower) || 
+                 (item.namaProduk || '').toLowerCase().includes(lower);
+        }
+        return false;
+      });
+    }
+
+    setFilteredData(result);
+  }, [search, selectedVisitDate, dataList, source]);
 
   // Kelompokkan data berdasarkan tanggal untuk sidebar list
   const groupedData = useMemo(() => {
@@ -167,11 +286,9 @@ export default function CetakKwitansi({ onNavigate, initialSewaList = null }) {
       if (!rawDate) rawDate = 'Tanpa Tanggal';
       
       let displayDate = rawDate;
-      if (rawDate.match(/^\d{4}-\d{2}-\d{2}$/)) {
-        const d = new Date(rawDate);
-        if (!isNaN(d.getTime())) {
-          displayDate = d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
-        }
+      const norm = normalizeDateString(rawDate);
+      if (norm && /^\d{4}-\d{2}-\d{2}$/.test(norm)) {
+        displayDate = formatTanggalIndo(norm);
       }
       
       if (!groups[displayDate]) groups[displayDate] = [];
@@ -332,6 +449,90 @@ export default function CetakKwitansi({ onNavigate, initialSewaList = null }) {
               </button>
             </div>
 
+            {/* Kalender Pilihan Tanggal Kunjungan */}
+            <div className="mb-4 p-3.5 bg-amber-50/70 border border-amber-200/80 rounded-2xl shadow-xs">
+              <div className="flex items-center justify-between mb-2.5">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-xl bg-amber-600 text-white flex items-center justify-center shadow-xs shadow-amber-600/20">
+                    <Calendar size={15} />
+                  </div>
+                  <div>
+                    <h4 className="font-extrabold text-[11px] text-amber-950 uppercase tracking-wide">
+                      Filter Tanggal Kunjungan
+                    </h4>
+                    <p className="text-[11px] font-bold text-amber-800">
+                      {selectedVisitDate ? formatTanggalIndo(selectedVisitDate) : 'Semua Tanggal'}
+                    </p>
+                  </div>
+                </div>
+                {selectedVisitDate && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedVisitDate('')}
+                    className="text-[10px] font-bold text-amber-800 hover:text-amber-950 bg-white hover:bg-amber-100/60 border border-amber-300 px-2.5 py-1 rounded-lg transition-all shadow-xs flex items-center gap-1 cursor-pointer"
+                    title="Tampilkan semua tanggal"
+                  >
+                    <X size={11} /> Reset
+                  </button>
+                )}
+              </div>
+
+              {/* Input Kalender & Quick Button Hari Ini */}
+              <div className="flex items-center gap-2">
+                <input 
+                  type="date"
+                  value={selectedVisitDate}
+                  onChange={(e) => setSelectedVisitDate(e.target.value)}
+                  className="flex-1 px-3 py-2 bg-white border border-amber-300 rounded-xl text-xs font-bold text-slate-800 shadow-xs focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-600 cursor-pointer"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const today = new Date();
+                    const tStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                    setSelectedVisitDate(tStr);
+                  }}
+                  className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs shadow-amber-600/20 whitespace-nowrap active:scale-95 cursor-pointer"
+                >
+                  Hari Ini
+                </button>
+              </div>
+
+              {/* Quick Date Chips (Tanggal Tersedia yang ada Datanya) */}
+              {availableDatesWithCount.length > 0 && (
+                <div className="mt-2.5 pt-2.5 border-t border-amber-200/60">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[9.5px] font-extrabold text-amber-900 uppercase tracking-wider">
+                      Tanggal Tersedia ({availableDatesWithCount.length}):
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto pr-1 custom-scrollbar">
+                    {availableDatesWithCount.slice(0, 16).map((item) => {
+                      const isSelected = selectedVisitDate === item.date;
+                      return (
+                        <button
+                          key={item.date}
+                          type="button"
+                          onClick={() => setSelectedVisitDate(isSelected ? '' : item.date)}
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border transition-all flex items-center gap-1 cursor-pointer ${
+                            isSelected 
+                              ? 'bg-amber-700 text-white border-amber-700 shadow-xs' 
+                              : 'bg-white text-amber-950 border-amber-200/80 hover:bg-amber-100/60'
+                          }`}
+                        >
+                          <CalendarDays size={10} className={isSelected ? 'text-white' : 'text-amber-600'} />
+                          <span>{item.date}</span>
+                          <span className={`text-[9px] px-1 py-0.1 rounded-full font-black ${isSelected ? 'bg-amber-900 text-amber-100' : 'bg-amber-100 text-amber-800'}`}>
+                            {item.count}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div className="relative mb-4">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
               <input 
@@ -339,16 +540,38 @@ export default function CetakKwitansi({ onNavigate, initialSewaList = null }) {
                 placeholder="Cari nama instansi/ID..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-4 focus:ring-amber-500/10 focus:border-amber-600 outline-none"
+                className="w-full pl-11 pr-10 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-4 focus:ring-amber-500/10 focus:border-amber-600 outline-none"
               />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                >
+                  <X size={15} />
+                </button>
+              )}
             </div>
 
-            <div className="h-[400px] overflow-y-auto pr-2 space-y-2 custom-scrollbar">
+            <div className="h-[380px] overflow-y-auto pr-2 space-y-2 custom-scrollbar">
               {isLoading ? (
                 <div className="text-center py-10 text-slate-400 font-medium">Memuat data...</div>
               ) : filteredData.length === 0 ? (
                 <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                  <p className="text-slate-400 font-semibold text-sm">Tidak ada data ditemukan</p>
+                  <p className="text-slate-500 font-semibold text-sm">
+                    {selectedVisitDate 
+                      ? `Tidak ada data kunjungan pada ${formatTanggalIndo(selectedVisitDate)}` 
+                      : 'Tidak ada data ditemukan'}
+                  </p>
+                  {selectedVisitDate && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedVisitDate('')}
+                      className="mt-3 px-3.5 py-1.5 bg-amber-100 text-amber-800 hover:bg-amber-200 rounded-xl text-xs font-bold transition-all inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+                    >
+                      <RotateCcw size={12} /> Tampilkan Semua Tanggal
+                    </button>
+                  )}
                 </div>
               ) : (
                 Object.keys(groupedData).map((dateKey) => (
