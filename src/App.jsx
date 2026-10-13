@@ -447,6 +447,8 @@ export default function App() {
   };
 
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [isCustomPicCheckout, setIsCustomPicCheckout] = useState(false);
+  const [isCustomPicEdit, setIsCustomPicEdit] = useState(false);
   const [formData, setFormData] = useState({
     namaRombongan: '', picRombongan: '', noWa: '', picKantor: '', keterangan: '', catatan: '', statusPembayaran: 'Belum Transfer', listrikTambahan: false, luasLahan: 50, isGazeboPackage: false
   });
@@ -743,6 +745,7 @@ export default function App() {
       if (!record) return;
       setSelectedRecord(record);
       setDetailMode('view');
+      setIsCustomPicEdit(false);
       setEditFormData({...record});
       setRescheduleData({ tanggal: record.tanggal_sewa, lokasi: record.lokasi_sewa });
   };
@@ -819,6 +822,7 @@ export default function App() {
 
       setCartLokasi([]);
       setIsCheckoutOpen(false);
+      setIsCustomPicCheckout(false);
       setFormData({ namaRombongan: '', picRombongan: '', noWa: '', picKantor: '', keterangan: '', catatan: '', statusPembayaran: 'Belum Transfer', listrikTambahan: false, luasLahan: 50, isGazeboPackage: false });
       handleOpenDetail(newBooking);
       showToast('Reservasi baru berhasil ditambahkan!');
@@ -1905,7 +1909,7 @@ Terima kasih.`;
             <button type="button" onClick={() => setSelectedRecord(null)} className="p-2 text-white/80 hover:text-white bg-white/10 hover:bg-white/20 rounded-full transition-all duration-200"><X size={18} /></button>
           </div>
           
-          <div className="p-6 flex-1 overflow-y-auto pb-28 relative z-10 space-y-5 hide-scrollbar">
+          <div className="p-6 flex-1 overflow-y-auto pb-28 relative z-10 space-y-5 visible-scrollbar pr-3">
              <div className="bg-white p-5 rounded-3xl shadow-[0_4px_20px_rgba(4,120,87,0.03)] border border-slate-100 relative overflow-hidden">
                <div className="absolute top-0 right-0 w-20 h-20 bg-amber-100/40 rounded-bl-full -z-10 opacity-70"></div>
                <p className="text-[10px] uppercase font-extrabold tracking-widest text-amber-600 mb-1">ID Transaksi</p>
@@ -2146,11 +2150,57 @@ Terima kasih.`;
                          <div><label className="block text-[10px] font-extrabold text-emerald-950 uppercase tracking-wider mb-1">No WhatsApp</label><input required type="text" value={editFormData.no_hp_penyewa || ''} onChange={e => setEditFormData({...editFormData, no_hp_penyewa: e.target.value})} className="w-full px-4 py-2.5 border border-slate-200 rounded-2xl text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 outline-none font-semibold text-emerald-950 bg-white" /></div>
                       </div>
                       <div>
-                         <label className="block text-[10px] font-extrabold text-emerald-950 uppercase tracking-wider mb-1">PIC Kantor TMR</label>
-                         <select required value={editFormData.pic_kantor === '-' ? '' : (editFormData.pic_kantor || '')} onChange={e => setEditFormData({...editFormData, pic_kantor: e.target.value})} className="w-full px-4 py-2.5 border border-slate-200 rounded-2xl text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 outline-none font-semibold text-emerald-950 bg-white cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2310b981%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E')] bg-[right_1rem_center] bg-[length:1.25em_1.25em] bg-no-repeat pr-10">
-                             <option value="" disabled>Pilih PIC...</option>
-                             {picList.map((pic, idx) => <option key={pic.id || idx} value={pic.nama}>{pic.nama}</option>)}
-                         </select>
+                         <div className="flex items-center justify-between mb-1">
+                            <label className="block text-[10px] font-extrabold text-emerald-950 uppercase tracking-wider">PIC Kantor TMR</label>
+                            <button 
+                                type="button" 
+                                onClick={() => setIsCustomPicEdit(prev => !prev)} 
+                                className="text-[10px] font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-100/70 hover:bg-emerald-100 px-2 py-0.5 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                            >
+                                {isCustomPicEdit ? '← Pilih dari List' : '➕ Input Manual (Magang)'}
+                            </button>
+                         </div>
+                         {isCustomPicEdit ? (
+                             <div className="relative">
+                                 <input 
+                                     required 
+                                     type="text" 
+                                     value={editFormData.pic_kantor || ''} 
+                                     onChange={e => setEditFormData({ ...editFormData, pic_kantor: e.target.value })} 
+                                     placeholder="Ketik nama PIC / Magang..." 
+                                     className="w-full px-4 py-2.5 border-2 border-emerald-400 bg-emerald-50/20 rounded-2xl text-sm focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-600 outline-none font-bold text-emerald-950 pr-20 placeholder:text-slate-400 placeholder:font-normal"
+                                     autoFocus
+                                 />
+                                 <button 
+                                     type="button" 
+                                     onClick={() => setIsCustomPicEdit(false)}
+                                     className="absolute right-2 top-1/2 -translate-y-1/2 px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 text-[10px] font-extrabold rounded-xl transition-all shadow-sm"
+                                 >
+                                     Pilih List
+                                 </button>
+                             </div>
+                         ) : (
+                             <select 
+                                 required 
+                                 value={editFormData.pic_kantor === '-' ? '' : (editFormData.pic_kantor || '')} 
+                                 onChange={e => {
+                                     if (e.target.value === '__custom__') {
+                                         setIsCustomPicEdit(true);
+                                         setEditFormData({ ...editFormData, pic_kantor: '' });
+                                     } else {
+                                         setEditFormData({ ...editFormData, pic_kantor: e.target.value });
+                                     }
+                                 }} 
+                                 className="w-full px-4 py-2.5 border border-slate-200 rounded-2xl text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 outline-none font-semibold text-emerald-950 bg-white cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2310b981%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E')] bg-[right_1rem_center] bg-[length:1.25em_1.25em] bg-no-repeat pr-10"
+                             >
+                                 <option value="" disabled>Pilih PIC...</option>
+                                 {editFormData.pic_kantor && editFormData.pic_kantor !== '-' && !picList.some(p => p.nama === editFormData.pic_kantor) && (
+                                     <option value={editFormData.pic_kantor}>{editFormData.pic_kantor} (Non-Master / Magang)</option>
+                                 )}
+                                 {picList.map((pic, idx) => <option key={pic.id || idx} value={pic.nama}>{pic.nama}</option>)}
+                                 <option value="__custom__">➕ Ketik Nama Manual / Anak Magang...</option>
+                             </select>
+                         )}
                       </div>
                       <div><label className="block text-[10px] font-extrabold text-emerald-950 uppercase tracking-wider mb-1">Keterangan</label><textarea value={editFormData.keterangan || ''} onChange={e => setEditFormData({...editFormData, keterangan: e.target.value})} rows="2" className="w-full px-4 py-2.5 border border-slate-200 rounded-2xl text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 outline-none font-semibold text-emerald-950 bg-white" /></div>
                       <div><label className="block text-[10px] font-extrabold text-emerald-950 uppercase tracking-wider mb-1">Catatan Tambahan Sewa (Tenda, Kursi, dll)</label><textarea value={editFormData.catatan || ''} onChange={e => setEditFormData({...editFormData, catatan: e.target.value})} rows="2" className="w-full px-4 py-2.5 border border-slate-200 rounded-2xl text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 outline-none font-semibold text-emerald-950 bg-white" placeholder="Contoh: Bawa tenda 3x3..." /></div>
@@ -2569,10 +2619,10 @@ Terima kasih.`;
                         <h3 className="font-black text-lg tracking-tight bg-gradient-to-r from-white to-emerald-100 bg-clip-text text-transparent">Formulir Checkout</h3>
                         <p className="text-[10px] text-amber-400 font-extrabold tracking-widest uppercase mt-0.5">{cartLokasi.length} Fasilitas Terpilih • {formatTanggalIndo(selectedDate)}</p>
                     </div>
-                    <button type="button" onClick={() => setIsCheckoutOpen(false)} className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all duration-200 hover:scale-105"><X size={18} /></button>
+                    <button type="button" onClick={() => { setIsCheckoutOpen(false); setIsCustomPicCheckout(false); }} className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all duration-200 hover:scale-105"><X size={18} /></button>
                 </div>
                 {/* Scrollable form fields */}
-                <div className="overflow-y-auto flex-1 hide-scrollbar bg-slate-50/50">
+                <div className="overflow-y-auto flex-1 visible-scrollbar bg-slate-50/50 pr-1">
                 <form id="booking-form" onSubmit={handleSubmitBooking} className="p-4 sm:p-6 space-y-4 relative z-10">
                     
                     {/* Ringkasan Fasilitas */}
@@ -2691,11 +2741,67 @@ Terima kasih.`;
                             <input type="text" value={formatTanggalPendek(selectedDate)} disabled className="w-full px-4 py-3 border border-slate-200 bg-slate-100 text-slate-500 text-sm font-extrabold rounded-2xl cursor-not-allowed shadow-inner" />
                         </div>
                         <div>
-                            <label className="block text-[10px] font-extrabold text-emerald-950 uppercase tracking-wider mb-1.5">PIC Kantor (TMR)</label>
-                            <select required value={formData.picKantor} onChange={(e)=>setFormData({...formData, picKantor: e.target.value})} className="w-full px-4 py-3 border border-slate-200 rounded-2xl text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 outline-none font-semibold text-emerald-950 bg-white shadow-sm cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2310b981%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E')] bg-[right_1rem_center] bg-[length:1.25em_1.25em] bg-no-repeat pr-10">
-                                <option value="" disabled>Pilih Nama PIC...</option>
-                                {picList.map((pic, idx) => <option key={pic.id || idx} value={pic.nama}>{pic.nama}</option>)}
-                            </select>
+                            <div className="flex items-center justify-between mb-1.5">
+                                <label className="block text-[10px] font-extrabold text-emerald-950 uppercase tracking-wider">PIC Kantor (TMR)</label>
+                                <button 
+                                    type="button" 
+                                    onClick={() => {
+                                        setIsCustomPicCheckout(prev => !prev);
+                                        if (isCustomPicCheckout) setFormData({ ...formData, picKantor: '' });
+                                    }} 
+                                    className="text-[10px] font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-100/70 hover:bg-emerald-100 px-2 py-0.5 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                                >
+                                    {isCustomPicCheckout ? '← Pilih dari List' : '➕ Input Manual (Magang)'}
+                                </button>
+                            </div>
+
+                            {isCustomPicCheckout ? (
+                                <div>
+                                    <div className="relative">
+                                        <input 
+                                            required 
+                                            type="text" 
+                                            value={formData.picKantor} 
+                                            onChange={(e) => setFormData({ ...formData, picKantor: e.target.value })} 
+                                            placeholder="Ketik nama PIC / Magang..." 
+                                            className="w-full px-4 py-3 border-2 border-emerald-400 bg-emerald-50/20 rounded-2xl text-sm focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-600 outline-none font-bold text-emerald-950 shadow-sm pr-20 placeholder:text-slate-400 placeholder:font-normal"
+                                            autoFocus
+                                        />
+                                        <button 
+                                            type="button" 
+                                            onClick={() => {
+                                                setIsCustomPicCheckout(false);
+                                                setFormData({ ...formData, picKantor: '' });
+                                            }}
+                                            className="absolute right-2 top-1/2 -translate-y-1/2 px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 text-[10px] font-extrabold rounded-xl transition-all shadow-sm"
+                                            title="Pilih dari daftar master PIC"
+                                        >
+                                            Pilih List
+                                        </button>
+                                    </div>
+                                    <p className="text-[10px] text-emerald-700 font-bold mt-1">
+                                        *Nama hanya menempel pada pesanan ini (tidak disimpan ke data master).
+                                    </p>
+                                </div>
+                            ) : (
+                                <select 
+                                    required 
+                                    value={formData.picKantor} 
+                                    onChange={(e) => {
+                                        if (e.target.value === '__custom__') {
+                                            setIsCustomPicCheckout(true);
+                                            setFormData({ ...formData, picKantor: '' });
+                                        } else {
+                                            setFormData({ ...formData, picKantor: e.target.value });
+                                        }
+                                    }} 
+                                    className="w-full px-4 py-3 border border-slate-200 rounded-2xl text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 outline-none font-semibold text-emerald-950 bg-white shadow-sm cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2310b981%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E')] bg-[right_1rem_center] bg-[length:1.25em_1.25em] bg-no-repeat pr-10"
+                                >
+                                    <option value="" disabled>Pilih Nama PIC...</option>
+                                    {picList.map((pic, idx) => <option key={pic.id || idx} value={pic.nama}>{pic.nama}</option>)}
+                                    <option value="__custom__">➕ Ketik Nama Manual / Anak Magang...</option>
+                                </select>
+                            )}
                         </div>
                     </div>
                     
@@ -2739,6 +2845,7 @@ Terima kasih.`;
                       onClick={() => {
                           setCartLokasi([]);
                           setIsCheckoutOpen(false);
+                          setIsCustomPicCheckout(false);
                           setFormData({ namaRombongan: '', picRombongan: '', noWa: '', picKantor: '', keterangan: '', catatan: '', statusPembayaran: 'Belum Transfer', listrikTambahan: false, luasLahan: 50, isGazeboPackage: false });
                       }}
                       className="w-1/5 sm:w-auto px-0 sm:px-4 py-4 sm:py-3.5 text-xs sm:text-sm font-bold text-rose-500 bg-rose-50 hover:bg-rose-100 rounded-2xl transition-all duration-200 active:scale-95 flex items-center justify-center flex-col sm:flex-row gap-1"
@@ -2748,7 +2855,10 @@ Terima kasih.`;
                     </button>
                     <button
                       type="button"
-                      onClick={() => setIsCheckoutOpen(false)}
+                      onClick={() => {
+                          setIsCheckoutOpen(false);
+                          setIsCustomPicCheckout(false);
+                      }}
                       className="w-auto flex-1 py-4 sm:py-3.5 text-sm font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-2xl transition-all duration-200 active:scale-95"
                     >Batal</button>
                     <button
@@ -4027,6 +4137,11 @@ Terima kasih.`;
         .pb-safe { padding-bottom: calc(0.5rem + env(safe-area-inset-bottom)); } 
         .hide-scrollbar::-webkit-scrollbar { display: none; } 
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .visible-scrollbar::-webkit-scrollbar { width: 7px; }
+        .visible-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 9999px; margin: 4px 0; }
+        .visible-scrollbar::-webkit-scrollbar-thumb { background: #10b981; border-radius: 9999px; }
+        .visible-scrollbar::-webkit-scrollbar-thumb:hover { background: #059669; }
+        .visible-scrollbar { scrollbar-width: thin; scrollbar-color: #10b981 #f1f5f9; }
         .custom-date-picker::-webkit-calendar-picker-indicator { position: absolute; top: 0; left: 0; right: 0; bottom: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; padding: 0; margin: 0; }
       `}} />
     </div>
