@@ -46,7 +46,10 @@ import {
   Eye,
   PanelLeftClose,
   PanelLeft,
-  Bell
+  Bell,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
 import { db, storage, auth } from './firebase';
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, setDoc, getDoc } from 'firebase/firestore';
@@ -252,6 +255,44 @@ const formatBookingDateShort = (bookingStr) => {
   }
 };
 
+
+const parseBookingDateForSort = (bookingStr) => {
+  if (!bookingStr) return 0;
+  try {
+    const str = String(bookingStr).trim();
+    if (str.includes('/')) {
+      const parts = str.split(/[,\s]+/);
+      const datePart = parts[0];
+      const timePart = parts[1] || '00:00:00';
+      const [d, m, y] = datePart.split('/').map(n => parseInt(n, 10));
+      const cleanTime = timePart.replace('.', ':');
+      const timeComponents = cleanTime.split(':').map(n => parseInt(n, 10));
+      const hh = timeComponents[0] || 0;
+      const mm = timeComponents[1] || 0;
+      const ss = timeComponents[2] || 0;
+      const dt = new Date(y, m - 1, d, hh, mm, ss);
+      if (!isNaN(dt.getTime())) return dt.getTime();
+    }
+    const dt = new Date(str);
+    if (!isNaN(dt.getTime())) return dt.getTime();
+    return 0;
+  } catch(e) {
+    return 0;
+  }
+};
+
+const parseSewaDateForSort = (dateStr) => {
+  if (!dateStr) return 0;
+  try {
+    const norm = normalizeDateString(dateStr);
+    if (!norm) return 0;
+    const dt = new Date(norm);
+    return isNaN(dt.getTime()) ? 0 : dt.getTime();
+  } catch(e) {
+    return 0;
+  }
+};
+
 const CLIENT_ID = '905355425334-tbtvuvufgvnom6vnlb5d0rka00ih03if.apps.googleusercontent.com';
 const SCOPES = 'https://www.googleapis.com/auth/drive.file';
 
@@ -431,6 +472,17 @@ export default function App() {
   const [sewaSearchQuery, setSewaSearchQuery] = useState('');
   const [sidebarDateSearch, setSidebarDateSearch] = useState('');
   const [filterDatePembayaran, setFilterDatePembayaran] = useState('');
+  const [sewaSortField, setSewaSortField] = useState(null);
+  const [sewaSortDirection, setSewaSortDirection] = useState('asc'); // 'asc' | 'desc'
+
+  const handleToggleSewaSort = (field) => {
+    if (sewaSortField === field) {
+      setSewaSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSewaSortField(field);
+      setSewaSortDirection(field === 'tanggal_booking' ? 'desc' : 'asc');
+    }
+  };
   
   // Rendering optimization limits to prevent massive DOM freezes
   const [sewaDisplayLimit, setSewaDisplayLimit] = useState(50);
@@ -778,14 +830,48 @@ export default function App() {
       });
     }
 
+    // Apply in-memory sort if sewaSortField is chosen
+    let sortedData = dataFiltered;
+    if (sewaSortField) {
+      sortedData = [...dataFiltered].sort((a, b) => {
+        let valA = 0, valB = 0;
+        if (sewaSortField === 'tanggal_booking') {
+          valA = parseBookingDateForSort(a.tanggal_booking);
+          valB = parseBookingDateForSort(b.tanggal_booking);
+        } else if (sewaSortField === 'tanggal_sewa') {
+          valA = parseSewaDateForSort(a.tanggal_sewa);
+          valB = parseSewaDateForSort(b.tanggal_sewa);
+        } else if (sewaSortField === 'hari') {
+          valA = parseSewaDateForSort(a.tanggal_sewa);
+          valB = parseSewaDateForSort(b.tanggal_sewa);
+        } else if (sewaSortField === 'total_biaya') {
+          valA = Number(a.total_biaya || 0);
+          valB = Number(b.total_biaya || 0);
+        } else if (sewaSortField === 'luas_lahan') {
+          valA = Number(a.luas_lahan || 0);
+          valB = Number(b.luas_lahan || 0);
+        } else if (sewaSortField === 'pic') {
+          valA = (a.pic_kantor && a.pic_kantor !== '-' ? a.pic_kantor : (a.pic_rombongan || '')).toLowerCase();
+          valB = (b.pic_kantor && b.pic_kantor !== '-' ? b.pic_kantor : (b.pic_rombongan || '')).toLowerCase();
+        } else {
+          valA = String(a[sewaSortField] || '').toLowerCase();
+          valB = String(b[sewaSortField] || '').toLowerCase();
+        }
+
+        if (valA < valB) return sewaSortDirection === 'asc' ? -1 : 1;
+        if (valA > valB) return sewaSortDirection === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
     return {
       targetDateNorm,
       totalCount,
       belumBayarCount: belumBayarAll.length,
       sudahBayarCount: sudahBayarAll.length,
-      dataFiltered
+      dataFiltered: sortedData
     };
-  }, [sewaList, filterDateSewa, filterStatusSewa, sewaSearchQuery]);
+  }, [sewaList, filterDateSewa, filterStatusSewa, sewaSearchQuery, sewaSortField, sewaSortDirection]);
 
   const getIconData = (tipe) => {
     switch(tipe) {
@@ -3115,6 +3201,26 @@ Terima kasih,
                                            <span className="text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full lowercase">
                                               {dataFiltered.length} data
                                            </span>
+                                            {sewaSortField && (
+                                                <span className="inline-flex items-center gap-1.5 text-[10px] font-bold bg-amber-50 text-amber-900 border border-amber-300 px-2.5 py-0.5 rounded-full shadow-xs">
+                                                   <span>Urut: <strong className="font-extrabold">{
+                                                      sewaSortField === 'tanggal_booking' ? 'Tgl Pemesanan' :
+                                                      sewaSortField === 'tanggal_sewa' ? 'Tgl Sewa' :
+                                                      sewaSortField === 'lokasi_sewa' ? 'Fasilitas' :
+                                                      sewaSortField === 'nama_penyewa' ? 'Nama' :
+                                                      sewaSortField === 'total_biaya' ? 'Biaya' :
+                                                      sewaSortField === 'luas_lahan' ? 'Luas' :
+                                                      sewaSortField === 'status_pembayaran' ? 'Status' :
+                                                      sewaSortField === 'pic' ? 'PIC' : sewaSortField
+                                                   }</strong> ({
+                                                      sewaSortField === 'tanggal_booking' ? (sewaSortDirection === 'desc' ? 'Terbaru' : 'Terlama') :
+                                                      sewaSortField === 'tanggal_sewa' ? (sewaSortDirection === 'asc' ? 'Terdekat' : 'Terjauh') :
+                                                      sewaSortField === 'total_biaya' || sewaSortField === 'luas_lahan' ? (sewaSortDirection === 'asc' ? 'Terkecil' : 'Terbesar') :
+                                                      (sewaSortDirection === 'asc' ? 'A-Z' : 'Z-A')
+                                                   })</span>
+                                                   <button type="button" onClick={() => setSewaSortField(null)} className="hover:text-rose-600 font-black ml-0.5 cursor-pointer text-xs leading-none" title="Reset urutan ke semula">×</button>
+                                                </span>
+                                              )}
                                         </h2>
                                         <p className="text-[11px] text-slate-500 font-semibold truncate max-w-xs sm:max-w-md">
                                            {filterDateSewa ? formatTanggalIndo(filterDateSewa) : 'Semua Jadwal Mendatang'}
@@ -3237,22 +3343,47 @@ Terima kasih,
                                      </div>
                                   ) : (
                                      <table key={targetDateNorm || 'all'} className="min-w-full border-collapse text-left text-xs whitespace-nowrap">
-                                        <thead className="sticky top-0 bg-slate-100/95 backdrop-blur-sm border-b border-slate-200 z-10 text-[11px] font-black text-slate-600 uppercase tracking-wider">
-                                           <tr>
-                                              <th className="py-2.5 px-3 text-center w-14">Aksi</th>
-                                              <th className="py-2.5 px-3">Fasilitas</th>
-                                              <th className="py-2.5 px-3 text-center">Luas Laha..</th>
-                                              <th className="py-2.5 px-3">Status Pembayar..</th>
-                                              <th className="py-2.5 px-3">Hari</th>
-                                              <th className="py-2.5 px-3">Nama Penyewa</th>
-                                              <th className="py-2.5 px-3">keterang..</th>
-                                              <th className="py-2.5 px-3">Tanggal Penyewaan</th>
-                                              <th className="py-2.5 px-3">No.HP Penyewa</th>
-                                              <th className="py-2.5 px-3">Tanggal Pemesanan..</th>
-                                              <th className="py-2.5 px-3">PIC</th>
-                                              <th className="py-2.5 px-3 text-right">Biaya</th>
-                                           </tr>
-                                        </thead>
+                                        <thead className="sticky top-0 bg-slate-100/95 backdrop-blur-sm border-b border-slate-200 z-10 text-[11px] font-black text-slate-600 uppercase tracking-wider select-none">
+                                            <tr>
+                                               <th className="py-2.5 px-3 text-center w-14">Aksi</th>
+                                               {[
+                                                  { key: 'lokasi_sewa', label: 'Fasilitas', align: 'left' },
+                                                  { key: 'luas_lahan', label: 'Luas Laha..', align: 'center' },
+                                                  { key: 'status_pembayaran', label: 'Status Pembayar..', align: 'left' },
+                                                  { key: 'hari', label: 'Hari', align: 'left' },
+                                                  { key: 'nama_penyewa', label: 'Nama Penyewa', align: 'left' },
+                                                  { key: 'keterangan', label: 'keterang..', align: 'left' },
+                                                  { key: 'tanggal_sewa', label: 'Tanggal Penyewaan', align: 'left' },
+                                                  { key: 'no_hp_penyewa', label: 'No.HP Penyewa', align: 'left' },
+                                                  { key: 'tanggal_booking', label: 'Tanggal Pemesanan..', align: 'left' },
+                                                  { key: 'pic', label: 'PIC', align: 'left' },
+                                                  { key: 'total_biaya', label: 'Biaya', align: 'right' }
+                                               ].map(col => {
+                                                  const isSorted = sewaSortField === col.key;
+                                                  return (
+                                                     <th 
+                                                        key={col.key}
+                                                        onClick={() => handleToggleSewaSort(col.key)}
+                                                        className={`py-2.5 px-3 cursor-pointer transition-colors group hover:bg-slate-200/80 ${col.align === 'center' ? 'text-center' : col.align === 'right' ? 'text-right' : 'text-left'} ${isSorted ? 'bg-emerald-100/80 text-emerald-950 font-black' : ''}`}
+                                                        title={`Klik untuk mengurutkan (sort) berdasarkan ${col.label}`}
+                                                     >
+                                                        <div className={`inline-flex items-center gap-1.5 ${col.align === 'center' ? 'justify-center' : col.align === 'right' ? 'justify-end' : 'justify-start'}`}>
+                                                           <span>{col.label}</span>
+                                                           {isSorted ? (
+                                                              sewaSortDirection === 'asc' ? (
+                                                                 <ArrowUp size={11} className="text-emerald-700 stroke-[2.5] shrink-0" />
+                                                              ) : (
+                                                                 <ArrowDown size={11} className="text-emerald-700 stroke-[2.5] shrink-0" />
+                                                              )
+                                                           ) : (
+                                                              <ArrowUpDown size={10} className="text-slate-400 opacity-30 group-hover:opacity-100 transition-opacity shrink-0" />
+                                                           )}
+                                                        </div>
+                                                     </th>
+                                                  );
+                                               })}
+                                            </tr>
+                                         </thead>
                                         <tbody key={targetDateNorm || 'all'} className="divide-y divide-slate-100 text-slate-700">
                                            {dataFiltered.map((item, idx) => {
                                               const locInfo = masterLokasiMap.get(item.lokasi_sewa) || masterLokasi.find(l => l.nama === item.lokasi_sewa);
