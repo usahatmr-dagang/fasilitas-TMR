@@ -260,18 +260,43 @@ const formatBookingDateDetail = (bookingStr) => {
   if (!bookingStr) return '-';
   try {
     let dt = null;
+    let timeStr = '';
+
     if (typeof bookingStr === 'object') {
       if (bookingStr instanceof Date && !isNaN(bookingStr.getTime())) {
         dt = bookingStr;
+        const hh = String(dt.getHours()).padStart(2, '0');
+        const mm = String(dt.getMinutes()).padStart(2, '0');
+        if (dt.getHours() !== 0 || dt.getMinutes() !== 0) {
+          timeStr = `${hh}:${mm} WIB`;
+        }
       } else if (bookingStr.seconds !== undefined) {
         dt = new Date(bookingStr.seconds * 1000);
+        const hh = String(dt.getHours()).padStart(2, '0');
+        const mm = String(dt.getMinutes()).padStart(2, '0');
+        if (dt.getHours() !== 0 || dt.getMinutes() !== 0) {
+          timeStr = `${hh}:${mm} WIB`;
+        }
       }
     } else {
       const s = String(bookingStr).trim();
       if (!s || s === '-') return '-';
 
-      const parts = s.split(/[,\s]+/);
+      const normalizedS = s.replace('T', ' ');
+      const parts = normalizedS.split(/[,\s]+/);
       const datePart = parts[0];
+
+      if (parts.length > 1 && parts[1]) {
+        const rawTime = parts[1].trim();
+        const tSegments = rawTime.split(/[:.]+/);
+        if (tSegments.length >= 2) {
+          const hh = tSegments[0].padStart(2, '0');
+          const mm = tSegments[1].padStart(2, '0');
+          timeStr = `${hh}:${mm} WIB`;
+        } else if (tSegments.length === 1 && tSegments[0]) {
+          timeStr = `${tSegments[0]} WIB`;
+        }
+      }
 
       if (datePart.includes('/')) {
         const dParts = datePart.split('/');
@@ -292,7 +317,14 @@ const formatBookingDateDetail = (bookingStr) => {
         }
       } else {
         const parsed = new Date(s);
-        if (!isNaN(parsed.getTime())) dt = parsed;
+        if (!isNaN(parsed.getTime())) {
+          dt = parsed;
+          if (!timeStr && (dt.getHours() !== 0 || dt.getMinutes() !== 0)) {
+            const hh = String(dt.getHours()).padStart(2, '0');
+            const mm = String(dt.getMinutes()).padStart(2, '0');
+            timeStr = `${hh}:${mm} WIB`;
+          }
+        }
       }
     }
 
@@ -303,7 +335,8 @@ const formatBookingDateDetail = (bookingStr) => {
     const bln = new Intl.DateTimeFormat('id-ID', { month: 'long' }).format(dt);
     const year = dt.getFullYear();
 
-    return `${hari}, ${day} ${bln} ${year}`;
+    const dateFormatted = `${hari}, ${day} ${bln} ${year}`;
+    return timeStr ? `${dateFormatted}, ${timeStr}` : dateFormatted;
   } catch (e) {
     return bookingStr;
   }
