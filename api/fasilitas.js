@@ -37,10 +37,11 @@ function transformSewaDoc(doc) {
     const hasBuktiListrik = Boolean(d.buktiTransferListrikDocUrl || d.bukti_transfer_listrik);
 
     const biayaListrik = 100000;
-    // Jika fasilitas memiliki listrik tambahan dan bukti listrik terpisah atau aktif, nominal lokasi dipisahkan
+    // Jika fasilitas memiliki listrik tambahan dan bukti listrik terpisah, nominal lokasi dipisahkan (karena ada 2 transaksi mutasi bank terpisah).
+    // Jika bukti listrik tidak terpisah (dibayar sekaligus dalam satu transfer), nominal lokasi tetap utuh total_biaya.
     const biayaLokasi = (d.listrik_tambahan && hasBuktiListrik)
         ? Math.max(0, rawTotal - biayaListrik)
-        : (d.listrik_tambahan ? Math.max(0, rawTotal - biayaListrik) : rawTotal);
+        : rawTotal;
 
     const tglLokasi = normalizeDate(d.tanggal_transfer) || normalizeDate(d.tanggal_sewa);
     const tglListrik = normalizeDate(d.tanggal_transfer_listrik) || tglLokasi;
