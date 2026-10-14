@@ -101,8 +101,8 @@ export default function PublicUpload() {
     if (!file) return;
 
     // Validate size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      setErrorMsg('Ukuran file terlalu besar. Maksimal 5 MB.');
+    if (file.size > 15 * 1024 * 1024) {
+      setErrorMsg('Ukuran file terlalu besar. Maksimal 15 MB.');
       return;
     }
 
@@ -129,28 +129,33 @@ export default function PublicUpload() {
         img.src = event.target.result;
         img.onload = () => {
           const canvas = document.createElement('canvas');
-          const MAX_WIDTH = 1200;
+          // Dimensi optimal: proporsi cetak F4/A4 tajam, teks struk/m-banking tetap terbaca jelas
+          const MAX_WIDTH = 900;
           const MAX_HEIGHT = 1200;
           let width = img.width;
           let height = img.height;
 
-          if (width > height) {
-            if (width > MAX_WIDTH) {
-              height *= MAX_WIDTH / width;
-              width = MAX_WIDTH;
-            }
-          } else {
-            if (height > MAX_HEIGHT) {
-              width *= MAX_HEIGHT / height;
-              height = MAX_HEIGHT;
-            }
+          if (width > MAX_WIDTH || height > MAX_HEIGHT) {
+            const ratio = Math.min(MAX_WIDTH / width, MAX_HEIGHT / height);
+            width = Math.round(width * ratio);
+            height = Math.round(height * ratio);
           }
+
           canvas.width = width;
           canvas.height = height;
           const ctx = canvas.getContext('2d');
+
+          // Menjaga ketajaman teks/angka dengan interpolasi kualitas tinggi
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+
+          // Background putih untuk menghindari screenshot transparan menjadi hitam di JPEG
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, width, height);
           ctx.drawImage(img, 0, 0, width, height);
-          
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+
+          // Kualitas 0.72 (72%) menghasilkan teks sangat tajam & jelas dibaca mata manusia (~60KB - 100KB)
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.72);
           resolve(dataUrl);
         };
         img.onerror = (error) => reject(error);

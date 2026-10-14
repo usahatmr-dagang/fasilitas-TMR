@@ -1654,33 +1654,76 @@ Terima kasih,
     }
   };
 
-  const handleUploadListrikChange = (e) => {
+  const compressImageForUpload = (file) => {
+    return new Promise((resolve, reject) => {
+      if (!file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+        return;
+      }
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target.result;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 900;
+          const MAX_HEIGHT = 1200;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > MAX_WIDTH || height > MAX_HEIGHT) {
+            const ratio = Math.min(MAX_WIDTH / width, MAX_HEIGHT / height);
+            width = Math.round(width * ratio);
+            height = Math.round(height * ratio);
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, width, height);
+          ctx.drawImage(img, 0, 0, width, height);
+
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.72);
+          resolve(dataUrl);
+        };
+        img.onerror = reject;
+      };
+      reader.onerror = reject;
+    });
+  };
+
+  const handleUploadListrikChange = async (e) => {
       const file = e.target.files[0];
       if(!file) return;
-      const reader = new FileReader();
-      reader.onloadend = async () => {
+      try {
+          const compressedDataUrl = await compressImageForUpload(file);
           const updatedRecord = { 
               ...selectedRecord, 
-              bukti_transfer_listrik: reader.result,
+              bukti_transfer_listrik: compressedDataUrl,
               tanggal_transfer: selectedRecord.tanggal_transfer || getTodayString() 
           };
-          try {
-              const { docId, ...dataToUpdate } = updatedRecord;
-              await updateDoc(doc(db, 'sewaList', selectedRecord.docId), dataToUpdate);
-              
-              // SINKRONISASI KE TABEL PUBLIK
-              await setDoc(doc(db, 'publicSewaList', selectedRecord.docId), {
-                tanggal_sewa: dataToUpdate.tanggal_sewa,
-                lokasi_sewa: selectedRecord.lokasi_sewa
-              }, { merge: true });
+          const { docId, ...dataToUpdate } = updatedRecord;
+          await updateDoc(doc(db, 'sewaList', selectedRecord.docId), dataToUpdate);
+          
+          // SINKRONISASI KE TABEL PUBLIK
+          await setDoc(doc(db, 'publicSewaList', selectedRecord.docId), {
+            tanggal_sewa: dataToUpdate.tanggal_sewa,
+            lokasi_sewa: selectedRecord.lokasi_sewa
+          }, { merge: true });
 
-              setSelectedRecord({ ...selectedRecord, ...dataToUpdate });
-              showToast('Struk listrik berhasil ditambahkan!');
-          } catch (error) {
-              showToast('Gagal menambah struk!', 'error');
-          }
-      };
-      reader.readAsDataURL(file);
+          setSelectedRecord({ ...selectedRecord, ...dataToUpdate });
+          showToast('Struk listrik berhasil ditambahkan!');
+      } catch (error) {
+          console.error("Upload error:", error);
+          showToast('Gagal menambah struk!', 'error');
+      }
   };
 
   const handleAddPic = async (e) => {
