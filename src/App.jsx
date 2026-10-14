@@ -256,6 +256,59 @@ const formatBookingDateShort = (bookingStr) => {
 };
 
 
+const formatBookingDateDetail = (bookingStr) => {
+  if (!bookingStr) return '-';
+  try {
+    let dt = null;
+    if (typeof bookingStr === 'object') {
+      if (bookingStr instanceof Date && !isNaN(bookingStr.getTime())) {
+        dt = bookingStr;
+      } else if (bookingStr.seconds !== undefined) {
+        dt = new Date(bookingStr.seconds * 1000);
+      }
+    } else {
+      const s = String(bookingStr).trim();
+      if (!s || s === '-') return '-';
+
+      const parts = s.split(/[,\s]+/);
+      const datePart = parts[0];
+
+      if (datePart.includes('/')) {
+        const dParts = datePart.split('/');
+        if (dParts.length === 3) {
+          const d = parseInt(dParts[0], 10);
+          const m = parseInt(dParts[1], 10) - 1;
+          let y = parseInt(dParts[2], 10);
+          if (y < 100) y += 2000;
+          dt = new Date(y, m, d);
+        }
+      } else if (datePart.includes('-')) {
+        const dParts = datePart.split('-');
+        if (dParts.length === 3) {
+          const y = parseInt(dParts[0], 10);
+          const m = parseInt(dParts[1], 10) - 1;
+          const d = parseInt(dParts[2], 10);
+          dt = new Date(y, m, d);
+        }
+      } else {
+        const parsed = new Date(s);
+        if (!isNaN(parsed.getTime())) dt = parsed;
+      }
+    }
+
+    if (!dt || isNaN(dt.getTime())) return bookingStr;
+
+    const hari = new Intl.DateTimeFormat('id-ID', { weekday: 'long' }).format(dt);
+    const day = String(dt.getDate()).padStart(2, '0');
+    const bln = new Intl.DateTimeFormat('id-ID', { month: 'long' }).format(dt);
+    const year = dt.getFullYear();
+
+    return `${hari}, ${day} ${bln} ${year}`;
+  } catch (e) {
+    return bookingStr;
+  }
+};
+
 const parseBookingDateForSort = (bookingStr) => {
   if (!bookingStr) return 0;
   try {
@@ -2013,7 +2066,7 @@ Terima kasih,
 
                         <div className="grid grid-cols-2 gap-4">
                             <div><p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider mb-1">Tanggal Sewa</p><p className="font-bold text-emerald-950 text-sm">{formatTanggalPendek(selectedRecord.tanggal_sewa)}</p></div>
-                            <div><p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider mb-1">Waktu Pesanan Dibuat</p><p className="font-bold text-emerald-950 text-sm">{selectedRecord.tanggal_booking || '-'}</p></div>
+                            <div><p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider mb-1">Waktu Pesanan Dibuat</p><p className="font-bold text-emerald-950 text-sm" title={selectedRecord.tanggal_booking || ''}>{formatBookingDateDetail(selectedRecord.tanggal_booking)}</p></div>
                         </div>
                         {selectedRecord.is_gazebo_package && (
                             <>
@@ -3501,7 +3554,7 @@ Terima kasih,
                                                     </td>
 
                                                     {/* Column 10: Tanggal Pemesanan */}
-                                                    <td className="py-2 px-3 text-slate-500">
+                                                    <td className="py-2 px-3 text-slate-500" title={formatBookingDateDetail(item.tanggal_booking)}>
                                                        {formatBookingDateShort(item.tanggal_booking)}
                                                     </td>
 
