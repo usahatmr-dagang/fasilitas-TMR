@@ -40,9 +40,20 @@ service cloud.firestore {
       // Publik HANYA BISA GET via ID saat upload bukti (tidak bisa membongkar/list semua data)
       allow get: if true;
       allow update: if 
-          resource.data.status_pembayaran == "Belum Transfer" &&
-          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status_pembayaran', 'bukti_transfer', 'tanggal_transfer']) &&
-          request.resource.data.status_pembayaran == "Menunggu Verifikasi";
+          // 1. Upload bukti transfer pembayaran lokasi utama (status Belum Transfer)
+          (
+            resource.data.status_pembayaran == "Belum Transfer" &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status_pembayaran', 'bukti_transfer', 'tanggal_transfer']) &&
+            request.resource.data.status_pembayaran == "Menunggu Verifikasi"
+          )
+          ||
+          // 2. Upload bukti transfer listrik tambahan (jika diaktifkan & dibuka aksesnya oleh admin)
+          (
+            resource.data.listrik_tambahan == true &&
+            resource.data.akses_upload_listrik == true &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['bukti_transfer_listrik', 'tanggal_transfer_listrik', 'akses_upload_listrik']) &&
+            request.resource.data.akses_upload_listrik == false
+          );
     }
 
     // Aturan untuk promoList (Form pendaftaran Promo)
