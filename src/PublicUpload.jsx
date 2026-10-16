@@ -167,14 +167,11 @@ export default function PublicUpload() {
   // Status helpers
   const isMainPaid = bookingData?.status_pembayaran === 'Lunas' || bookingData?.status_pembayaran === 'Sudah Transfer' || bookingData?.status_pembayaran === 'Sudah Lunas';
 
-  let biayaLokasiMurni = 0;
-  if (Array.isArray(bookingData?.detail_lokasi) && bookingData.detail_lokasi.length > 0) {
-    biayaLokasiMurni = bookingData.detail_lokasi.reduce((acc, loc) => acc + (Number(loc.biaya) || 0), 0);
-  }
-  const totalSudahTermasukListrik = biayaLokasiMurni > 0 && (Number(bookingData?.total_biaya) >= biayaLokasiMurni + 100000);
-
-  // Perlu bukti transfer listrik terpisah hanya jika listrik belum masuk ke tagihan utama yang sudah dibayar
-  const needsListrik = Boolean(bookingData?.listrik_tambahan && bookingData?.akses_upload_listrik && !bookingData?.bukti_transfer_listrik && isMainPaid && !totalSudahTermasukListrik);
+  // Perlu bukti transfer listrik terpisah jika:
+  // 1. Lokasi utama sudah lunas (isMainPaid)
+  // 2. Admin mengaktifkan listrik tambahan (bookingData?.listrik_tambahan)
+  // 3. Akses upload listrik aktif (bookingData?.akses_upload_listrik)
+  const needsListrik = Boolean(isMainPaid && bookingData?.listrik_tambahan && bookingData?.akses_upload_listrik);
   const isMainPending = Boolean((bookingData?.status_pembayaran === 'Menunggu Verifikasi' || bookingData?.bukti_transfer) && !isMainPaid);
   const isBelumBayar = Boolean(bookingData?.status_pembayaran === 'Belum Transfer' && !bookingData?.bukti_transfer);
 
@@ -215,13 +212,13 @@ export default function PublicUpload() {
       if (docSnap.exists()) {
           const currentData = docSnap.data();
           if (isListrikUpload) {
-              if (currentData.bukti_transfer_listrik) {
+              if (currentData.bukti_transfer_listrik && !currentData.akses_upload_listrik) {
                   setErrorMsg('Bukti transfer listrik sudah diunggah sebelumnya. Menunggu verifikasi admin.');
                   setIsLoading(false);
                   return;
               }
           } else {
-              if (currentData.status_pembayaran === 'Sudah Transfer' || currentData.status_pembayaran === 'Lunas' || currentData.status_pembayaran === 'Menunggu Verifikasi') {
+              if (currentData.status_pembayaran === 'Sudah Transfer' || currentData.status_pembayaran === 'Lunas' || currentData.status_pembayaran === 'Sudah Lunas' || currentData.status_pembayaran === 'Menunggu Verifikasi') {
                   setErrorMsg('Bukti transfer sudah diunggah sebelumnya. Menunggu verifikasi admin.');
                   setIsLoading(false);
                   return;
@@ -359,7 +356,7 @@ export default function PublicUpload() {
                       
                       {isMainPaid && !needsListrik && (
                         <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 text-[11px] font-black px-2.5 py-1 rounded-full border border-emerald-300">
-                          <CheckCircle2 size={13} className="text-emerald-600" /> SUDAH LUNAS
+                          <CheckCircle2 size={13} className="text-emerald-600" /> SUDAH LUNAS {bookingData.listrik_tambahan && (bookingData.bukti_transfer_listrik || !bookingData.akses_upload_listrik) ? '+ LISTRIK' : ''}
                         </span>
                       )}
                       {isMainPending && (
@@ -386,6 +383,9 @@ export default function PublicUpload() {
                     {isMainPaid && !needsListrik && (
                       <p className="text-[11px] text-emerald-600 font-bold mt-0.5">Telah Lunas Diverifikasi</p>
                     )}
+                    {needsListrik && (
+                      <p className="text-[11px] text-amber-600 font-bold mt-0.5">Menunggu Struk Listrik (+Rp 100rb)</p>
+                    )}
                   </div>
                 </div>
 
@@ -410,7 +410,7 @@ export default function PublicUpload() {
                       <Zap size={14} className="text-amber-500" /> Pemakaian Listrik Tambahan:
                     </span>
                     <span className="font-bold text-slate-800">
-                      {totalSudahTermasukListrik || (isMainPaid && !needsListrik) ? 'Termasuk Dalam Paket (Lunas)' : 'Tambahan Listrik (+Rp 100.000)'}
+                      {bookingData.bukti_transfer_listrik ? 'Lunas / Struk Terverifikasi (+Rp 100.000)' : needsListrik ? 'Perlu Pembayaran (+Rp 100.000)' : 'Termasuk (+Rp 100.000)'}
                     </span>
                   </div>
                 )}
@@ -429,17 +429,36 @@ export default function PublicUpload() {
                   
                   {bookingData.tanggal_transfer && (
                     <div className="inline-block mt-3 px-3 py-1 bg-white rounded-lg border border-emerald-200 text-emerald-900 text-xs font-bold">
-                      Tanggal Pembayaran: {formatTanggalIndo(bookingData.tanggal_transfer)}
+                      Tanggal Pembayaran Lokasi: {formatTanggalIndo(bookingData.tanggal_transfer)}
                     </div>
                   )}
 
                   {bookingData.bukti_transfer && (
                     <div className="mt-5 pt-4 border-t border-emerald-200/80">
-                      <p className="text-xs font-bold text-emerald-900 mb-2">Struk Bukti Pembayaran Resmi:</p>
+                      <p className="text-xs font-bold text-emerald-900 mb-2">Struk Bukti Pembayaran Resmi Lokasi:</p>
                       <img 
                         src={bookingData.bukti_transfer} 
                         alt="Bukti Transfer" 
                         className="max-h-64 mx-auto rounded-xl border border-emerald-200 shadow-sm object-contain bg-white"
+                      />
+                    </div>
+                  )}
+
+                  {bookingData.bukti_transfer_listrik && (
+                    <div className="mt-5 pt-4 border-t border-amber-200/80 bg-amber-50/50 p-4 rounded-2xl border border-amber-200 text-center">
+                      <div className="flex items-center justify-center gap-1.5 text-amber-900 font-extrabold text-xs mb-1">
+                        <Zap size={15} className="text-amber-500" />
+                        <span>Struk Bukti Pembayaran Listrik Tambahan (+Rp 100.000):</span>
+                      </div>
+                      {bookingData.tanggal_transfer_listrik && (
+                        <p className="text-[11px] text-amber-700 font-semibold mb-2">
+                          Tanggal Transfer: {formatTanggalIndo(bookingData.tanggal_transfer_listrik)}
+                        </p>
+                      )}
+                      <img 
+                        src={bookingData.bukti_transfer_listrik} 
+                        alt="Bukti Transfer Listrik" 
+                        className="max-h-64 mx-auto rounded-xl border border-amber-200 shadow-sm object-contain bg-white"
                       />
                     </div>
                   )}

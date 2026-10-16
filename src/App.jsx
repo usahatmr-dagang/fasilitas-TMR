@@ -1227,7 +1227,7 @@ Terima kasih,
         ...selectedRecord, 
         ...editFormData,
         detail_lokasi: detailLokasiUpdate,
-        akses_upload_listrik: (editFormData.listrik_tambahan && !selectedRecord.listrik_tambahan && (selectedRecord.status_pembayaran === 'Sudah Transfer' || selectedRecord.status_pembayaran === 'Lunas')) ? true : (editFormData.akses_upload_listrik || false),
+        akses_upload_listrik: (editFormData.listrik_tambahan && !selectedRecord.listrik_tambahan && (selectedRecord.status_pembayaran === 'Sudah Transfer' || selectedRecord.status_pembayaran === 'Lunas' || selectedRecord.status_pembayaran === 'Sudah Lunas')) ? true : (editFormData.akses_upload_listrik || false),
         total_biaya: biayaLokasi + biayaListrik 
     };
 
@@ -1704,10 +1704,12 @@ Terima kasih,
       if(!file) return;
       try {
           const compressedDataUrl = await compressImageForUpload(file);
+          const tglListrik = selectedRecord.tanggal_transfer_listrik || getTodayString();
           const updatedRecord = { 
               ...selectedRecord, 
               bukti_transfer_listrik: compressedDataUrl,
-              tanggal_transfer: selectedRecord.tanggal_transfer || getTodayString() 
+              tanggal_transfer_listrik: tglListrik,
+              akses_upload_listrik: false
           };
           const { docId, ...dataToUpdate } = updatedRecord;
           await updateDoc(doc(db, 'sewaList', selectedRecord.docId), dataToUpdate);
@@ -1719,10 +1721,13 @@ Terima kasih,
           }, { merge: true });
 
           setSelectedRecord({ ...selectedRecord, ...dataToUpdate });
+          setSewaList(prev => prev.map(item => item.docId === selectedRecord.docId ? { ...item, ...dataToUpdate } : item));
           showToast('Struk listrik berhasil ditambahkan!');
       } catch (error) {
           console.error("Upload error:", error);
           showToast('Gagal menambah struk!', 'error');
+      } finally {
+          if (e.target) e.target.value = '';
       }
   };
 
@@ -1942,7 +1947,7 @@ Terima kasih,
           return;
       }
       setIsSubmittingPortal(true);
-      const updatedBooking = { ...portalBooking, bukti_transfer_listrik: uploadListrikFile, tanggal_transfer_listrik: tanggalUploadPortal };
+      const updatedBooking = { ...portalBooking, bukti_transfer_listrik: uploadListrikFile, tanggal_transfer_listrik: tanggalUploadPortal, akses_upload_listrik: false };
       try {
           const docRef = doc(db, 'sewaList', portalBooking.docId);
           const docSnap = await getDoc(docRef);
@@ -2188,16 +2193,32 @@ Terima kasih,
                                  checked={selectedRecord.listrik_tambahan || false}
                                  onChange={(e) => {
                                      const isChecked = e.target.checked;
-                                     const biayaLok = getBiayaLokasi(selectedRecord.lokasi_sewa, selectedRecord.luas_lahan);
-                                     const biayaLis = isChecked ? 100000 : 0;
-                                     handleUpdateRecordInline(selectedRecord, { listrik_tambahan: isChecked, akses_upload_listrik: isChecked, total_biaya: biayaLok + biayaLis }, 'Status listrik diperbarui.');
+                                     const currentTotal = Number(selectedRecord.total_biaya) || 0;
+                                     let baseBiayaLokasi = 0;
+                                     if (Array.isArray(selectedRecord.detail_lokasi) && selectedRecord.detail_lokasi.length > 0) {
+                                         baseBiayaLokasi = selectedRecord.detail_lokasi.reduce((acc, loc) => acc + (Number(loc.biaya) || 0), 0);
+                                     } else if (currentTotal > 0) {
+                                         baseBiayaLokasi = selectedRecord.listrik_tambahan ? Math.max(0, currentTotal - 100000) : currentTotal;
+                                     } else {
+                                         baseBiayaLokasi = getBiayaLokasi(selectedRecord.lokasi_sewa, selectedRecord.luas_lahan);
+                                     }
+                                     const updatedTotalBiaya = baseBiayaLokasi + (isChecked ? 100000 : 0);
+                                     handleUpdateRecordInline(
+                                         selectedRecord, 
+                                         { 
+                                             listrik_tambahan: isChecked, 
+                                             akses_upload_listrik: isChecked ? (!selectedRecord.bukti_transfer_listrik ? true : (selectedRecord.akses_upload_listrik || false)) : false, 
+                                             total_biaya: updatedTotalBiaya 
+                                         }, 
+                                         'Status listrik diperbarui.'
+                                     );
                                  }} 
                              />
                              <div className="w-11 h-6 bg-slate-200 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
                          </label>
                       </div>
 
-                      {selectedRecord.listrik_tambahan && (selectedRecord.status_pembayaran === 'Lunas' || selectedRecord.status_pembayaran === 'Sudah Transfer') && (
+                      {selectedRecord.listrik_tambahan && (selectedRecord.status_pembayaran === 'Lunas' || selectedRecord.status_pembayaran === 'Sudah Transfer' || selectedRecord.status_pembayaran === 'Sudah Lunas') && (
                           <div className="bg-white rounded-3xl p-5 shadow-[0_4px_20px_rgba(4,120,87,0.03)] border border-amber-200 relative overflow-hidden">
                               <div className="absolute top-0 right-0 w-24 h-24 bg-amber-50/50 rounded-bl-full -z-10"></div>
                               <div className="flex items-center justify-between mb-4 border-b border-amber-100 pb-3">
@@ -2231,6 +2252,10 @@ Terima kasih,
                                                   <Printer size={16} className="mb-1 text-slate-500"/> {isGenerating ? '...' : 'Cetak Struk Listrik'}
                                               </button>
                                           )}
+                                          <label className="flex-1 min-w-[90px] bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold py-2.5 rounded-xl transition-all duration-200 text-[10px] flex flex-col justify-center items-center h-14 cursor-pointer text-center leading-tight">
+                                              <input type="file" accept="image/*" className="hidden" onChange={handleUploadListrikChange} />
+                                              <UploadCloud size={16} className="mb-1 text-amber-600"/> Ganti Struk
+                                          </label>
                                           <button type="button" onClick={() => handleUpdateRecordInline(selectedRecord, { bukti_transfer_listrik: null, buktiTransferListrikDocUrl: null }, 'Struk listrik dihapus.')} className="flex-1 min-w-[90px] bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold py-2.5 rounded-xl transition-all duration-200 text-[10px] flex flex-col justify-center items-center h-14">
                                               <X size={16} className="mb-1 text-rose-500"/> Hapus Struk Listrik
                                           </button>
