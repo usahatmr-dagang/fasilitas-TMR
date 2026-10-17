@@ -24,154 +24,18 @@ import {
 import { db } from '../firebase';
 import { collection, doc, onSnapshot, setDoc, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { defaultTitikPromoList } from '../data/defaultTitikPromo';
-
-const monthNames = [
-  "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-  "Juli", "Agustus", "September", "Oktober", "November", "Desember"
-];
-
-// Helper: Normalisasi format tanggal ke YYYY-MM-DD
-const normalizeDateToYMD = (dateInput) => {
-  if (!dateInput) return '';
-  const s = String(dateInput).trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-  if (s.includes('/')) {
-    const p = s.split('/');
-    if (p.length === 3 && p[2].length === 4) {
-      return `${p[2]}-${p[1].padStart(2, '0')}-${p[0].padStart(2, '0')}`;
-    }
-  }
-  const d = new Date(s);
-  if (!isNaN(d.getTime())) {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
-  }
-  return s;
-};
-
-// Helper: Format tanggal ringkas (2026-10-18 -> 18 Okt 2026)
-const formatShortDate = (dateStr) => {
-  if (!dateStr) return '-';
-  const norm = normalizeDateToYMD(dateStr);
-  const parts = norm.split('-');
-  if (parts.length !== 3) return dateStr;
-  const [y, m, d] = parts;
-  const shortMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-  return `${parseInt(d, 10)} ${shortMonths[parseInt(m, 10) - 1] || ''} ${y}`;
-};
-
-// Helper: Ekstraksi seluruh tanggal YYYY-MM-DD dari promo
-const extractPromoDates = (promo) => {
-  const dates = new Set();
-  if (!promo) return [];
-
-  if (promo.selectedDates && Array.isArray(promo.selectedDates)) {
-    promo.selectedDates.forEach(d => {
-      const dStr = typeof d === 'object' && d !== null ? d.date : d;
-      const norm = normalizeDateToYMD(dStr);
-      if (norm) dates.add(norm);
-    });
-  }
-
-  if (promo.dates && Array.isArray(promo.dates)) {
-    promo.dates.forEach(d => {
-      const norm = normalizeDateToYMD(d);
-      if (norm) dates.add(norm);
-    });
-  }
-
-  if (promo.tanggalTransfer) {
-    const norm = normalizeDateToYMD(promo.tanggalTransfer);
-    if (norm) dates.add(norm);
-  }
-
-  return Array.from(dates).sort();
-};
-
-// Helper: Cek apakah promo aktif pada tanggal tertentu
-const isPromoOnDate = (promo, targetDateYMD) => {
-  if (!promo || !targetDateYMD) return false;
-  const normTarget = normalizeDateToYMD(targetDateYMD);
-
-  const dates = extractPromoDates(promo);
-  if (dates.length > 0) {
-    return dates.includes(normTarget);
-  }
-
-  if (promo.tanggalPromo) {
-    const parts = normTarget.split('-');
-    if (parts.length === 3) {
-      const [, m, d] = parts;
-      const mIdx = parseInt(m, 10) - 1;
-      const monthName = monthNames[mIdx] || '';
-      const dayNum = String(parseInt(d, 10));
-      const tp = String(promo.tanggalPromo).toLowerCase();
-      if (tp.includes(dayNum) && tp.includes(monthName.toLowerCase())) {
-        return true;
-      }
-    }
-  }
-
-  return false;
-};
-
-// Helper: Menghitung rentang tanggal
-const generateDatesRange = (startDateStr, endDateStr) => {
-  if (!startDateStr) return [];
-  if (!endDateStr) return [startDateStr];
-  const start = new Date(startDateStr);
-  const end = new Date(endDateStr);
-  if (isNaN(start.getTime()) || isNaN(end.getTime()) || start > end) return [startDateStr];
-
-  const dates = [];
-  const curr = new Date(start);
-  while (curr <= end) {
-    const y = curr.getFullYear();
-    const m = String(curr.getMonth() + 1).padStart(2, '0');
-    const d = String(curr.getDate()).padStart(2, '0');
-    dates.push(`${y}-${m}-${d}`);
-    curr.setDate(curr.getDate() + 1);
-  }
-  return dates;
-};
-
-// Helper: Ringkasan teks rentang tanggal (misal: "1 - 2 April 2026")
-const formatDatesSummary = (dateStrings) => {
-  if (!dateStrings || dateStrings.length === 0) return '-';
-  const sorted = [...dateStrings].sort();
-  const byMonthYear = {};
-  
-  sorted.forEach(dStr => {
-    const parts = dStr.split('-');
-    if (parts.length === 3) {
-      const [y, m, d] = parts;
-      const my = `${monthNames[parseInt(m, 10) - 1]} ${y}`;
-      if (!byMonthYear[my]) byMonthYear[my] = [];
-      byMonthYear[my].push(parseInt(d, 10));
-    }
-  });
-
-  const monthParts = [];
-  for (const [my, days] of Object.entries(byMonthYear)) {
-    days.sort((a, b) => a - b);
-    if (days.length === 1) {
-      monthParts.push(`${days[0]} ${my}`);
-    } else if (days.length === 2) {
-      monthParts.push(`${days[0]} - ${days[1]} ${my}`);
-    } else {
-      const isContinuous = days.every((d, i) => i === 0 || d === days[i - 1] + 1);
-      if (isContinuous) {
-        monthParts.push(`${days[0]} - ${days[days.length - 1]} ${my}`);
-      } else {
-        monthParts.push(`${days.join(', ')} ${my}`);
-      }
-    }
-  }
-
-  return monthParts.join(', ');
-};
+import {
+  monthNames,
+  normalizeDateToYMD,
+  formatShortDate,
+  extractPromoDates,
+  isPromoOnDate,
+  getPromoRequestedTitikQty,
+  hasPromoBannerOnDate,
+  getPromoBannerCountOnDate,
+  formatDatesSummary,
+  generateDatesRange
+} from '../utils/promoDateHelper';
 
 // ALOKASI ANTI-BENTROK: 1 Titik 1 Promo per Hari
 const computeAllocationForDate = (promoList, dateYMD, titikList) => {
@@ -209,10 +73,10 @@ const computeAllocationForDate = (promoList, dateYMD, titikList) => {
     }
   });
 
-  // Pass 2: Titik dinamis non-overlapping
+  // Pass 2: Titik dinamis non-overlapping (1 Titik 1 Promo)
   const allTitikIds = titikList.map(t => t.id);
   unassigned.forEach(promo => {
-    const qty = parseInt(promo.jumlahTitik, 10) || 1;
+    const qty = getPromoRequestedTitikQty(promo, dateYMD);
     let count = 0;
     for (const tId of allTitikIds) {
       if (!occupied.has(tId)) {
@@ -680,7 +544,8 @@ export default function TitikPromoManager({
         {filteredTitikList.map(titik => {
           const activePromo = allocationOnDate[titik.id];
           const isOccupied = !!activePromo;
-          const hasBanner = activePromo ? (activePromo.hasBanner || parseInt(activePromo.jumlahBanner, 10) > 0) : false;
+          const hasBanner = activePromo ? hasPromoBannerOnDate(activePromo, selectedDate) : false;
+          const bannerCount = activePromo ? getPromoBannerCountOnDate(activePromo, selectedDate) : 0;
 
           return (
             <div 
@@ -738,7 +603,7 @@ export default function TitikPromoManager({
                       <div className="flex items-center justify-between pt-1 border-t border-rose-100/60 mt-1">
                         <span className="text-[10px] font-bold text-slate-400 uppercase">Banner</span>
                         <span className={`text-[10px] font-extrabold ${hasBanner ? 'text-amber-800' : 'text-slate-500'}`}>
-                          {hasBanner ? `🚩 Pakai (${activePromo.jumlahBanner || 1})` : '🚫 Tanpa Banner'}
+                          {hasBanner ? `🚩 Pakai (${bannerCount})` : '🚫 Tanpa Banner'}
                         </span>
                       </div>
                     </div>

@@ -11,6 +11,7 @@ import { saveAs } from 'file-saver';
 import { openKwitansiPrintWindow } from './utils/kwitansiHelper';
 import PromoMapView from './components/PromoMapView';
 import TitikPromoManager from './components/TitikPromoManager';
+import { isPromoOnDate, extractPromoDates } from './utils/promoDateHelper';
 
 // Konversi angka ke teks (Terbilang)
 const terbilang = (angka) => {
@@ -232,12 +233,7 @@ export default function PromoDashboard({ onNavigate }) {
     
     return promoList.filter(promo => {
         if (viewMode === 'promo') {
-            if (promo.selectedDates && Array.isArray(promo.selectedDates)) {
-                return promo.selectedDates.some(d => typeof d === 'object' && d !== null ? d.date === targetDateStr : d === targetDateStr);
-            }
-            // Fallback for old string-based data
-            const dayString = String(date.getDate());
-            return promo.tanggalPromo?.includes(dayString) && promo.tanggalPromo?.toLowerCase().includes(monthNames[date.getMonth()].toLowerCase());
+            return isPromoOnDate(promo, targetDateStr);
         } else {
             if (!promo.tanggalTransfer) return false;
             return promo.tanggalTransfer === targetDateStr;
@@ -709,11 +705,11 @@ export default function PromoDashboard({ onNavigate }) {
                     let dateStr = null;
                     if (selectedDate) {
                       dateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
-                    } else if (p.selectedDates && p.selectedDates.length > 0) {
-                      const first = p.selectedDates[0];
-                      dateStr = typeof first === 'object' ? first.date : first;
-                    } else if (p.tanggalTransfer) {
-                      dateStr = p.tanggalTransfer;
+                    } else {
+                      const pDates = extractPromoDates(p);
+                      if (pDates.length > 0) {
+                        dateStr = pDates[0];
+                      }
                     }
                     setMapTargetDate(dateStr);
                     setShowMapModal(true);
