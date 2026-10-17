@@ -4,7 +4,6 @@ import 'leaflet/dist/leaflet.css';
 import { 
   Calendar as CalendarIcon, 
   MapPin, 
-  Layers, 
   Move, 
   X, 
   CheckCircle2, 
@@ -22,24 +21,9 @@ import { db } from '../firebase';
 import { collection, doc, onSnapshot, updateDoc, setDoc } from 'firebase/firestore';
 import { defaultTitikPromoList } from '../data/defaultTitikPromo';
 
-// Map layer sources (Google Maps & OSM tiles)
-const TILE_LAYERS = {
-  googleHybrid: {
-    name: 'Google Satelit',
-    url: 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}',
-    attribution: '&copy; Google Maps'
-  },
-  googleRoad: {
-    name: 'Google Jalan',
-    url: 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
-    attribution: '&copy; Google Maps'
-  },
-  osm: {
-    name: 'OpenStreetMap',
-    url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-    attribution: '&copy; OpenStreetMap contributors'
-  }
-};
+// Konfigurasi Google Street (Roadmap) khusus kawasan Ragunan
+// Hanya memuat tile vektor Google Street berukuran ringan (~15KB per tile)
+const GOOGLE_STREET_URL = 'https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}';
 
 export default function PromoMapView({ promoList = [], initialDate = null, onClose }) {
   // Format tanggal YYYY-MM-DD
@@ -50,7 +34,6 @@ export default function PromoMapView({ promoList = [], initialDate = null, onClo
 
   const [selectedDate, setSelectedDate] = useState(initialDate || getTodayStr());
   const [filterZona, setFilterZona] = useState('SEMUA');
-  const [mapLayerKey, setMapLayerKey] = useState('googleHybrid');
   const [isDragMode, setIsDragMode] = useState(false);
   const [titikList, setTitikList] = useState(defaultTitikPromoList);
   const [selectedTitik, setSelectedTitik] = useState(null);
@@ -171,34 +154,42 @@ export default function PromoMapView({ promoList = [], initialDate = null, onClo
     };
   }, [titikList, bookedTitikMap]);
 
-  // 3. Inisialisasi Leaflet Map
+  // 3. Inisialisasi Leaflet Map Terbatas Khusus Kawasan Ragunan
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
     if (!mapInstanceRef.current) {
-      // Pusat Ragunan: Lat -6.3121, Lng 106.8201
+      // Batas koordinat ketat kawasan Taman Margasatwa Ragunan (TMR)
+      // Mencegah Leaflet mendownload tile peta di luar area Ragunan
+      const ragunanBounds = L.latLngBounds(
+        L.latLng(-6.3210, 106.8130), // Batas Selatan (Danau Ragunan)
+        L.latLng(-6.3030, 106.8270)  // Batas Utara (Gerbang Utama)
+      );
+
+      // Inisialisasi map dengan fokus ketat
       const map = L.map(mapContainerRef.current, {
-        center: [-6.3121, 106.8201],
-        zoom: 15,
-        minZoom: 14,
-        maxZoom: 19,
-        zoomControl: false
+        center: [-6.3115, 106.8200], // Titik Pusat Ragunan
+        zoom: 16,
+        minZoom: 15, // Mencegah zoom out terlalu jauh yang memboroskan resource
+        maxZoom: 18,
+        maxBounds: ragunanBounds,
+        maxBoundsViscosity: 1.0, // Stiff/Kaku: Peta tidak bisa digeser keluar dari batas Ragunan
+        zoomControl: false,
+        preferCanvas: true
       });
 
       L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-      // Batasi geser peta agar tidak keluar dari kawasan Ragunan
-      const ragunanBounds = L.latLngBounds(
-        L.latLng(-6.3250, 106.8080),
-        L.latLng(-6.3000, 106.8320)
-      );
-      map.setMaxBounds(ragunanBounds);
-
-      // Tile layer awal
-      const layerConfig = TILE_LAYERS[mapLayerKey];
-      tileLayerRef.current = L.tileLayer(layerConfig.url, {
-        attribution: layerConfig.attribution,
-        maxZoom: 19
+      // Tile layer Google Street HANYA di kawasan Ragunan
+      // Opsi `bounds: ragunanBounds` menghentikan request download tile di luar Ragunan
+      tileLayerRef.current = L.tileLayer(GOOGLE_STREET_URL, {
+        attribution: '&copy; Google Maps',
+        bounds: ragunanBounds,
+        minZoom: 15,
+        maxZoom: 18,
+        updateWhenIdle: true,     // Mengurangi beban CPU/network saat menggeser peta
+        updateWhenZooming: false,  // Mencegah request berlebihan saat animasi zoom
+        keepBuffer: 1             // Mengurangi pemakaian memori browser agar smooth
       }).addTo(map);
 
       mapInstanceRef.current = map;
@@ -212,20 +203,7 @@ export default function PromoMapView({ promoList = [], initialDate = null, onClo
     };
   }, []);
 
-  // Ganti tile layer ketika layerKey berubah
-  useEffect(() => {
-    if (!mapInstanceRef.current) return;
-    if (tileLayerRef.current) {
-      mapInstanceRef.current.removeLayer(tileLayerRef.current);
-    }
-    const layerConfig = TILE_LAYERS[mapLayerKey];
-    tileLayerRef.current = L.tileLayer(layerConfig.url, {
-      attribution: layerConfig.attribution,
-      maxZoom: 19
-    }).addTo(mapInstanceRef.current);
-  }, [mapLayerKey]);
-
-  // 4. Render Marker untuk ke-100 Titik
+  // 4. Render Marker untuk ke-100 Titik (Performa tinggi & hemat resource)
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
@@ -252,14 +230,13 @@ export default function PromoMapView({ promoList = [], initialDate = null, onClo
 
       const opacityClass = isZoneMatched ? 'opacity-100' : 'opacity-20 pointer-events-none';
 
-      // Icon HTML kustom dengan nomor titik & warna status
+      // Icon HTML kustom tanpa beban animasi berat (menjamin 60 FPS)
       const iconHtml = `
-        <div class="relative flex items-center justify-center cursor-pointer transition-transform duration-200 hover:scale-125 ${opacityClass}">
-          ${isBooked ? '<span class="absolute w-8 h-8 rounded-full bg-rose-500/40 animate-ping"></span>' : ''}
-          <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-black shadow-lg border-2 border-white ${
+        <div class="relative flex items-center justify-center cursor-pointer transition-transform duration-150 hover:scale-125 ${opacityClass}">
+          <div class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black shadow-md border-2 border-white ${
             isBooked 
-              ? 'bg-rose-600 text-white shadow-rose-600/50' 
-              : 'bg-emerald-600 text-white shadow-emerald-600/50 hover:bg-emerald-500'
+              ? 'bg-rose-600 text-white shadow-rose-600/40 ring-2 ring-rose-400/80' 
+              : 'bg-emerald-600 text-white shadow-emerald-600/40 hover:bg-emerald-500'
           }">
             ${nomor}
           </div>
@@ -269,8 +246,8 @@ export default function PromoMapView({ promoList = [], initialDate = null, onClo
       const customIcon = L.divIcon({
         className: 'custom-promo-pin',
         html: iconHtml,
-        iconSize: [28, 28],
-        iconAnchor: [14, 14]
+        iconSize: [24, 24],
+        iconAnchor: [12, 12]
       });
 
       let marker = markersRef.current[titik.id];
@@ -451,22 +428,25 @@ export default function PromoMapView({ promoList = [], initialDate = null, onClo
             {isDragMode ? 'Mode Geser Aktif (Drag Pin)' : 'Atur Posisi Pin'}
           </button>
 
-          {/* Layer Selector */}
-          <div className="flex items-center bg-slate-100 p-1 rounded-xl">
-            {Object.keys(TILE_LAYERS).map(key => (
-              <button
-                key={key}
-                onClick={() => setMapLayerKey(key)}
-                className={`text-[11px] font-bold px-2.5 py-1 rounded-lg transition-all ${
-                  mapLayerKey === key 
-                    ? 'bg-white text-emerald-900 shadow-sm' 
-                    : 'text-slate-500 hover:text-slate-800'
-                }`}
-              >
-                {TILE_LAYERS[key].name}
-              </button>
-            ))}
+          {/* Badge Google Street Kawasan TMR Saja */}
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-800 rounded-xl text-xs font-bold border border-emerald-200 shadow-inner">
+            <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
+            <span>Google Street &bull; Kawasan TMR</span>
           </div>
+
+          {/* Tombol Cepat Kembali ke Pusat Ragunan */}
+          <button 
+            type="button"
+            onClick={() => {
+              if (mapInstanceRef.current) {
+                mapInstanceRef.current.setView([-6.3115, 106.8200], 16, { animate: true });
+              }
+            }}
+            className="px-2.5 py-1.5 rounded-xl text-xs font-bold text-slate-600 hover:text-emerald-700 bg-white hover:bg-slate-50 border border-slate-200 transition-all shadow-sm"
+            title="Pusatkan kembali ke kawasan Ragunan"
+          >
+            🎯 Pusat TMR
+          </button>
 
           {/* Close Map Modal */}
           {onClose && (
