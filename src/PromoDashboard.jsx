@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, CheckCircle2, Download, Search, X, Loader2, Info, Settings, Save, ArrowLeft, Trash2, Edit, Lock, MapPin, Phone } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, CheckCircle2, Download, Search, X, Loader2, Info, Settings, Save, ArrowLeft, Trash2, Edit, Lock, MapPin, Phone, Layers } from 'lucide-react';
 import { db, auth } from './firebase';
 import { collection, onSnapshot, doc, updateDoc, setDoc, getDoc, deleteDoc } from 'firebase/firestore';
 import { signInWithEmailAndPassword } from 'firebase/auth';
@@ -10,6 +10,7 @@ import Docxtemplater from 'docxtemplater';
 import { saveAs } from 'file-saver';
 import { openKwitansiPrintWindow } from './utils/kwitansiHelper';
 import PromoMapView from './components/PromoMapView';
+import TitikPromoManager from './components/TitikPromoManager';
 
 // Konversi angka ke teks (Terbilang)
 const terbilang = (angka) => {
@@ -58,6 +59,7 @@ export default function PromoDashboard({ onNavigate }) {
   // Map Modal State
   const [showMapModal, setShowMapModal] = useState(false);
   const [mapTargetDate, setMapTargetDate] = useState(null);
+  const [mapTargetTitik, setMapTargetTitik] = useState(null);
 
   // Settings State
   const [showSettings, setShowSettings] = useState(false);
@@ -1030,10 +1032,22 @@ export default function PromoDashboard({ onNavigate }) {
         <div className="flex items-center gap-2.5">
           <button 
             type="button"
+            onClick={() => setViewMode('titik')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-all border ${
+              viewMode === 'titik' 
+                ? 'bg-emerald-800 text-white border-emerald-900 shadow-md' 
+                : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-emerald-200'
+            }`}
+          >
+            <Layers size={18} /> Kelola 100 Titik
+          </button>
+          <button 
+            type="button"
             onClick={() => {
               const d = selectedDate || new Date();
               const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
               setMapTargetDate(dateStr);
+              setMapTargetTitik(null);
               setShowMapModal(true);
             }}
             className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all shadow-md shadow-emerald-600/20"
@@ -1053,6 +1067,18 @@ export default function PromoDashboard({ onNavigate }) {
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
             <Loader2 className="animate-spin text-emerald-500" size={40} />
+          </div>
+        ) : viewMode === 'titik' ? (
+          <div className="max-w-7xl mx-auto w-full pb-12">
+            <TitikPromoManager 
+              promoList={promoList}
+              initialDate={selectedDate ? `${selectedDate.getFullYear()}-${String(selectedDate.getMonth()+1).padStart(2,'0')}-${String(selectedDate.getDate()).padStart(2,'0')}` : null}
+              onOpenMapAtTitik={(titikId, dateStr) => {
+                setMapTargetTitik(titikId);
+                setMapTargetDate(dateStr);
+                setShowMapModal(true);
+              }}
+            />
           </div>
         ) : (
           <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 max-w-7xl mx-auto lg:h-full items-start w-full">
@@ -1074,6 +1100,13 @@ export default function PromoDashboard({ onNavigate }) {
                       className={`px-3 py-1.5 text-xs font-bold rounded-lg border ${viewMode === 'transfer' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-emerald-700 border-emerald-200 hover:bg-emerald-50'}`}
                     >
                       Jadwal Transfer
+                    </button>
+                    <button 
+                      onClick={() => setViewMode('titik')}
+                      className={`px-3 py-1.5 text-xs font-bold rounded-lg border flex items-center gap-1.5 ${viewMode === 'titik' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-emerald-700 border-emerald-200 hover:bg-emerald-50'}`}
+                    >
+                      <Layers size={13} />
+                      Kelola 100 Titik
                     </button>
                   </div>
                 </div>
@@ -1176,7 +1209,11 @@ export default function PromoDashboard({ onNavigate }) {
         <PromoMapView 
           promoList={promoList}
           initialDate={mapTargetDate}
-          onClose={() => setShowMapModal(false)}
+          initialTitikId={mapTargetTitik}
+          onClose={() => {
+            setShowMapModal(false);
+            setMapTargetTitik(null);
+          }}
         />
       )}
     </div>

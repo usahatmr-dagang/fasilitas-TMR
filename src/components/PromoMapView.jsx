@@ -255,7 +255,7 @@ const computeAllocationForDate = (promoList, dateYMD, titikList) => {
   return { allocation, promoToTitikMap };
 };
 
-export default function PromoMapView({ promoList = [], initialDate = null, onClose }) {
+export default function PromoMapView({ promoList = [], initialDate = null, initialTitikId = null, onClose }) {
   const getTodayStr = () => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -266,6 +266,26 @@ export default function PromoMapView({ promoList = [], initialDate = null, onClo
   const [isDragMode, setIsDragMode] = useState(false);
   const [titikList, setTitikList] = useState(defaultTitikPromoList);
   const [selectedTitik, setSelectedTitik] = useState(null);
+
+  // Auto-focus ke initialTitikId jika diarahkan dari dashboard 100 Titik
+  useEffect(() => {
+    if (initialTitikId && titikList && titikList.length > 0) {
+      const found = titikList.find(t => t.id === initialTitikId || t.nomor === Number(initialTitikId) || t.kode === initialTitikId);
+      if (found) {
+        setSelectedTitik(found);
+        setEditTitikForm({
+          nama: found.nama || `Titik Promo ${String(found.nomor).padStart(2, '0')}`,
+          zona: found.zona || '',
+          keterangan: found.keterangan || '',
+          lat: found.lat,
+          lng: found.lng
+        });
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.setView([found.lat, found.lng], 17, { animate: true });
+        }
+      }
+    }
+  }, [initialTitikId, titikList]);
   const [isSavingTitik, setIsSavingTitik] = useState(false);
   const [toast, setToast] = useState(null);
 
