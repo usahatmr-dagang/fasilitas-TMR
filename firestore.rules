@@ -47,5 +47,11 @@ service cloud.firestore {
     match /promoList/{document=**} {
       allow create: if true;
     }
+
+    // Aturan untuk masterTitikPromo (100 Titik Lokasi Promo Ragunan)
+    match /masterTitikPromo/{docId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
   }
 }

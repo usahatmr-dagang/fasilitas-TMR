@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, CheckCircle2, Download, Search, X, Loader2, Info, Settings, Save, ArrowLeft, Trash2, Edit, Lock } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, CheckCircle2, Download, Search, X, Loader2, Info, Settings, Save, ArrowLeft, Trash2, Edit, Lock, MapPin, Phone } from 'lucide-react';
 import { db, auth } from './firebase';
 import { collection, onSnapshot, doc, updateDoc, setDoc, getDoc, deleteDoc } from 'firebase/firestore';
 import { signInWithEmailAndPassword } from 'firebase/auth';
@@ -9,6 +9,7 @@ import PizZip from 'pizzip';
 import Docxtemplater from 'docxtemplater';
 import { saveAs } from 'file-saver';
 import { openKwitansiPrintWindow } from './utils/kwitansiHelper';
+import PromoMapView from './components/PromoMapView';
 
 // Konversi angka ke teks (Terbilang)
 const terbilang = (angka) => {
@@ -54,6 +55,10 @@ export default function PromoDashboard({ onNavigate }) {
   const [googleAccessToken, setGoogleAccessToken] = useState(null);
   const CLIENT_ID = '905355425334-tbtvuvufgvnom6vnlb5d0rka00ih03if.apps.googleusercontent.com';
 
+  // Map Modal State
+  const [showMapModal, setShowMapModal] = useState(false);
+  const [mapTargetDate, setMapTargetDate] = useState(null);
+
   // Settings State
   const [showSettings, setShowSettings] = useState(false);
   const [tarif, setTarif] = useState({ hargaTitik: 1000000, hargaBanner: 100000 });
@@ -64,6 +69,8 @@ export default function PromoDashboard({ onNavigate }) {
   const [editingPromo, setEditingPromo] = useState(null);
   const [editForm, setEditForm] = useState({
     namaPerusahaan: '',
+    namaPenandaTangan: '',
+    noHp: '',
     namaProduk: '',
     jumlahTitik: '',
     jumlahBanner: '',
@@ -528,6 +535,8 @@ export default function PromoDashboard({ onNavigate }) {
     setEditingPromo(promo);
     setEditForm({
       namaPerusahaan: promo.namaPerusahaan || '',
+      namaPenandaTangan: promo.namaPenandaTangan || '',
+      noHp: promo.noHp || '',
       namaProduk: promo.namaProduk || '',
       jumlahTitik: promo.jumlahTitik || '',
       jumlahBanner: promo.jumlahBanner || '',
@@ -543,6 +552,8 @@ export default function PromoDashboard({ onNavigate }) {
       const docRef = doc(db, 'promoList', editingPromo.id);
       await updateDoc(docRef, {
         namaPerusahaan: editForm.namaPerusahaan,
+        namaPenandaTangan: editForm.namaPenandaTangan,
+        noHp: editForm.noHp,
         namaProduk: editForm.namaProduk,
         jumlahTitik: editForm.jumlahTitik,
         jumlahBanner: editForm.jumlahBanner,
@@ -638,6 +649,48 @@ export default function PromoDashboard({ onNavigate }) {
                 )}
               </div>
 
+              {/* DATA PENGAJU PROMO LENGKAP & KONTAK HUBUNGI */}
+              <div className="bg-emerald-50/70 border border-emerald-100 rounded-xl p-3 mb-4 shadow-sm">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800">
+                    Data Pengaju Promo (Kontak)
+                  </span>
+                  {p?.noHp && (
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-200 text-emerald-900">
+                      Kontak Siap
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-black text-slate-800 truncate">{p?.namaPenandaTangan || 'Nama pengaju belum diisi'}</p>
+                    <p className="text-xs font-mono font-bold text-slate-500">{p?.noHp || 'No HP belum diisi'}</p>
+                  </div>
+                  {p?.noHp && (
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <a
+                        href={`https://wa.me/${String(p.noHp).replace(/\D/g, '').replace(/^0/, '62')}?text=${encodeURIComponent(
+                          `Halo Bapak/Ibu ${p.namaPenandaTangan || ''}, kami dari pihak Pengelola Taman Margasatwa Ragunan ingin menghubungi terkait permohonan promo ${p.namaProduk || ''} (${p.namaPerusahaan || ''})...`
+                        )}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow-sm transition-all"
+                        title="Hubungi via WhatsApp"
+                      >
+                        <Phone size={12} /> WA
+                      </a>
+                      <a
+                        href={`tel:${String(p.noHp).replace(/\D/g, '')}`}
+                        className="p-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs transition-all"
+                        title="Telepon Langsung"
+                      >
+                        <Phone size={12} />
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {viewMode === 'transfer' && p?.buktiTransferUrl && (
                 <div className="mb-4">
                   <a href={p.buktiTransferUrl} target="_blank" rel="noreferrer" className="block rounded-xl overflow-hidden border border-slate-200 hover:shadow-sm">
@@ -647,6 +700,27 @@ export default function PromoDashboard({ onNavigate }) {
               )}
 
               <div className="space-y-2 mt-4">
+                {/* Tombol Cek Lokasi di Peta */}
+                <button 
+                  type="button"
+                  onClick={() => {
+                    let dateStr = null;
+                    if (selectedDate) {
+                      dateStr = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}-${String(selectedDate.getDate()).padStart(2, '0')}`;
+                    } else if (p.selectedDates && p.selectedDates.length > 0) {
+                      const first = p.selectedDates[0];
+                      dateStr = typeof first === 'object' ? first.date : first;
+                    } else if (p.tanggalTransfer) {
+                      dateStr = p.tanggalTransfer;
+                    }
+                    setMapTargetDate(dateStr);
+                    setShowMapModal(true);
+                  }}
+                  className="w-full py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border-2 border-emerald-300 rounded-xl font-bold flex items-center justify-center gap-2 text-sm transition-all shadow-sm"
+                >
+                  <MapPin size={16} className="text-emerald-700" /> Lihat Posisi Titik di Peta
+                </button>
+
                 {p?.status !== 'Terverifikasi' && (
                   <button onClick={() => handleVerifikasi(p.id)} className="w-full py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 text-sm">
                     <CheckCircle2 size={16} /> Verifikasi
@@ -861,6 +935,28 @@ export default function PromoDashboard({ onNavigate }) {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">Nama Pengaju / Penanggung Jawab</label>
+                  <input 
+                    type="text" 
+                    value={editForm.namaPenandaTangan} 
+                    onChange={(e) => setEditForm({...editForm, namaPenandaTangan: e.target.value})}
+                    placeholder="Nama lengkap pengaju"
+                    className="w-full border-2 border-slate-200 rounded-xl px-4 py-2 font-bold text-emerald-900 focus:border-emerald-500 focus:ring-0" 
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-1">No HP / WhatsApp Pengaju</label>
+                  <input 
+                    type="text" 
+                    value={editForm.noHp} 
+                    onChange={(e) => setEditForm({...editForm, noHp: e.target.value})}
+                    placeholder="0812xxxxxxx"
+                    className="w-full border-2 border-slate-200 rounded-xl px-4 py-2 font-bold text-emerald-900 focus:border-emerald-500 focus:ring-0" 
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
                   <label className="block text-sm font-bold text-slate-700 mb-1">Jumlah Titik</label>
                   <input 
                     type="number" 
@@ -931,12 +1027,26 @@ export default function PromoDashboard({ onNavigate }) {
             <p className="text-sm font-semibold text-emerald-700/70 mt-1">Kelola jadwal promosi dan selling pengunjung di area Taman Margasatwa Ragunan.</p>
           </div>
         </div>
-        <button 
-          onClick={() => setShowSettings(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-xl font-bold transition-all border border-emerald-200"
-        >
-          <Settings size={18} /> Pengaturan Harga
-        </button>
+        <div className="flex items-center gap-2.5">
+          <button 
+            type="button"
+            onClick={() => {
+              const d = selectedDate || new Date();
+              const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+              setMapTargetDate(dateStr);
+              setShowMapModal(true);
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all shadow-md shadow-emerald-600/20"
+          >
+            <MapPin size={18} /> Peta 100 Titik Promo
+          </button>
+          <button 
+            onClick={() => setShowSettings(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-xl font-bold transition-all border border-emerald-200"
+          >
+            <Settings size={18} /> Pengaturan Harga
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-auto p-4 lg:p-8 relative">
@@ -1060,6 +1170,15 @@ export default function PromoDashboard({ onNavigate }) {
           </div>
         )}
       </div>
+
+      {/* Interactive Map View Modal (100 Titik) */}
+      {showMapModal && (
+        <PromoMapView 
+          promoList={promoList}
+          initialDate={mapTargetDate}
+          onClose={() => setShowMapModal(false)}
+        />
+      )}
     </div>
   );
 }
