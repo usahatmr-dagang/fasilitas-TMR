@@ -231,8 +231,12 @@ export default function PromoMapView({ promoList = [], initialDate = null, onClo
       const opacityClass = isZoneMatched ? 'opacity-100' : 'opacity-20 pointer-events-none';
 
       // Icon HTML kustom tanpa beban animasi berat (menjamin 60 FPS)
+      const ringDragStyle = isDragMode 
+        ? 'ring-4 ring-amber-400 scale-110 shadow-amber-500/50 cursor-grab active:cursor-grabbing' 
+        : 'cursor-pointer hover:scale-125';
+
       const iconHtml = `
-        <div class="relative flex items-center justify-center cursor-pointer transition-transform duration-150 hover:scale-125 ${opacityClass}">
+        <div class="relative flex items-center justify-center transition-transform duration-150 ${ringDragStyle} ${opacityClass}">
           <div class="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black shadow-md border-2 border-white ${
             isBooked 
               ? 'bg-rose-600 text-white shadow-rose-600/40 ring-2 ring-rose-400/80' 
@@ -289,7 +293,13 @@ export default function PromoMapView({ promoList = [], initialDate = null, onClo
       } else {
         marker.setLatLng([titik.lat, titik.lng]);
         marker.setIcon(customIcon);
-        marker.setDraggable(isDragMode);
+        if (marker.dragging) {
+          if (isDragMode) {
+            marker.dragging.enable();
+          } else {
+            marker.dragging.disable();
+          }
+        }
       }
 
       // Tooltip sederhana saat hover
@@ -464,6 +474,21 @@ export default function PromoMapView({ promoList = [], initialDate = null, onClo
       {/* Main Map Body & Drawer */}
       <div className="flex-1 relative overflow-hidden flex">
         
+        {/* Floating Banner Mode Geser Pin */}
+        {isDragMode && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[500] bg-amber-500 text-white px-4 py-2.5 rounded-2xl shadow-xl flex items-center gap-3 border border-amber-400 font-bold text-xs animate-in fade-in slide-in-from-top-2">
+            <Move size={16} className="animate-pulse shrink-0" />
+            <span>Mode Atur Posisi Aktif: Klik dan geser (drag) pin ke titik baru. Posisi tersimpan otomatis!</span>
+            <button 
+              type="button" 
+              onClick={() => setIsDragMode(false)}
+              className="px-2.5 py-1 bg-white text-amber-950 hover:bg-amber-50 rounded-lg text-xs font-black shadow-sm transition-all shrink-0"
+            >
+              Selesai
+            </button>
+          </div>
+        )}
+
         {/* Leaflet Map Canvas */}
         <div ref={mapContainerRef} className="w-full h-full z-0"></div>
 
