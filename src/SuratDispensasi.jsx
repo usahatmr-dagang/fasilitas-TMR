@@ -137,7 +137,7 @@ export default function SuratDispensasi({ onNavigate, initialSewaList = null }) 
   // Additional form state
   const [jmlKendaraan, setJmlKendaraan] = useState('1 Mobil');
   const [nopol, setNopol] = useState('');
-  const [jmlPersonel, setJmlPersonel] = useState('2 Dewasa');
+  const [jmlPersonel, setJmlPersonel] = useState('2 Personel');
   const [keperluan, setKeperluan] = useState('');
   const [jamLoading, setJamLoading] = useState('06.00 s/d 07.30 WIB');
   const [tglKunjungan, setTglKunjungan] = useState('');
@@ -367,7 +367,12 @@ export default function SuratDispensasi({ onNavigate, initialSewaList = null }) 
         }
         
       } else {
-        setKeperluan(`Loading Barang Promo (${selectedItem.namaProduk || ''})`);
+        const cleanProduct = (selectedItem.namaProduk || '').replace(/^\((.*)\)$/, '$1').trim();
+        const prodPart = cleanProduct ? ` ${cleanProduct}` : '';
+        const cleanP = jmlPersonel && jmlPersonel !== '-' 
+          ? (jmlPersonel.toLowerCase().includes('personel') ? jmlPersonel : `${jmlPersonel.replace(/dewasa/i, '').trim() || jmlPersonel} Personel`)
+          : '2 Personel';
+        setKeperluan(`Loading Barang Promo${prodPart} ( ${cleanP} )`);
         
         if (selectedItem.selectedDates && Array.isArray(selectedItem.selectedDates) && selectedItem.selectedDates.length > 0) {
           setTglKunjungan(formatMultiTanggal(selectedItem.selectedDates));
@@ -451,6 +456,14 @@ export default function SuratDispensasi({ onNavigate, initialSewaList = null }) 
           return formatTanggalIndo(tgl);
       };
 
+      let finalKeperluan = keperluan;
+      if (source === 'promo') {
+        if (jmlPersonel && jmlPersonel !== '-' && !finalKeperluan.toLowerCase().includes('personel') && !finalKeperluan.toLowerCase().includes('petugas')) {
+          const cleanP = jmlPersonel.toLowerCase().includes('personel') ? jmlPersonel : `${jmlPersonel.replace(/dewasa/i, '').trim() || jmlPersonel} Personel`;
+          finalKeperluan = `${finalKeperluan.trim()} ( ${cleanP} )`;
+        }
+      }
+
       docTemplater.render({
         nomor: formatNomor,
         Nomor: formatNomor,
@@ -459,7 +472,7 @@ export default function SuratDispensasi({ onNavigate, initialSewaList = null }) 
         namaRombongan: namaInstansi || '-',
         tanggalKunjungan: formatTgl(tglKunjungan),
         TanggalKunjungan: formatTgl(tglKunjungan),
-        keperluan: keperluan,
+        keperluan: finalKeperluan,
         nopol: nopol,
         jmlKendaraan: jmlKendaraan,
         jmlPersonel: jmlPersonel,
@@ -491,7 +504,7 @@ export default function SuratDispensasi({ onNavigate, initialSewaList = null }) 
         namaRombongan: namaInstansi,
         tanggalKunjungan: tglKunjungan,
         nopol: nopol,
-        keperluan: keperluan,
+        keperluan: finalKeperluan,
         jmlKendaraan: jmlKendaraan,
         jmlPersonel: jmlPersonel,
         jamLoading: jamLoading,
@@ -557,6 +570,12 @@ export default function SuratDispensasi({ onNavigate, initialSewaList = null }) 
           return formatTanggalIndo(tgl);
       };
 
+      let finalKeperluan = hist.keperluan;
+      if (hist.sumber === 'promo' && hist.jmlPersonel && hist.jmlPersonel !== '-' && !finalKeperluan.toLowerCase().includes('personel') && !finalKeperluan.toLowerCase().includes('petugas')) {
+        const cleanP = hist.jmlPersonel.toLowerCase().includes('personel') ? hist.jmlPersonel : `${hist.jmlPersonel.replace(/dewasa/i, '').trim() || hist.jmlPersonel} Personel`;
+        finalKeperluan = `${finalKeperluan.trim()} ( ${cleanP} )`;
+      }
+
       docTemplater.render({
         nomor: hist.nomorSurat,
         Nomor: hist.nomorSurat,
@@ -565,7 +584,7 @@ export default function SuratDispensasi({ onNavigate, initialSewaList = null }) 
         namaRombongan: hist.namaRombongan || '-',
         tanggalKunjungan: formatTgl(hist.tanggalKunjungan),
         TanggalKunjungan: formatTgl(hist.tanggalKunjungan),
-        keperluan: hist.keperluan,
+        keperluan: finalKeperluan,
         nopol: hist.nopol,
         jmlKendaraan: hist.jmlKendaraan || '-',
         jmlPersonel: hist.jmlPersonel || '-',
@@ -622,13 +641,13 @@ export default function SuratDispensasi({ onNavigate, initialSewaList = null }) 
             <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2"><Building size={18}/> Pilih Sumber Data</h3>
             <div className="flex flex-col sm:flex-row gap-3 mb-6">
               <button 
-                onClick={() => setSource('sewa')}
+                onClick={() => { setSource('sewa'); setSelectedItem(null); setJmlPersonel('2 Personel'); }}
                 className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm transition-all border-2 ${source === 'sewa' ? 'bg-emerald-50 border-emerald-600 text-emerald-700' : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'}`}
               >
                 Penyewa (Rombongan)
               </button>
               <button 
-                onClick={() => setSource('promo')}
+                onClick={() => { setSource('promo'); setSelectedItem(null); setJmlPersonel('2 Personel'); }}
                 className={`flex-1 py-3 px-4 rounded-xl font-bold text-sm transition-all border-2 ${source === 'promo' ? 'bg-blue-50 border-blue-600 text-blue-700' : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'}`}
               >
                 Data Promo
@@ -859,8 +878,23 @@ export default function SuratDispensasi({ onNavigate, initialSewaList = null }) 
                     <input 
                       type="text" 
                       value={jmlPersonel}
-                      onChange={(e) => setJmlPersonel(e.target.value)}
-                      placeholder="Misal: 2 Dewasa"
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setJmlPersonel(val);
+                        if (source === 'promo') {
+                          setKeperluan(prev => {
+                            const cleanP = val.trim() ? (val.toLowerCase().includes('personel') ? val : `${val.replace(/dewasa/i, '').trim() || val} Personel`) : '';
+                            const suffix = cleanP ? ` ( ${cleanP} )` : '';
+                            if (/\s*\(\s*[^)]*personel[^)]*\s*\)$/i.test(prev)) {
+                              return prev.replace(/\s*\(\s*[^)]*personel[^)]*\s*\)$/i, suffix);
+                            } else if (cleanP) {
+                              return `${prev.trim()}${suffix}`;
+                            }
+                            return prev;
+                          });
+                        }
+                      }}
+                      placeholder="Misal: 2 Personel"
                       className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 outline-none"
                     />
                   </div>
