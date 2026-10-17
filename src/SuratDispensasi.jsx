@@ -470,6 +470,7 @@ export default function SuratDispensasi({ onNavigate, initialSewaList = null }) 
       const docxBlob = docTemplater.getZip().generate({
         type: 'blob',
         mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        compression: 'DEFLATE',
       });
 
       const fileName = `Surat Dispensasi - ${namaInstansi} - ${formatNomor.replace(/\//g, '_')}`;
@@ -575,6 +576,7 @@ export default function SuratDispensasi({ onNavigate, initialSewaList = null }) 
       const docxBlob = docTemplater.getZip().generate({
         type: 'blob',
         mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        compression: 'DEFLATE',
       });
 
       const fileName = `Surat Dispensasi - ${hist.namaRombongan} - ${hist.nomorSurat.replace(/\//g, '_')}`;
