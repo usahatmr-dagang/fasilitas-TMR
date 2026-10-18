@@ -2138,7 +2138,7 @@ Terima kasih,
                                     ))
                                 ) : (
                                     <div className="flex justify-between items-center text-xs font-bold">
-                                        <span className="text-emerald-950">{selectedRecord.lokasi_sewa} {selectedRecord.luas_lahan ? `(${selectedRecord.luas_lahan} m²)` : ''}</span>
+                                        <span className={`font-bold ${isLapangan ? 'text-emerald-600' : 'text-slate-900'}`}>{selectedRecord.lokasi_sewa} {selectedRecord.luas_lahan ? `(${selectedRecord.luas_lahan} m²)` : ''}</span>
                                         <span className="text-slate-500">{formatRupiah(viewBiayaLokasi)}</span>
                                     </div>
                                 )}
@@ -3541,7 +3541,7 @@ Terima kasih,
                                         <tbody key={targetDateNorm || 'all'} className="divide-y divide-slate-100 text-slate-700">
                                            {dataFiltered.map((item, idx) => {
                                               const locInfo = masterLokasiMap.get(item.lokasi_sewa) || masterLokasi.find(l => l.nama === item.lokasi_sewa);
-                                              const isLapangan = locInfo?.tipe === 'lapangan' || (item.lokasi_sewa && item.lokasi_sewa.includes('LAP'));
+                                              const isLapangan = locInfo?.tipe === 'lapangan' || (item.lokasi_sewa && String(item.lokasi_sewa).toUpperCase().includes('LAP')) || (item.lokasi_sewa && String(item.lokasi_sewa).toLowerCase().includes('lapangan'));
                                               const isPaid = ['Sudah Transfer', 'Lunas', 'Sudah Lunas'].includes(item.status_pembayaran);
                                               const isPending = item.status_pembayaran === 'Menunggu Verifikasi';
 
@@ -3590,18 +3590,40 @@ Terima kasih,
                                                        </div>
                                                     </td>
 
-                                                    {/* Column 2: Fasilitas */}
+                                                    {/* Column 2: Fasilitas (Lapangan = Hijau, Pendopo = Hitam) */}
                                                     <td className="py-2 px-3">
-                                                       <div className="flex items-center gap-1.5">
-                                                          {isLapangan ? (
-                                                             <TreePine size={13} className="text-emerald-600 flex-shrink-0" />
-                                                          ) : (
-                                                             <Tent size={13} className="text-blue-600 flex-shrink-0" />
-                                                          )}
-                                                          <span className="font-bold text-slate-900 group-hover:text-emerald-900 transition-colors">
-                                                             {item.lokasi_sewa}
-                                                          </span>
-                                                       </div>
+                                                       {item.lokasi_sewa && item.lokasi_sewa.includes(',') ? (
+                                                          <div className="flex flex-col gap-1">
+                                                             {item.lokasi_sewa.split(',').map((part, pIdx) => {
+                                                                const trimmed = part.trim();
+                                                                const subInfo = masterLokasiMap.get(trimmed) || masterLokasi.find(l => l.nama === trimmed);
+                                                                const subIsLap = subInfo?.tipe === 'lapangan' || String(trimmed).toUpperCase().includes('LAP') || String(trimmed).toLowerCase().includes('lapangan');
+                                                                return (
+                                                                   <div key={pIdx} className="flex items-center gap-1.5">
+                                                                      {subIsLap ? (
+                                                                         <TreePine size={13} className="text-emerald-600 flex-shrink-0" />
+                                                                      ) : (
+                                                                         <Tent size={13} className="text-blue-600 flex-shrink-0" />
+                                                                      )}
+                                                                      <span className={`font-bold transition-colors ${subIsLap ? 'text-emerald-600 group-hover:text-emerald-700' : 'text-slate-900 group-hover:text-black'}`}>
+                                                                         {trimmed}
+                                                                      </span>
+                                                                   </div>
+                                                                );
+                                                             })}
+                                                          </div>
+                                                       ) : (
+                                                          <div className="flex items-center gap-1.5">
+                                                             {isLapangan ? (
+                                                                <TreePine size={13} className="text-emerald-600 flex-shrink-0" />
+                                                             ) : (
+                                                                <Tent size={13} className="text-blue-600 flex-shrink-0" />
+                                                             )}
+                                                             <span className={`font-bold transition-colors ${isLapangan ? 'text-emerald-600 group-hover:text-emerald-700' : 'text-slate-900 group-hover:text-black'}`}>
+                                                                {item.lokasi_sewa}
+                                                             </span>
+                                                          </div>
+                                                       )}
                                                     </td>
 
                                                     {/* Column 3: Luas Lahan */}
