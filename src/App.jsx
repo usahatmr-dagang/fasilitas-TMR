@@ -1656,21 +1656,48 @@ Terima kasih,
   };
 
   const compressImageForUpload = (file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const rawResult = event.target.result;
-        if (!file.type || !file.type.startsWith('image/')) {
-          return resolve(rawResult);
+    return new Promise((resolve) => {
+      let isDone = false;
+      const done = (result) => {
+        if (isDone) return;
+        isDone = true;
+        resolve(result);
+      };
+
+      // Hard safety timeout: max 3.5 seconds
+      const timer = setTimeout(() => {
+        console.warn("Compression timed out, falling back to direct FileReader");
+        try {
+          const reader = new FileReader();
+          reader.onload = (e) => done(e.target.result);
+          reader.onerror = () => done('');
+          reader.readAsDataURL(file);
+        } catch (e) {
+          done('');
         }
-        const img = new Image();
-        img.onload = () => {
+      }, 3500);
+
+      try {
+        if (!file.type || !file.type.startsWith('image/')) {
+          clearTimeout(timer);
+          const reader = new FileReader();
+          reader.onload = (e) => done(e.target.result);
+          reader.onerror = () => done('');
+          reader.readAsDataURL(file);
+          return;
+        }
+
+        const objectUrl = URL.createObjectURL(file);
+        const img = new window.Image();
+
+        const processImage = () => {
+          clearTimeout(timer);
           try {
             const canvas = document.createElement('canvas');
-            const MAX_WIDTH = 900;
-            const MAX_HEIGHT = 1200;
-            let width = img.width;
-            let height = img.height;
+            const MAX_WIDTH = 800;
+            const MAX_HEIGHT = 1000;
+            let width = img.naturalWidth || img.width;
+            let height = img.naturalHeight || img.height;
 
             if (width > MAX_WIDTH || height > MAX_HEIGHT) {
               const ratio = Math.min(MAX_WIDTH / width, MAX_HEIGHT / height);
@@ -1682,26 +1709,48 @@ Terima kasih,
             canvas.height = height;
             const ctx = canvas.getContext('2d');
             ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = 'high';
+            ctx.imageSmoothingQuality = 'medium';
             ctx.fillStyle = '#FFFFFF';
             ctx.fillRect(0, 0, width, height);
             ctx.drawImage(img, 0, 0, width, height);
 
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.72);
-            resolve(dataUrl);
+            URL.revokeObjectURL(objectUrl);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.65);
+            done(dataUrl);
           } catch (canvasErr) {
-            console.warn("Canvas compression failed, falling back to raw reader result:", canvasErr);
-            resolve(rawResult);
+            URL.revokeObjectURL(objectUrl);
+            console.warn("Canvas export failed, using reader:", canvasErr);
+            const reader = new FileReader();
+            reader.onload = (e) => done(e.target.result);
+            reader.onerror = () => done('');
+            reader.readAsDataURL(file);
           }
         };
+
+        img.onload = processImage;
         img.onerror = () => {
-          console.warn("Image onload failed, falling back to raw reader result");
-          resolve(rawResult);
+          clearTimeout(timer);
+          URL.revokeObjectURL(objectUrl);
+          const reader = new FileReader();
+          reader.onload = (e) => done(e.target.result);
+          reader.onerror = () => done('');
+          reader.readAsDataURL(file);
         };
-        img.src = rawResult;
-      };
-      reader.onerror = () => reject(new Error("Gagal membaca file gambar"));
-      reader.readAsDataURL(file);
+
+        img.src = objectUrl;
+
+        // If already complete synchronously
+        if (img.complete && (img.naturalWidth || img.width)) {
+          processImage();
+        }
+      } catch (err) {
+        clearTimeout(timer);
+        console.warn("ObjectURL failed:", err);
+        const reader = new FileReader();
+        reader.onload = (e) => done(e.target.result);
+        reader.onerror = () => done('');
+        reader.readAsDataURL(file);
+      }
     });
   };
 
@@ -1721,6 +1770,10 @@ Terima kasih,
       setIsUploadingListrik(true);
       try {
           const compressedDataUrl = await compressImageForUpload(file);
+          if (!compressedDataUrl) {
+              throw new Error("Gagal membaca file gambar. Silakan coba file lain.");
+          }
+
           const tglListrik = selectedRecord.tanggal_transfer_listrik || getTodayString();
           const updates = { 
               bukti_transfer_listrik: compressedDataUrl,
@@ -1728,14 +1781,22 @@ Terima kasih,
               akses_upload_listrik: false
           };
           
-          await updateDoc(doc(db, 'sewaList', targetDocId), updates);
+          const updatePromise = updateDoc(doc(db, 'sewaList', targetDocId), updates);
+          const timeoutPromise = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error("Database Firebase tidak merespon setelah 12 detik. Periksa koneksi internet.")), 12000)
+          );
+
+          await Promise.race([updatePromise, timeoutPromise]);
           
-          // SINKRONISASI KE TABEL PUBLIK (Hanya tanggal & lokasi sewa)
+          // SINKRONISASI KE TABEL PUBLIK (Non-blocking)
           try {
-            await setDoc(doc(db, 'publicSewaList', targetDocId), {
-              tanggal_sewa: selectedRecord.tanggal_sewa || '',
-              lokasi_sewa: selectedRecord.lokasi_sewa || ''
-            }, { merge: true });
+            await Promise.race([
+              setDoc(doc(db, 'publicSewaList', targetDocId), {
+                tanggal_sewa: selectedRecord.tanggal_sewa || '',
+                lokasi_sewa: selectedRecord.lokasi_sewa || ''
+              }, { merge: true }),
+              new Promise((_, reject) => setTimeout(() => reject(new Error("Sync timeout")), 4000))
+            ]);
           } catch (syncErr) {
             console.warn("Public sewa sync notice:", syncErr);
           }
@@ -1745,6 +1806,7 @@ Terima kasih,
           showToast('Struk listrik berhasil ditambahkan!');
       } catch (error) {
           console.error("Upload error:", error);
+          alert(`Gagal menambah struk:\n${error.message || 'Terjadi kesalahan sistem'}`);
           showToast('Gagal menambah struk: ' + (error.message || 'Terjadi kesalahan'), 'error');
       } finally {
           setIsUploadingListrik(false);
