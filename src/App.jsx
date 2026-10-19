@@ -457,6 +457,7 @@ export default function App() {
   const [isAuthChecking, setIsAuthChecking] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSubmittingPortal, setIsSubmittingPortal] = useState(false);
+  const [isUploadingListrik, setIsUploadingListrik] = useState(false);
 
   useEffect(() => {
     // Secret Route
@@ -1656,77 +1657,97 @@ Terima kasih,
 
   const compressImageForUpload = (file) => {
     return new Promise((resolve, reject) => {
-      if (!file.type.startsWith('image/')) {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-        return;
-      }
       const reader = new FileReader();
-      reader.readAsDataURL(file);
       reader.onload = (event) => {
+        const rawResult = event.target.result;
+        if (!file.type || !file.type.startsWith('image/')) {
+          return resolve(rawResult);
+        }
         const img = new Image();
-        img.src = event.target.result;
         img.onload = () => {
-          const canvas = document.createElement('canvas');
-          const MAX_WIDTH = 900;
-          const MAX_HEIGHT = 1200;
-          let width = img.width;
-          let height = img.height;
+          try {
+            const canvas = document.createElement('canvas');
+            const MAX_WIDTH = 900;
+            const MAX_HEIGHT = 1200;
+            let width = img.width;
+            let height = img.height;
 
-          if (width > MAX_WIDTH || height > MAX_HEIGHT) {
-            const ratio = Math.min(MAX_WIDTH / width, MAX_HEIGHT / height);
-            width = Math.round(width * ratio);
-            height = Math.round(height * ratio);
+            if (width > MAX_WIDTH || height > MAX_HEIGHT) {
+              const ratio = Math.min(MAX_WIDTH / width, MAX_HEIGHT / height);
+              width = Math.round(width * ratio);
+              height = Math.round(height * ratio);
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, width, height);
+            ctx.drawImage(img, 0, 0, width, height);
+
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.72);
+            resolve(dataUrl);
+          } catch (canvasErr) {
+            console.warn("Canvas compression failed, falling back to raw reader result:", canvasErr);
+            resolve(rawResult);
           }
-
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx.imageSmoothingEnabled = true;
-          ctx.imageSmoothingQuality = 'high';
-          ctx.fillStyle = '#FFFFFF';
-          ctx.fillRect(0, 0, width, height);
-          ctx.drawImage(img, 0, 0, width, height);
-
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.72);
-          resolve(dataUrl);
         };
-        img.onerror = reject;
+        img.onerror = () => {
+          console.warn("Image onload failed, falling back to raw reader result");
+          resolve(rawResult);
+        };
+        img.src = rawResult;
       };
-      reader.onerror = reject;
+      reader.onerror = () => reject(new Error("Gagal membaca file gambar"));
+      reader.readAsDataURL(file);
     });
   };
 
   const handleUploadListrikChange = async (e) => {
-      const file = e.target.files[0];
+      const file = e.target.files && e.target.files[0];
       if(!file) return;
+      if (!selectedRecord) {
+          showToast('Data reservasi tidak ditemukan!', 'error');
+          return;
+      }
+      const targetDocId = selectedRecord.docId || selectedRecord.id;
+      if (!targetDocId) {
+          showToast('ID Dokumen tidak valid!', 'error');
+          return;
+      }
+
+      setIsUploadingListrik(true);
       try {
           const compressedDataUrl = await compressImageForUpload(file);
           const tglListrik = selectedRecord.tanggal_transfer_listrik || getTodayString();
-          const updatedRecord = { 
-              ...selectedRecord, 
+          const updates = { 
               bukti_transfer_listrik: compressedDataUrl,
               tanggal_transfer_listrik: tglListrik,
               akses_upload_listrik: false
           };
-          const { docId, ...dataToUpdate } = updatedRecord;
-          await updateDoc(doc(db, 'sewaList', selectedRecord.docId), dataToUpdate);
           
-          // SINKRONISASI KE TABEL PUBLIK
-          await setDoc(doc(db, 'publicSewaList', selectedRecord.docId), {
-            tanggal_sewa: dataToUpdate.tanggal_sewa,
-            lokasi_sewa: selectedRecord.lokasi_sewa
-          }, { merge: true });
+          await updateDoc(doc(db, 'sewaList', targetDocId), updates);
+          
+          // SINKRONISASI KE TABEL PUBLIK (Hanya tanggal & lokasi sewa)
+          try {
+            await setDoc(doc(db, 'publicSewaList', targetDocId), {
+              tanggal_sewa: selectedRecord.tanggal_sewa || '',
+              lokasi_sewa: selectedRecord.lokasi_sewa || ''
+            }, { merge: true });
+          } catch (syncErr) {
+            console.warn("Public sewa sync notice:", syncErr);
+          }
 
-          setSelectedRecord({ ...selectedRecord, ...dataToUpdate });
-          setSewaList(prev => prev.map(item => item.docId === selectedRecord.docId ? { ...item, ...dataToUpdate } : item));
+          setSelectedRecord(prev => ({ ...prev, ...updates }));
+          setSewaList(prev => prev.map(item => (item.docId === targetDocId || item.id === targetDocId) ? { ...item, ...updates } : item));
           showToast('Struk listrik berhasil ditambahkan!');
       } catch (error) {
           console.error("Upload error:", error);
-          showToast('Gagal menambah struk!', 'error');
+          showToast('Gagal menambah struk: ' + (error.message || 'Terjadi kesalahan'), 'error');
       } finally {
+          setIsUploadingListrik(false);
           if (e.target) e.target.value = '';
       }
   };
@@ -1979,31 +2000,54 @@ Terima kasih,
   };
 
   const handleUpdateRecordInline = async (record, updates, successMsg) => {
+      const targetDocId = record?.docId || record?.id;
+      if (!targetDocId) {
+          showToast('ID data tidak ditemukan!', 'error');
+          return;
+      }
       try {
-          const { docId, ...dataToUpdate } = { ...record, ...updates };
-          await updateDoc(doc(db, 'sewaList', record.docId), dataToUpdate);
+          await updateDoc(doc(db, 'sewaList', targetDocId), updates);
           
-          await setDoc(doc(db, 'publicSewaList', record.docId), {
-            tanggal_sewa: dataToUpdate.tanggal_sewa || record.tanggal_sewa,
-            lokasi_sewa: dataToUpdate.lokasi_sewa || record.lokasi_sewa
-          }, { merge: true });
+          if (updates.tanggal_sewa || updates.lokasi_sewa) {
+            try {
+              await setDoc(doc(db, 'publicSewaList', targetDocId), {
+                tanggal_sewa: updates.tanggal_sewa || record.tanggal_sewa || '',
+                lokasi_sewa: updates.lokasi_sewa || record.lokasi_sewa || ''
+              }, { merge: true });
+            } catch (syncErr) {
+              console.warn("Public sewa sync notice:", syncErr);
+            }
+          }
 
-          setSelectedRecord({ ...record, ...updates });
+          setSelectedRecord(prev => ({ ...prev, ...updates }));
+          setSewaList(prev => prev.map(item => (item.docId === targetDocId || item.id === targetDocId) ? { ...item, ...updates } : item));
           if (successMsg) showToast(successMsg, 'success');
       } catch (error) {
-          showToast('Gagal update data!', 'error');
+          console.error("Inline update error:", error);
+          showToast('Gagal update data: ' + (error.message || 'Terjadi kesalahan'), 'error');
       }
   };
 
   const handleDeleteRecordInline = async (record, successMsg) => {
+      const targetDocId = record?.docId || record?.id;
+      if (!targetDocId) {
+          showToast('ID data tidak ditemukan!', 'error');
+          return;
+      }
       try {
-          await deleteDoc(doc(db, 'sewaList', record.docId));
-          await deleteDoc(doc(db, 'publicSewaList', record.docId));
+          await deleteDoc(doc(db, 'sewaList', targetDocId));
+          try {
+            await deleteDoc(doc(db, 'publicSewaList', targetDocId));
+          } catch (delErr) {
+            console.warn("Public sewa delete notice:", delErr);
+          }
           
           setSelectedRecord(null);
+          setSewaList(prev => prev.filter(item => item.docId !== targetDocId && item.id !== targetDocId));
           if (successMsg) showToast(successMsg, 'success');
       } catch (error) {
-          showToast('Gagal menghapus data!', 'error');
+          console.error("Delete error:", error);
+          showToast('Gagal menghapus data: ' + (error.message || 'Terjadi kesalahan'), 'error');
       }
   };
 
@@ -2252,21 +2296,39 @@ Terima kasih,
                                                   <Printer size={16} className="mb-1 text-slate-500"/> {isGenerating ? '...' : 'Cetak Struk Listrik'}
                                               </button>
                                           )}
-                                          <label className="flex-1 min-w-[90px] bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold py-2.5 rounded-xl transition-all duration-200 text-[10px] flex flex-col justify-center items-center h-14 cursor-pointer text-center leading-tight">
-                                              <input type="file" accept="image/*" className="hidden" onChange={handleUploadListrikChange} />
-                                              <UploadCloud size={16} className="mb-1 text-amber-600"/> Ganti Struk
+                                          <label className={`flex-1 min-w-[90px] ${isUploadingListrik ? 'bg-amber-100 text-amber-500 cursor-not-allowed' : 'bg-amber-50 hover:bg-amber-100 text-amber-700 cursor-pointer'} font-bold py-2.5 rounded-xl transition-all duration-200 text-[10px] flex flex-col justify-center items-center h-14 text-center leading-tight`}>
+                                              <input type="file" accept="image/*" disabled={isUploadingListrik} className="hidden" onChange={handleUploadListrikChange} />
+                                              {isUploadingListrik ? (
+                                                  <>
+                                                      <Loader2 size={16} className="mb-1 text-amber-600 animate-spin" />
+                                                      Memproses...
+                                                  </>
+                                              ) : (
+                                                  <>
+                                                      <UploadCloud size={16} className="mb-1 text-amber-600"/> Ganti Struk
+                                                  </>
+                                              )}
                                           </label>
-                                          <button type="button" onClick={() => handleUpdateRecordInline(selectedRecord, { bukti_transfer_listrik: null, buktiTransferListrikDocUrl: null }, 'Struk listrik dihapus.')} className="flex-1 min-w-[90px] bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold py-2.5 rounded-xl transition-all duration-200 text-[10px] flex flex-col justify-center items-center h-14">
+                                          <button type="button" disabled={isUploadingListrik} onClick={() => handleUpdateRecordInline(selectedRecord, { bukti_transfer_listrik: null, buktiTransferListrikDocUrl: null }, 'Struk listrik dihapus.')} className="flex-1 min-w-[90px] bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold py-2.5 rounded-xl transition-all duration-200 text-[10px] flex flex-col justify-center items-center h-14 disabled:opacity-50">
                                               <X size={16} className="mb-1 text-rose-500"/> Hapus Struk Listrik
                                           </button>
                                       </div>
                                   </div>
                               ) : (
                                   <div className="text-center mt-2">
-                                      <label className="w-full border-2 border-dashed border-amber-200 bg-white text-amber-700 font-bold py-4 rounded-2xl hover:bg-amber-50/50 transition-all duration-200 text-xs flex flex-col items-center justify-center cursor-pointer block">
-                                          <input type="file" accept="image/*" className="hidden" onChange={handleUploadListrikChange} />
-                                          <UploadCloud size={20} className="mb-1.5 text-amber-500" />
-                                          Admin: Upload Bukti Listrik
+                                      <label className={`w-full border-2 border-dashed border-amber-200 bg-white text-amber-700 font-bold py-4 rounded-2xl ${isUploadingListrik ? 'opacity-60 cursor-not-allowed' : 'hover:bg-amber-50/50 cursor-pointer'} transition-all duration-200 text-xs flex flex-col items-center justify-center block`}>
+                                          <input type="file" accept="image/*" disabled={isUploadingListrik} className="hidden" onChange={handleUploadListrikChange} />
+                                          {isUploadingListrik ? (
+                                              <>
+                                                  <Loader2 size={20} className="mb-1.5 text-amber-500 animate-spin" />
+                                                  Memproses Unggah Bukti...
+                                              </>
+                                          ) : (
+                                              <>
+                                                  <UploadCloud size={20} className="mb-1.5 text-amber-500" />
+                                                  Admin: Upload Bukti Listrik
+                                              </>
+                                          )}
                                       </label>
                                   </div>
                               )}
