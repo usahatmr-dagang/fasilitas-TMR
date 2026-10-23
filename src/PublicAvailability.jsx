@@ -111,7 +111,7 @@ export default function PublicAvailability() {
       
       if (Array.isArray(sewa.detail_lokasi)) {
         sewa.detail_lokasi.forEach(det => {
-          if (det && det.nama) lokasiArray.push(cleanLocName(det.nama));
+          if (det && det.nama && (!sewa.lokasi_sewa || String(sewa.lokasi_sewa).includes(det.nama))) lokasiArray.push(cleanLocName(det.nama));
         });
       }
 

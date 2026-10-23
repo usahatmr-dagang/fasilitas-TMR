@@ -542,6 +542,30 @@ export default function App() {
     return hargaSewa;
   }, [masterLokasiMap, masterLokasi]);
 
+  const getSanitizedDetailLokasi = useCallback((record) => {
+    if (!record || !record.lokasi_sewa) return record?.detail_lokasi || null;
+    if (Array.isArray(record.detail_lokasi) && record.detail_lokasi.length > 0) {
+      const lokasiSewaParts = String(record.lokasi_sewa).split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
+      const detailNames = record.detail_lokasi.map(d => (d?.nama || '').trim().toUpperCase()).filter(Boolean);
+      const isMismatch = !record.detail_lokasi.every(d => d.nama && record.lokasi_sewa.toUpperCase().includes(d.nama.trim().toUpperCase())) ||
+                         !lokasiSewaParts.every(name => detailNames.includes(name));
+      if (!isMismatch) {
+        return record.detail_lokasi;
+      }
+    }
+    const parts = String(record.lokasi_sewa).split(',').map(s => s.trim()).filter(Boolean);
+    return parts.map(locName => {
+      const locInfo = masterLokasiMap.get(locName) || masterLokasi.find(l => l.nama === locName);
+      const isLap = locInfo?.tipe === 'lapangan' || locName.toUpperCase().includes('LAP');
+      const luas = isLap ? (record.luas_lahan || 50) : null;
+      return {
+        nama: locName,
+        luas: luas,
+        biaya: getBiayaLokasi(locName, luas)
+      };
+    });
+  }, [masterLokasiMap, masterLokasi, getBiayaLokasi]);
+
   const [newMasterLokasiNama, setNewMasterLokasiNama] = useState('');
   const [newMasterLokasiTipe, setNewMasterLokasiTipe] = useState('pendopo');
   const [editingLokasiId, setEditingLokasiId] = useState(null);
@@ -734,8 +758,11 @@ export default function App() {
     if (filterTipe !== 'semua') filteredLokasi = masterLokasi.filter(lokasi => lokasi.tipe === filterTipe);
     return filteredLokasi.map(lokasi => {
       const booking = sewaHariIni.find(sewa => {
-          if (sewa.detail_lokasi && Array.isArray(sewa.detail_lokasi)) return sewa.detail_lokasi.some(l => l.nama === lokasi.nama);
-          return sewa.lokasi_sewa === lokasi.nama || (sewa.lokasi_sewa && sewa.lokasi_sewa.split(', ').includes(lokasi.nama));
+          const detail = sewa.detail_lokasi;
+          const isDetailValid = Array.isArray(detail) && detail.length > 0 &&
+            detail.every(l => l.nama && sewa.lokasi_sewa && sewa.lokasi_sewa.includes(l.nama));
+          if (isDetailValid) return detail.some(l => l.nama === lokasi.nama);
+          return sewa.lokasi_sewa === lokasi.nama || (sewa.lokasi_sewa && sewa.lokasi_sewa.split(',').map(s => s.trim()).includes(lokasi.nama));
       });
       return { ...lokasi, status: booking ? 'Disewa' : 'Tersedia', bookingInfo: booking || null };
     });
@@ -773,8 +800,11 @@ export default function App() {
     if (!rescheduleData.tanggal || !selectedRecord) return [];
     const sewaHariItu = sewaList.filter(s => s.tanggal_sewa === rescheduleData.tanggal && s.id_sewa !== selectedRecord.id_sewa && s.status_pembayaran !== 'Ditutup');
     return masterLokasi.filter(l => !sewaHariItu.find(s => {
-        if (s.detail_lokasi && Array.isArray(s.detail_lokasi)) return s.detail_lokasi.some(det => det.nama === l.nama);
-        return s.lokasi_sewa === l.nama || (s.lokasi_sewa && s.lokasi_sewa.split(', ').includes(l.nama));
+        const detail = s.detail_lokasi;
+        const isDetailValid = Array.isArray(detail) && detail.length > 0 &&
+          detail.every(det => det.nama && s.lokasi_sewa && s.lokasi_sewa.includes(det.nama));
+        if (isDetailValid) return detail.some(det => det.nama === l.nama);
+        return s.lokasi_sewa === l.nama || (s.lokasi_sewa && s.lokasi_sewa.split(',').map(x => x.trim()).includes(l.nama));
     }));
   }, [rescheduleData.tanggal, sewaList, selectedRecord, masterLokasi]);
 
@@ -979,11 +1009,19 @@ export default function App() {
 
   const handleOpenDetail = (record) => {
       if (!record) return;
-      setSelectedRecord(record);
+      const cleanDetail = getSanitizedDetailLokasi(record);
+      const isMismatch = Array.isArray(record.detail_lokasi) && record.detail_lokasi.length > 0 && cleanDetail !== record.detail_lokasi;
+
+      if (isMismatch && record.docId) {
+        updateDoc(doc(db, 'sewaList', record.docId), { detail_lokasi: cleanDetail }).catch(() => {});
+      }
+
+      const activeRecord = cleanDetail ? { ...record, detail_lokasi: cleanDetail } : record;
+      setSelectedRecord(activeRecord);
       setDetailMode('view');
       setIsCustomPicEdit(false);
-      setEditFormData({...record});
-      setRescheduleData({ tanggal: record.tanggal_sewa, lokasi: record.lokasi_sewa });
+      setEditFormData({...activeRecord});
+      setRescheduleData({ tanggal: activeRecord.tanggal_sewa, lokasi: activeRecord.lokasi_sewa });
   };
 
   const handleSubmitBooking = async (e) => {
@@ -1260,10 +1298,17 @@ Terima kasih,
     const biayaLokasiBaru = getBiayaLokasi(rescheduleData.lokasi, luas_lahan_reschedule);
     const biayaListrik = selectedRecord.listrik_tambahan ? 100000 : 0;
 
+    const newDetailLokasi = [{
+        nama: rescheduleData.lokasi,
+        luas: luas_lahan_reschedule,
+        biaya: biayaLokasiBaru
+    }];
+
     const updatedRecord = { 
         ...selectedRecord, 
         tanggal_sewa: rescheduleData.tanggal, 
         lokasi_sewa: rescheduleData.lokasi, 
+        detail_lokasi: newDetailLokasi,
         luas_lahan: luas_lahan_reschedule,
         total_biaya: biayaLokasiBaru + biayaListrik,
         history_reschedule: newHistory 
@@ -1272,6 +1317,10 @@ Terima kasih,
     try {
         const { docId, ...dataToUpdate } = updatedRecord;
         await updateDoc(doc(db, 'sewaList', selectedRecord.docId), dataToUpdate);
+        await setDoc(doc(db, 'publicSewaList', selectedRecord.docId), {
+            tanggal_sewa: updatedRecord.tanggal_sewa,
+            lokasi_sewa: updatedRecord.lokasi_sewa
+        }, { merge: true });
         setSelectedRecord(updatedRecord);
         setDetailMode('view');
         showToast('Jadwal berhasil dipindahkan!', 'success');
@@ -1297,7 +1346,13 @@ Terima kasih,
 
     let displayLokasi = selectedRecord.lokasi_sewa || '-';
 
-    if (selectedRecord.detail_lokasi && Array.isArray(selectedRecord.detail_lokasi) && selectedRecord.detail_lokasi.length > 0) {
+    // Periksa apakah detail_lokasi sinkron dengan lokasi_sewa terkini
+    const isDetailValid = Array.isArray(selectedRecord.detail_lokasi) && 
+      selectedRecord.detail_lokasi.length > 0 &&
+      selectedRecord.detail_lokasi.every(loc => loc.nama && selectedRecord.lokasi_sewa && selectedRecord.lokasi_sewa.includes(loc.nama)) &&
+      (selectedRecord.lokasi_sewa || '').split(',').every(name => selectedRecord.detail_lokasi.some(loc => loc.nama && loc.nama.trim().toUpperCase() === name.trim().toUpperCase()));
+
+    if (isDetailValid) {
       displayLokasi = selectedRecord.detail_lokasi.map(loc => {
         const isLap = isLokasiLap(loc.nama) || (loc.luas && Number(loc.luas) > 0);
         if (isLap) {
