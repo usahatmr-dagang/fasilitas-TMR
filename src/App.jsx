@@ -1329,13 +1329,9 @@ Terima kasih,
     }
   };
 
-  // --- HANDLER FITUR CETAK PENANDA LOKASI (F4 LANDSCAPE) ---
-  const handlePrintPenanda = () => {
-    if (!selectedRecord) return;
-    
-    const tglStr = formatTanggalPendek(selectedRecord.tanggal_sewa);
-
-    // Deteksi dan format nama lokasi serta luas lahan jika lapangan
+  // --- FORMAT NAMA LOKASI DENGAN LUAS LAHAN JIKA LAPANGAN / MEMILIKI LUAS ---
+  const formatLokasiWithLuas = useCallback((record) => {
+    if (!record) return '-';
     const isLokasiLap = (locName) => {
       if (!locName) return false;
       const upper = String(locName).toUpperCase();
@@ -1344,47 +1340,73 @@ Terima kasih,
       return match?.tipe === 'lapangan';
     };
 
-    let displayLokasi = selectedRecord.lokasi_sewa || '-';
+    let displayLokasi = record.lokasi_sewa || '-';
 
-    // Periksa apakah detail_lokasi sinkron dengan lokasi_sewa terkini
-    const isDetailValid = Array.isArray(selectedRecord.detail_lokasi) && 
-      selectedRecord.detail_lokasi.length > 0 &&
-      selectedRecord.detail_lokasi.every(loc => loc.nama && selectedRecord.lokasi_sewa && selectedRecord.lokasi_sewa.includes(loc.nama)) &&
-      (selectedRecord.lokasi_sewa || '').split(',').every(name => selectedRecord.detail_lokasi.some(loc => loc.nama && loc.nama.trim().toUpperCase() === name.trim().toUpperCase()));
+    const isDetailValid = Array.isArray(record.detail_lokasi) && 
+      record.detail_lokasi.length > 0 &&
+      record.detail_lokasi.every(loc => loc.nama && record.lokasi_sewa && record.lokasi_sewa.includes(loc.nama)) &&
+      (record.lokasi_sewa || '').split(',').every(name => record.detail_lokasi.some(loc => loc.nama && loc.nama.trim().toUpperCase() === name.trim().toUpperCase()));
 
     if (isDetailValid) {
-      displayLokasi = selectedRecord.detail_lokasi.map(loc => {
+      return record.detail_lokasi.map(loc => {
         const isLap = isLokasiLap(loc.nama) || (loc.luas && Number(loc.luas) > 0);
         if (isLap) {
-          const luas = loc.luas || selectedRecord.luas_lahan || 50;
+          const luas = loc.luas || record.luas_lahan || 50;
           return `${loc.nama} (${luas} m²)`;
         }
         return loc.nama;
       }).join(', ');
     } else {
       if (displayLokasi.includes(',')) {
-        displayLokasi = displayLokasi.split(',').map(item => {
+        return displayLokasi.split(',').map(item => {
           const trimmed = item.trim();
           const isLap = isLokasiLap(trimmed);
           if (isLap && !trimmed.includes('m²') && !trimmed.includes('m2')) {
-            const luas = selectedRecord.luas_lahan || 50;
+            let luas = record.luas_lahan;
+            if (!luas) {
+              const m = (record.keterangan || '').match(/Luas(?:\s+Lahan)?[:\s]*(\d+)/i);
+              if (m) luas = m[1];
+              else luas = 50;
+            }
             return `${trimmed} (${luas} m²)`;
           }
           return trimmed;
         }).join(', ');
       } else {
-        const isLap = isLokasiLap(displayLokasi) || (selectedRecord.luas_lahan && Number(selectedRecord.luas_lahan) > 0);
+        const isLap = isLokasiLap(displayLokasi) || (record.luas_lahan && Number(record.luas_lahan) > 0);
         if (isLap && !displayLokasi.includes('m²') && !displayLokasi.includes('m2')) {
-          let luas = selectedRecord.luas_lahan;
+          let luas = record.luas_lahan;
           if (!luas) {
-            const m = (selectedRecord.keterangan || '').match(/Luas(?:\s+Lahan)?[:\s]*(\d+)/i);
+            if (Array.isArray(record.detail_lokasi) && record.detail_lokasi[0]?.luas) {
+              luas = record.detail_lokasi[0].luas;
+            }
+          }
+          if (!luas) {
+            const m = (record.keterangan || '').match(/Luas(?:\s+Lahan)?[:\s]*(\d+)/i);
             if (m) luas = m[1];
-            else luas = 50;
+          }
+          if (!luas && (record.total_biaya && record.total_biaya >= 100000)) {
+            const biayaLokasiMurni = record.listrik_tambahan ? (record.total_biaya - 100000) : record.total_biaya;
+            if (biayaLokasiMurni > 0 && biayaLokasiMurni % 2000 === 0) {
+              luas = Math.round(biayaLokasiMurni / 2000);
+            }
+          }
+          if (!luas) {
+            luas = 50;
           }
           displayLokasi = `${displayLokasi} (${luas} m²)`;
         }
+        return displayLokasi;
       }
     }
+  }, [masterLokasi]);
+
+  // --- HANDLER FITUR CETAK PENANDA LOKASI (F4 LANDSCAPE) ---
+  const handlePrintPenanda = () => {
+    if (!selectedRecord) return;
+    
+    const tglStr = formatTanggalPendek(selectedRecord.tanggal_sewa);
+    const displayLokasi = formatLokasiWithLuas(selectedRecord);
 
     const iframe = document.createElement('iframe');
     iframe.style.position = 'fixed';
@@ -1593,6 +1615,7 @@ Terima kasih,
 
       const tglSewaStr = formatTanggalPendek(selectedRecord.tanggal_sewa);
       const tglTransferStr = formatTanggalPendek(selectedRecord.tanggal_transfer) || '-';
+      const displayLokasi = formatLokasiWithLuas(selectedRecord);
 
       const biayaListrik = selectedRecord.listrik_tambahan ? 100000 : 0;
       let totalBayar = selectedRecord.total_biaya !== undefined ? selectedRecord.total_biaya : (getBiayaLokasi(selectedRecord.lokasi_sewa, selectedRecord.luas_lahan) + biayaListrik);
@@ -1617,7 +1640,7 @@ Terima kasih,
             <div style="text-align: left; margin: 20px 0; font-size: 14pt;">
               <p><b>ID Transaksi:</b> ${selectedRecord.id_sewa}</p>
               <p><b>Nama Penyewa:</b> ${selectedRecord.nama_penyewa}</p>
-              <p><b>Lokasi Sewa:</b> ${selectedRecord.lokasi_sewa}</p>
+              <p><b>Lokasi Sewa:</b> ${displayLokasi}</p>
               <p><b>Tanggal Sewa:</b> ${tglSewaStr}</p>
               <p><b>Tanggal Transfer:</b> ${tglTransferStr}</p>
               <p><b>Nominal Transfer:</b> ${nominalText}</p>
@@ -1665,6 +1688,7 @@ Terima kasih,
 
       const tglSewaStr = formatTanggalPendek(selectedRecord.tanggal_sewa);
       const tglTransferStr = selectedRecord.tanggal_transfer_listrik ? formatTanggalPendek(selectedRecord.tanggal_transfer_listrik) : '-';
+      const displayLokasi = formatLokasiWithLuas(selectedRecord);
 
       const htmlContent = `
         <!DOCTYPE html>
@@ -1680,7 +1704,7 @@ Terima kasih,
             <div style="text-align: left; margin: 20px 0; font-size: 14pt;">
               <p><b>ID Transaksi:</b> ${selectedRecord.id_sewa}</p>
               <p><b>Nama Penyewa:</b> ${selectedRecord.nama_penyewa}</p>
-              <p><b>Lokasi Sewa:</b> ${selectedRecord.lokasi_sewa}</p>
+              <p><b>Lokasi Sewa:</b> ${displayLokasi}</p>
               <p><b>Tanggal Sewa:</b> ${tglSewaStr}</p>
               <p><b>Tanggal Transfer Listrik:</b> ${tglTransferStr}</p>
               <p><b>Nominal Transfer:</b> Rp 100.000</p>

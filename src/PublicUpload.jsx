@@ -400,7 +400,7 @@ export default function PublicUpload() {
                   </div>
                   <div>
                     <p className="text-slate-500 text-xs mb-0.5">Lokasi Sewa</p>
-                    <p className="font-bold text-slate-800">{bookingData.lokasi_sewa}</p>
+                    <p className="font-bold text-slate-800">{bookingData.lokasi_sewa} {bookingData.luas_lahan && !String(bookingData.lokasi_sewa).includes('m²') && !String(bookingData.lokasi_sewa).includes('m2') ? `(${bookingData.luas_lahan} m²)` : ''}</p>
                   </div>
                 </div>
 
