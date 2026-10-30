@@ -18,13 +18,29 @@ const auth = getAuth(app);
 function normalizeDate(dateStr) {
     if (!dateStr) return '';
     if (typeof dateStr !== 'string') return '';
-    const cleanStr = dateStr.split(',')[0].trim().split(' ')[0].trim();
+    const cleanStr = dateStr.trim();
     if (cleanStr.includes('/')) {
-        const parts = cleanStr.split('/');
-        if (parts.length === 3 && parts[2].length === 4) {
-            return `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+        const parts = cleanStr.split(' ')[0].split('/');
+        if (parts.length === 3) {
+            const y = parts[2].length === 4 ? parts[2] : (parts[0].length === 4 ? parts[0] : parts[2]);
+            const m = parts[1].padStart(2, '0');
+            const d = (parts[2].length === 4 ? parts[0] : parts[2]).padStart(2, '0');
+            return `${y}-${m}-${d}`;
         }
     }
+    const mYmd = cleanStr.match(/(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/);
+    if (mYmd) {
+        return `${mYmd[1]}-${String(mYmd[2]).padStart(2, '0')}-${String(mYmd[3]).padStart(2, '0')}`;
+    }
+    try {
+        const d = new Date(cleanStr.replace(/WIB|WITA|WIT/i, '').trim());
+        if (!isNaN(d.getTime())) {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        }
+    } catch(e) {}
     return cleanStr;
 }
 
