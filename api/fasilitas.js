@@ -45,10 +45,13 @@ function transformSewaDoc(doc) {
 
     const tglLokasi = normalizeDate(d.tanggal_transfer) || normalizeDate(d.tanggal_sewa);
     const tglListrik = normalizeDate(d.tanggal_transfer_listrik) || tglLokasi;
+    const tglSewa = normalizeDate(d.tanggal_sewa) || '';
+    const luasLahan = Number(d.luas_lahan) || 0;
 
     // Transaksi 1: Sewa Lokasi / Fasilitas Utama
-    if (hasBuktiLokasi) {
+    if (hasBuktiLokasi || d.status_pembayaran === 'Sudah Transfer' || d.tanggal_transfer || rawTotal > 0) {
         transactions.push({
+            ...d,
             id: hasBuktiListrik ? `${doc.id}_lokasi` : doc.id,
             docId: doc.id,
             id_sewa: d.id_sewa || doc.id,
@@ -58,12 +61,17 @@ function transformSewaDoc(doc) {
             nama_penyewa: d.nama_penyewa || '-',
             pic_rombongan: d.pic_rombongan || '-',
             lokasi_sewa: d.lokasi_sewa || '-',
+            tanggal_sewa: tglSewa,
+            tanggalPemakaian: tglSewa,
+            luas_lahan: luasLahan,
             keterangan_transaksi: `Sewa Lokasi: ${d.lokasi_sewa || '-'} (${d.nama_penyewa || '-'})`,
+            keterangan: d.keterangan || d.catatan || '',
+            detail_lokasi: d.detail_lokasi || '',
             jumlahTransfer: biayaLokasi,
             jumlahTransferNumeric: biayaLokasi,
             tanggal_transfer: tglLokasi,
             tanggalTransfer: tglLokasi,
-            buktiTransferUrl: d.buktiTransferDocUrl || d.bukti_transfer,
+            buktiTransferUrl: d.buktiTransferDocUrl || d.bukti_transfer || null,
             buktiTransferDocUrl: d.buktiTransferDocUrl || null,
             status_pembayaran: d.status_pembayaran || 'Sudah Transfer',
             listrik_tambahan: d.listrik_tambahan || false
@@ -73,6 +81,7 @@ function transformSewaDoc(doc) {
     // Transaksi 2: Listrik Tambahan
     if (hasBuktiListrik) {
         transactions.push({
+            ...d,
             id: `${doc.id}_listrik`,
             docId: doc.id,
             id_sewa: d.id_sewa ? `${d.id_sewa}-LST` : `${doc.id}-LST`,
@@ -82,7 +91,12 @@ function transformSewaDoc(doc) {
             nama_penyewa: d.nama_penyewa || '-',
             pic_rombongan: d.pic_rombongan || '-',
             lokasi_sewa: d.lokasi_sewa || '-',
+            tanggal_sewa: tglSewa,
+            tanggalPemakaian: tglSewa,
+            luas_lahan: 0,
             keterangan_transaksi: `Listrik Tambahan: ${d.lokasi_sewa || '-'} (${d.nama_penyewa || '-'})`,
+            keterangan: d.keterangan || d.catatan || '',
+            detail_lokasi: d.detail_lokasi || '',
             jumlahTransfer: biayaListrik,
             jumlahTransferNumeric: biayaListrik,
             tanggal_transfer: tglListrik,

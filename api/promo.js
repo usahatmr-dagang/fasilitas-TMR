@@ -30,10 +30,9 @@ function normalizeDate(dateStr) {
 
 function transformPromoDoc(doc) {
     const d = doc.data();
-    const buktiUrl = d.buktiTransferUrl || d.bukti_transfer;
-    if (!buktiUrl) return null;
+    const buktiUrl = d.buktiTransferUrl || d.bukti_transfer || d.buktiTransferDocUrl || null;
 
-    const nominalNumeric = d.jumlahTransferNumeric || (typeof d.jumlahTransfer === 'string' ? Number(d.jumlahTransfer.replace(/[^0-9]/g, '')) : Number(d.jumlahTransfer)) || 0;
+    const nominalNumeric = d.jumlahTransferNumeric || (typeof d.jumlahTransfer === 'string' ? Number(d.jumlahTransfer.replace(/[^0-9]/g, '')) : Number(d.jumlahTransfer)) || Number(d.totalBiaya || 0) || 0;
     const tgl = normalizeDate(d.tanggalTransfer || d.tanggal_transfer || d.createdAt);
 
     return {
@@ -46,6 +45,11 @@ function transformPromoDoc(doc) {
         namaPerusahaan: d.namaPerusahaan || '-',
         pic_rombongan: d.namaPenandaTangan || '-',
         namaProduk: d.namaProduk || '-',
+        tanggalEvent: d.tanggalPromo || d.tanggalEvent || (Array.isArray(d.selectedDates) ? d.selectedDates.map(s => typeof s === 'object' ? s.date : s).join(', ') : '-'),
+        jumlahHari: Number(d.jumlahHari) || (Array.isArray(d.selectedDates) ? d.selectedDates.length : 1),
+        jumlahTitik: Number(d.jumlahTitik) || (d.titik ? Number(d.titik) : 1),
+        jumlahBanner: Number(d.jumlahBanner) || Number(d.banner) || 0,
+        jumlahSpanduk: Number(d.jumlahSpanduk) || Number(d.spanduk) || 0,
         lokasi_sewa: `Promo (${d.jumlahTitik || 1} Titik, ${d.jumlahBanner || 0} Banner)`,
         keterangan_transaksi: `Promo: ${d.namaProduk || '-'} (${d.namaPerusahaan || '-'})`,
         jumlahTransfer: nominalNumeric,
@@ -55,6 +59,7 @@ function transformPromoDoc(doc) {
         buktiTransferUrl: buktiUrl,
         buktiTransferDocUrl: d.buktiTransferDocUrl || d.pksDriveUrl || null,
         status_pembayaran: d.status || 'Menunggu Verifikasi',
+        keterangan: d.keterangan || d.catatan || '',
         ...d
     };
 }
