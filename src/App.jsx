@@ -49,7 +49,8 @@ import {
   Bell,
   ArrowUpDown,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  LockOpen
 } from 'lucide-react';
 import { db, storage, auth } from './firebase';
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, setDoc, getDoc } from 'firebase/firestore';
@@ -575,6 +576,8 @@ export default function App() {
 
   const [newPic, setNewPic] = useState('');
   const [blockData, setBlockData] = useState({ tanggal: '', tanggalSampai: '', lokasi: 'Semua Lokasi' });
+  const [unblockFilter, setUnblockFilter] = useState({ tanggal: '', lokasi: 'Semua Lokasi' });
+  const [unblockSelectedIds, setUnblockSelectedIds] = useState([]);
 
   const [selectedDate, setSelectedDate] = useState(getTodayString());
   const [filterTipe, setFilterTipe] = useState('semua');
@@ -1972,6 +1975,33 @@ Terima kasih,
       }
   };
 
+  // Daftar record 'Ditutup' yang difilter berdasarkan tanggal dan/atau lokasi
+  const unblockCandidates = useMemo(() => {
+      return sewaList.filter(s => {
+          if (s.status_pembayaran !== 'Ditutup') return false;
+          if (unblockFilter.tanggal && s.tanggal_sewa !== unblockFilter.tanggal) return false;
+          if (unblockFilter.lokasi !== 'Semua Lokasi' && s.lokasi_sewa !== unblockFilter.lokasi) return false;
+          return true;
+      }).sort((a, b) => a.tanggal_sewa.localeCompare(b.tanggal_sewa) || a.lokasi_sewa.localeCompare(b.lokasi_sewa));
+  }, [sewaList, unblockFilter]);
+
+  const handleUnblockLokasi = async () => {
+      if (unblockSelectedIds.length === 0) {
+          showToast('Pilih minimal satu lokasi untuk dibuka kembali!', 'error');
+          return;
+      }
+      try {
+          await Promise.all(unblockSelectedIds.map(async (id) => {
+              await deleteDoc(doc(db, 'sewaList', id));
+              await deleteDoc(doc(db, 'publicSewaList', id)).catch(() => {});
+          }));
+          showToast(`${unblockSelectedIds.length} lokasi berhasil dibuka kembali.`, 'success');
+          setUnblockSelectedIds([]);
+      } catch (error) {
+          showToast('Gagal membuka kembali lokasi!', 'error');
+      }
+  };
+
   const extractPaymentInfo = async (base64Data, mimeType) => {
     setIsScanning(true); setScanError('');
     const apiKey = ""; 
@@ -2839,28 +2869,33 @@ Terima kasih,
                       className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs font-semibold text-emerald-950 focus:ring-4 focus:ring-rose-500/10 focus:border-rose-450 outline-none shadow-sm cursor-pointer custom-date-picker" 
                     />
                   </div>
-                  <div>
-                    <label className="block text-[10px] uppercase tracking-widest font-black text-slate-500 mb-1.5">Tanggal Akhir Tutup</label>
-                    <input 
-                      type="date" 
-                      required 
-                      value={blockData.tanggalSampai} 
-                      min={blockData.tanggal || undefined}
-                      onChange={e => { setBlockData({...blockData, tanggalSampai: e.target.value}); e.target.blur(); }} 
-                      className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs font-semibold text-emerald-950 focus:ring-4 focus:ring-rose-500/10 focus:border-rose-450 outline-none shadow-sm cursor-pointer custom-date-picker" 
-                    />
-                    {blockData.tanggal && blockData.tanggalSampai && blockData.tanggal !== blockData.tanggalSampai && (
-                      <p className="text-[9px] font-bold text-rose-500 mt-1 flex items-center">
-                        <span className="mr-1">⚠</span>
-                        {(() => {
-                          const start = new Date(blockData.tanggal);
-                          const end = new Date(blockData.tanggalSampai);
-                          const days = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
-                          return `Range ${days} hari akan ditutup`;
-                        })()}
-                      </p>
-                    )}
-                  </div>
+                  {blockData.tanggal && (
+                    <div>
+                      <label className="block text-[10px] uppercase tracking-widest font-black text-slate-500 mb-1.5">
+                        Tanggal Akhir Tutup
+                        <span className="ml-2 text-rose-400 normal-case font-semibold">(isi jika lebih dari 1 hari)</span>
+                      </label>
+                      <input 
+                        type="date" 
+                        required 
+                        value={blockData.tanggalSampai} 
+                        min={blockData.tanggal}
+                        onChange={e => { setBlockData({...blockData, tanggalSampai: e.target.value}); e.target.blur(); }} 
+                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs font-semibold text-emerald-950 focus:ring-4 focus:ring-rose-500/10 focus:border-rose-450 outline-none shadow-sm cursor-pointer custom-date-picker" 
+                      />
+                      {blockData.tanggal && blockData.tanggalSampai && blockData.tanggal !== blockData.tanggalSampai && (
+                        <p className="text-[9px] font-bold text-rose-500 mt-1 flex items-center">
+                          <span className="mr-1">⚠</span>
+                          {(() => {
+                            const start = new Date(blockData.tanggal);
+                            const end = new Date(blockData.tanggalSampai);
+                            const days = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
+                            return `Range ${days} hari akan ditutup`;
+                          })()}
+                        </p>
+                      )}
+                    </div>
+                  )}
                   <div>
                     <label className="block text-[10px] uppercase tracking-widest font-black text-slate-500 mb-1.5">Pilih Fasilitas</label>
                     <select 
@@ -2877,6 +2912,82 @@ Terima kasih,
                   <Lock size={14} className="mr-2"/> Eksekusi Penutupan
                 </button>
               </form>
+            </div>
+
+            {/* Buka Kembali Lokasi */}
+            <div className="bg-slate-50/50 rounded-3xl p-6 border border-slate-100 relative overflow-hidden flex flex-col">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-100/20 rounded-bl-full -z-10"></div>
+              <h3 className="font-black text-emerald-950 mb-5 flex items-center text-sm uppercase tracking-wider">
+                <LockOpen size={16} className="mr-2 text-emerald-600"/> Buka Kembali Lokasi
+              </h3>
+              <div className="space-y-3 mb-4">
+                <div className="flex gap-3">
+                  <div className="flex-1">
+                    <label className="block text-[10px] uppercase tracking-widest font-black text-slate-500 mb-1.5">Filter Tanggal</label>
+                    <input 
+                      type="date" 
+                      value={unblockFilter.tanggal}
+                      onChange={e => { setUnblockFilter(p => ({...p, tanggal: e.target.value})); setUnblockSelectedIds([]); e.target.blur(); }}
+                      className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-2xl text-xs font-semibold text-emerald-950 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none shadow-sm cursor-pointer custom-date-picker"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-[10px] uppercase tracking-widest font-black text-slate-500 mb-1.5">Filter Fasilitas</label>
+                    <select
+                      value={unblockFilter.lokasi}
+                      onChange={e => { setUnblockFilter(p => ({...p, lokasi: e.target.value})); setUnblockSelectedIds([]); }}
+                      className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-2xl text-xs font-semibold text-emerald-950 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none shadow-sm cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2310b981%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E')] bg-[right_1rem_center] bg-[length:1.25em_1.25em] bg-no-repeat pr-10"
+                    >
+                      <option value="Semua Lokasi">Semua Lokasi</option>
+                      {masterLokasi.map(l => <option key={l.id} value={l.nama}>{l.nama}</option>)}
+                    </select>
+                  </div>
+                </div>
+                {unblockCandidates.length > 0 && (
+                  <div className="flex justify-between items-center px-1">
+                    <span className="text-[10px] font-bold text-slate-500">{unblockCandidates.length} lokasi ditutup ditemukan</span>
+                    <button type="button" onClick={() => setUnblockSelectedIds(
+                      unblockSelectedIds.length === unblockCandidates.length ? [] : unblockCandidates.map(c => c.docId)
+                    )} className="text-[10px] font-black text-emerald-600 hover:text-emerald-700">
+                      {unblockSelectedIds.length === unblockCandidates.length ? 'Batalkan Semua' : 'Pilih Semua'}
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 max-h-48 overflow-y-auto space-y-1.5 custom-scrollbar mb-4">
+                {unblockCandidates.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-8 text-slate-400">
+                    <LockOpen size={28} className="opacity-30 mb-2"/>
+                    <span className="text-xs font-semibold">
+                      {(!unblockFilter.tanggal && unblockFilter.lokasi === 'Semua Lokasi') 
+                        ? 'Gunakan filter untuk mencari lokasi yang ditutup' 
+                        : 'Tidak ada lokasi ditutup pada filter ini'}
+                    </span>
+                  </div>
+                ) : (
+                  unblockCandidates.map(item => {
+                    const isChecked = unblockSelectedIds.includes(item.docId);
+                    return (
+                      <div key={item.docId} onClick={() => setUnblockSelectedIds(prev => isChecked ? prev.filter(id => id !== item.docId) : [...prev, item.docId])}
+                        className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all duration-150 ${isChecked ? 'bg-emerald-50 border-emerald-300' : 'bg-white border-slate-100 hover:border-emerald-200'}`}>
+                        <div className={`w-4 h-4 rounded-md border-2 flex items-center justify-center shrink-0 transition-all ${isChecked ? 'bg-emerald-500 border-emerald-500' : 'border-slate-300'}`}>
+                          {isChecked && <svg viewBox="0 0 12 12" fill="none" className="w-3 h-3"><path d="M2 6l3 3 5-5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[11px] font-black text-emerald-950 truncate">{item.lokasi_sewa}</p>
+                          <p className="text-[9px] font-semibold text-slate-400">{formatTanggalIndo(item.tanggal_sewa)}</p>
+                        </div>
+                        <span className="text-[8px] font-black text-slate-400 uppercase bg-slate-100 px-2 py-0.5 rounded-full shrink-0">Maintenance</span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+              <button type="button" onClick={handleUnblockLokasi} disabled={unblockSelectedIds.length === 0}
+                className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 disabled:from-slate-300 disabled:to-slate-300 disabled:cursor-not-allowed text-white py-3.5 rounded-2xl font-black text-xs shadow-md shadow-emerald-900/10 transition-all active:scale-[0.98] flex justify-center items-center">
+                <LockOpen size={14} className="mr-2"/> 
+                {unblockSelectedIds.length > 0 ? `Buka ${unblockSelectedIds.length} Lokasi` : 'Buka Kembali Lokasi'}
+              </button>
             </div>
           </div>
 
