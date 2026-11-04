@@ -574,7 +574,7 @@ export default function App() {
   const [toast, setToast] = useState(null); 
 
   const [newPic, setNewPic] = useState('');
-  const [blockData, setBlockData] = useState({ tanggal: getTodayString(), lokasi: 'Semua Lokasi' });
+  const [blockData, setBlockData] = useState({ tanggal: getTodayString(), tanggalSampai: getTodayString(), lokasi: 'Semua Lokasi' });
 
   const [selectedDate, setSelectedDate] = useState(getTodayString());
   const [filterTipe, setFilterTipe] = useState('semua');
@@ -1924,27 +1924,49 @@ Terima kasih,
       e.preventDefault();
       const currentDateTime = new Date().toLocaleString('id-ID', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
       const lokasiTarget = blockData.lokasi === 'Semua Lokasi' ? masterLokasi.map(l => l.nama) : [blockData.lokasi];
-      
-      const newBlocks = lokasiTarget.map((lokName, i) => ({
-          id_sewa: `BLK-${Math.floor(1000 + Math.random() * 9000)}-${i}`,
-          tanggal_sewa: blockData.tanggal, lokasi_sewa: lokName, nama_penyewa: 'DITUTUP (MAINTENANCE)', pic_rombongan: '-', no_hp_penyewa: '-', pic_kantor: '-',
-          keterangan: 'Diblokir dari sistem pengaturan admin', status_pembayaran: 'Ditutup', tanggal_booking: currentDateTime,
-          bukti_transfer: null, bukti_transfer_listrik: null, ocr_data: null, history_reschedule: [], listrik_tambahan: false, akses_upload_listrik: false, total_biaya: 0
-      }));
 
-      const existingBookings = sewaList.filter(s => s.tanggal_sewa === blockData.tanggal);
-      const filteredBlocks = newBlocks.filter(b => !existingBookings.find(ex => ex.lokasi_sewa === b.lokasi_sewa));
+      // Buat array semua tanggal dalam range
+      const startDate = new Date(blockData.tanggal);
+      const endDate = new Date(blockData.tanggalSampai || blockData.tanggal);
+      if (endDate < startDate) {
+          showToast('Tanggal akhir tidak boleh sebelum tanggal mulai!', 'error');
+          return;
+      }
+      const dateList = [];
+      const cursor = new Date(startDate);
+      while (cursor <= endDate) {
+          dateList.push(cursor.toISOString().split('T')[0]);
+          cursor.setDate(cursor.getDate() + 1);
+      }
 
-        try {
-          await Promise.all(filteredBlocks.map(async (block) => {
-            const docRef = await addDoc(collection(db, 'sewaList'), block);
-            await setDoc(doc(db, 'publicSewaList', docRef.id), {
-              tanggal_sewa: block.tanggal_sewa,
-              lokasi_sewa: block.lokasi_sewa
-            });
-          }));
-          setIsBlockModalOpen(false);
-          showToast(`Berhasil menutup ${filteredBlocks.length} lokasi pada tanggal ${formatTanggalPendek(blockData.tanggal)}.`);
+      let totalBlocked = 0;
+      let totalSkipped = 0;
+      try {
+          for (const tgl of dateList) {
+              const existingBookings = sewaList.filter(s => s.tanggal_sewa === tgl);
+              const newBlocks = lokasiTarget.map((lokName, i) => ({
+                  id_sewa: `BLK-${Math.floor(1000 + Math.random() * 9000)}-${i}-${tgl}`,
+                  tanggal_sewa: tgl, lokasi_sewa: lokName, nama_penyewa: 'DITUTUP (MAINTENANCE)', pic_rombongan: '-', no_hp_penyewa: '-', pic_kantor: '-',
+                  keterangan: 'Diblokir dari sistem pengaturan admin', status_pembayaran: 'Ditutup', tanggal_booking: currentDateTime,
+                  bukti_transfer: null, bukti_transfer_listrik: null, ocr_data: null, history_reschedule: [], listrik_tambahan: false, akses_upload_listrik: false, total_biaya: 0
+              }));
+              const filteredBlocks = newBlocks.filter(b => !existingBookings.find(ex => ex.lokasi_sewa === b.lokasi_sewa));
+              totalSkipped += newBlocks.length - filteredBlocks.length;
+              await Promise.all(filteredBlocks.map(async (block) => {
+                  const docRef = await addDoc(collection(db, 'sewaList'), block);
+                  await setDoc(doc(db, 'publicSewaList', docRef.id), {
+                      tanggal_sewa: block.tanggal_sewa,
+                      lokasi_sewa: block.lokasi_sewa
+                  });
+                  totalBlocked++;
+              }));
+          }
+          const rangeLabel = dateList.length > 1
+              ? `${formatTanggalPendek(blockData.tanggal)} s/d ${formatTanggalPendek(blockData.tanggalSampai)}`
+              : formatTanggalPendek(blockData.tanggal);
+          const skippedMsg = totalSkipped > 0 ? ` (${totalSkipped} dilewati karena sudah ada booking)` : '';
+          showToast(`Berhasil menutup ${totalBlocked} slot lokasi pada ${rangeLabel}.${skippedMsg}`);
+          setBlockData({ tanggal: getTodayString(), tanggalSampai: getTodayString(), lokasi: 'Semua Lokasi' });
       } catch (error) {
           showToast('Gagal memblokir lokasi!', 'error');
       }
@@ -2800,14 +2822,36 @@ Terima kasih,
               <form onSubmit={handleBlockLokasi} className="space-y-4 flex-1 flex flex-col justify-between">
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-[10px] uppercase tracking-widest font-black text-slate-500 mb-1.5">Pilih Tanggal Tutup</label>
+                    <label className="block text-[10px] uppercase tracking-widest font-black text-slate-500 mb-1.5">Tanggal Mulai Tutup</label>
                     <input 
                       type="date" 
                       required 
                       value={blockData.tanggal} 
-                      onChange={e => setBlockData({...blockData, tanggal: e.target.value})} 
+                      onChange={e => setBlockData({...blockData, tanggal: e.target.value, tanggalSampai: blockData.tanggalSampai < e.target.value ? e.target.value : blockData.tanggalSampai})} 
                       className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs font-semibold text-emerald-950 focus:ring-4 focus:ring-rose-500/10 focus:border-rose-450 outline-none shadow-sm cursor-pointer custom-date-picker" 
                     />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] uppercase tracking-widest font-black text-slate-500 mb-1.5">Tanggal Akhir Tutup</label>
+                    <input 
+                      type="date" 
+                      required 
+                      value={blockData.tanggalSampai} 
+                      min={blockData.tanggal}
+                      onChange={e => setBlockData({...blockData, tanggalSampai: e.target.value})} 
+                      className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs font-semibold text-emerald-950 focus:ring-4 focus:ring-rose-500/10 focus:border-rose-450 outline-none shadow-sm cursor-pointer custom-date-picker" 
+                    />
+                    {blockData.tanggal !== blockData.tanggalSampai && (
+                      <p className="text-[9px] font-bold text-rose-500 mt-1 flex items-center">
+                        <span className="mr-1">⚠</span>
+                        {(() => {
+                          const start = new Date(blockData.tanggal);
+                          const end = new Date(blockData.tanggalSampai);
+                          const days = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
+                          return `Range ${days} hari akan ditutup`;
+                        })()}
+                      </p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-[10px] uppercase tracking-widest font-black text-slate-500 mb-1.5">Pilih Fasilitas</label>
