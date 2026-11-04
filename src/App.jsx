@@ -4592,6 +4592,7 @@ Terima kasih,
         .visible-scrollbar::-webkit-scrollbar-thumb { background: #10b981; border-radius: 9999px; }
         .visible-scrollbar::-webkit-scrollbar-thumb:hover { background: #059669; }
         .visible-scrollbar { scrollbar-width: thin; scrollbar-color: #10b981 #f1f5f9; }
+        .custom-date-picker { position: relative; }
         .custom-date-picker::-webkit-calendar-picker-indicator { position: absolute; top: 0; left: 0; right: 0; bottom: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; padding: 0; margin: 0; }
       `}} />
     </div>

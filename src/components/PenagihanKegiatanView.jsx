@@ -402,7 +402,8 @@ Terima kasih.`;
                   type="date"
                   value={tanggalKegiatan}
                   onChange={(e) => setTanggalKegiatan(e.target.value)}
-                  className="w-full px-4 py-3 border border-slate-200 bg-white text-emerald-950 text-sm font-extrabold rounded-2xl focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 outline-none shadow-xs cursor-pointer custom-date-picker"
+                  onClick={(e) => e.target.showPicker && e.target.showPicker()}
+                  className="relative w-full px-4 py-3 border border-slate-200 bg-white text-emerald-950 text-sm font-extrabold rounded-2xl focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 outline-none shadow-xs cursor-pointer"
                 />
                 {tanggalKegiatan && (
                   <p className="text-[11px] font-bold text-emerald-700 mt-1">
@@ -692,3 +693,4 @@ Terima kasih.`;
     </div>
   );
 }
+
