@@ -66,6 +66,7 @@ import SyncPembayaran from './SyncPembayaran';
 import SuratDispensasi from './SuratDispensasi';
 import CetakKwitansi from './CetakKwitansi';
 import BackupExcelView from './components/BackupExcelView';
+import PenagihanKegiatanView, { DAFTAR_KEGIATAN_NON_TEMPAT } from './components/PenagihanKegiatanView';
 import CheckoutModal from './components/CheckoutModal';
 import MediaModal from './components/MediaModal';
 import { openKwitansiPrintWindow } from './utils/kwitansiHelper';
@@ -547,6 +548,11 @@ export default function App() {
 
   const getSanitizedDetailLokasi = useCallback((record) => {
     if (!record || !record.lokasi_sewa) return record?.detail_lokasi || null;
+    if (record.kategori_sewa === 'kegiatan') {
+      return Array.isArray(record.detail_lokasi) && record.detail_lokasi.length > 0
+        ? record.detail_lokasi
+        : [{ nama: record.kegiatan || record.lokasi_sewa, luas: null, biaya: Number(record.total_biaya) || 0 }];
+    }
     if (Array.isArray(record.detail_lokasi) && record.detail_lokasi.length > 0) {
       const lokasiSewaParts = String(record.lokasi_sewa).split(',').map(s => s.trim().toUpperCase()).filter(Boolean);
       const detailNames = record.detail_lokasi.map(d => (d?.nama || '').trim().toUpperCase()).filter(Boolean);
@@ -801,6 +807,23 @@ export default function App() {
     };
   }, [fasilitasHarian]);
 
+  const { listKegiatanSudahBayar, listKegiatanBelumBayar } = useMemo(() => {
+    const kegiatanHariIni = sewaList.filter(
+      s => s.tanggal_sewa === selectedDate && s.kategori_sewa === 'kegiatan' && s.status_pembayaran !== 'Batal' && s.status_pembayaran !== 'Ditutup'
+    );
+    const sudah = [];
+    const belum = [];
+    for (const k of kegiatanHariIni) {
+      const status = k.status_pembayaran;
+      if (status === 'Sudah Transfer' || status === 'Sudah Lunas' || status === 'Lunas' || status === 'Menunggu Verifikasi') {
+        sudah.push(k);
+      } else {
+        belum.push(k);
+      }
+    }
+    return { listKegiatanSudahBayar: sudah, listKegiatanBelumBayar: belum };
+  }, [selectedDate, sewaList]);
+
   const availableLokasiForReschedule = useMemo(() => {
     if (!rescheduleData.tanggal || !selectedRecord) return [];
     const sewaHariItu = sewaList.filter(s => s.tanggal_sewa === rescheduleData.tanggal && s.id_sewa !== selectedRecord.id_sewa && s.status_pembayaran !== 'Ditutup');
@@ -957,7 +980,7 @@ export default function App() {
 
   const totalFasilitas = masterLokasi.length;
   const jumlahDisewa = useMemo(() => {
-    return sewaList.filter(sewa => sewa.tanggal_sewa === selectedDate && sewa.status_pembayaran !== 'Ditutup').length;
+    return sewaList.filter(sewa => sewa.tanggal_sewa === selectedDate && sewa.status_pembayaran !== 'Ditutup' && sewa.kategori_sewa !== 'kegiatan').length;
   }, [sewaList, selectedDate]);
   const persentaseSewa = useMemo(() => {
     return totalFasilitas > 0 ? Math.round((jumlahDisewa / totalFasilitas) * 100) : 0;
@@ -1161,17 +1184,30 @@ export default function App() {
 
   const handleKirimWA = () => {
     if (!selectedRecord) return;
-    const biayaLokasi = getBiayaLokasi(selectedRecord.lokasi_sewa, selectedRecord.luas_lahan);
-    const biayaListrik = selectedRecord.listrik_tambahan ? 100000 : 0;
+    const isKegiatan = selectedRecord.kategori_sewa === 'kegiatan';
+    const biayaLokasi = isKegiatan ? (Number(selectedRecord.total_biaya) || 0) : getBiayaLokasi(selectedRecord.lokasi_sewa, selectedRecord.luas_lahan);
+    const biayaListrik = (!isKegiatan && selectedRecord.listrik_tambahan) ? 100000 : 0;
     const totalBayar = selectedRecord.total_biaya !== undefined ? selectedRecord.total_biaya : (biayaLokasi + biayaListrik);
-    const isLapangan = masterLokasi.find(l => l.nama === selectedRecord.lokasi_sewa)?.tipe === 'lapangan';
+    const isLapangan = !isKegiatan && masterLokasi.find(l => l.nama === selectedRecord.lokasi_sewa)?.tipe === 'lapangan';
     const luasText = isLapangan ? `\nLuas Lahan: ${selectedRecord.luas_lahan} m²` : '';
 
-    const rincianBiayaText = selectedRecord.listrik_tambahan 
+    const rincianBiayaText = (!isKegiatan && selectedRecord.listrik_tambahan)
         ? `\nTarif Sewa Lokasi: ${formatRupiah(biayaLokasi)}\nTambahan Listrik: ${formatRupiah(biayaListrik)}\nJumlah yang harus dibayar: *${formatRupiah(totalBayar)}*`
         : `\nJumlah yang harus dibayar: *${formatRupiah(totalBayar)}*`;
 
-    const msg = `Terima kasih telah melakukan pemesanan fasilitas di Taman Margasatwa Ragunan.
+    const msg = isKegiatan
+      ? `Terima kasih telah melakukan pendaftaran kegiatan di Taman Margasatwa Ragunan.
+
+ID Transaksi: *${selectedRecord.id_sewa}*
+Nama Penyewa / Instansi: ${selectedRecord.nama_penyewa} ${selectedRecord.pic_rombongan !== '-' && selectedRecord.pic_rombongan !== selectedRecord.nama_penyewa ? `(${selectedRecord.pic_rombongan})` : ''}
+Jenis Kegiatan: *${selectedRecord.kegiatan || selectedRecord.lokasi_sewa}*
+Tanggal Kegiatan: ${formatTanggalPendek(selectedRecord.tanggal_sewa)}${rincianBiayaText}
+${selectedRecord.batas_pembayaran ? `\nHarap lakukan pembayaran maksimal pada *${formatTanggalIndo(selectedRecord.batas_pembayaran)}*. Lewat dari batas waktu tersebut, link upload akan tertutup otomatis.` : ''}
+Silahkan lihat detail nomor rekening dan kirim bukti pembayaran melalui link berikut ini:
+https://${window.location.host}/upload/${selectedRecord.docId}
+
+Terima kasih.`
+      : `Terima kasih telah melakukan pemesanan fasilitas di Taman Margasatwa Ragunan.
 
 ID Sewa: *${selectedRecord.id_sewa}*
 Nama Penyewa: ${selectedRecord.nama_penyewa} ${selectedRecord.pic_rombongan !== '-' && selectedRecord.pic_rombongan !== selectedRecord.nama_penyewa ? `(${selectedRecord.pic_rombongan})` : ''}
@@ -1201,26 +1237,27 @@ Terima kasih.`;
     const record = recordToRemind || selectedRecord;
     if (!record) return;
 
-    const biayaLokasi = getBiayaLokasi(record.lokasi_sewa, record.luas_lahan);
-    const biayaListrik = record.listrik_tambahan ? 100000 : 0;
+    const isKegiatan = record.kategori_sewa === 'kegiatan';
+    const biayaLokasi = isKegiatan ? (Number(record.total_biaya) || 0) : getBiayaLokasi(record.lokasi_sewa, record.luas_lahan);
+    const biayaListrik = (!isKegiatan && record.listrik_tambahan) ? 100000 : 0;
     const totalBayar = record.total_biaya !== undefined ? record.total_biaya : (biayaLokasi + biayaListrik);
-    const isLapangan = masterLokasi.find(l => l.nama === record.lokasi_sewa)?.tipe === 'lapangan';
+    const isLapangan = !isKegiatan && masterLokasi.find(l => l.nama === record.lokasi_sewa)?.tipe === 'lapangan';
     const luasText = isLapangan ? `\nLuas Lahan: ${record.luas_lahan} m²` : '';
     const batasText = record.batas_pembayaran ? formatTanggalIndo(record.batas_pembayaran) : 'besok';
 
     const msg = `Halo Bapak/Ibu *${record.nama_penyewa}*,
 
-Mengingatkan kembali mengenai reservasi fasilitas di *Taman Margasatwa Ragunan*:
+Mengingatkan kembali mengenai ${isKegiatan ? 'pendaftaran kegiatan' : 'reservasi fasilitas'} di *Taman Margasatwa Ragunan*:
 
-📌 *ID Sewa:* ${record.id_sewa}
-📍 *Lokasi:* ${record.lokasi_sewa}${luasText}
-📅 *Tanggal Kunjungan:* ${formatTanggalPendek(record.tanggal_sewa)}
+📌 *ID Transaksi:* ${record.id_sewa}
+📍 *${isKegiatan ? 'Jenis Kegiatan' : 'Lokasi'}:* ${record.kegiatan || record.lokasi_sewa}${luasText}
+📅 *Tanggal ${isKegiatan ? 'Kegiatan' : 'Kunjungan'}:* ${formatTanggalPendek(record.tanggal_sewa)}
 💰 *Total Biaya:* ${formatRupiah(totalBayar)}
 
 ⏰ *PENTING - BATAS WAKTU TERSISA 1 HARI:*
 Batas akhir pembayaran & unggah bukti transfer adalah besok, *${batasText} pukul 23:59 WIB*.
 
-Mengingat tingginya antrean reservasi lokasi, apabila pembayaran dan bukti transfer belum diunggah melewati batas waktu tersebut, maka *sistem akan otomatis membatalkan pesanan dan mengalihkan lokasi ini ke pengunjung lain*.
+Apabila pembayaran dan bukti transfer belum diunggah melewati batas waktu tersebut, maka *sistem akan otomatis membatalkan pesanan*.
 
 💳 *Lihat No. Rekening & Unggah Bukti Transfer di sini:*
 https://${window.location.host}/upload/${record.docId}
@@ -1295,7 +1332,14 @@ Terima kasih,
     let detailLokasiUpdate = selectedRecord.detail_lokasi || null;
     let biayaLokasi = 0;
 
-    if (selectedRecord.detail_lokasi && Array.isArray(selectedRecord.detail_lokasi)) {
+    if (selectedRecord.kategori_sewa === 'kegiatan') {
+        const manualBiaya = Number(String(editFormData.total_biaya ?? selectedRecord.total_biaya ?? 0).replace(/\D/g, '')) || 0;
+        const namaKeg = editFormData.lokasi_sewa || editFormData.kegiatan || selectedRecord.lokasi_sewa;
+        detailLokasiUpdate = [{ nama: namaKeg, luas: null, biaya: manualBiaya }];
+        biayaLokasi = manualBiaya;
+        editFormData.kegiatan = namaKeg;
+        editFormData.lokasi_sewa = namaKeg;
+    } else if (selectedRecord.detail_lokasi && Array.isArray(selectedRecord.detail_lokasi)) {
         const jumlahLapangan = selectedRecord.detail_lokasi.filter(l => l.luas !== null).length;
         const luas_lahan_total = Math.max(Number(editFormData.luas_lahan || 50), 50);
         const luas_per_lapangan = jumlahLapangan > 0 ? (luas_lahan_total / jumlahLapangan) : null;
@@ -2304,9 +2348,10 @@ Terima kasih,
   const renderDetailModal = () => {
     if (!selectedRecord) return null;
 
+    const isKegiatanRecord = selectedRecord.kategori_sewa === 'kegiatan';
     const locInfo = masterLokasi.find(l => l.nama === selectedRecord.lokasi_sewa);
     const isLapangan = locInfo?.tipe === 'lapangan' || (selectedRecord.lokasi_sewa && selectedRecord.lokasi_sewa.includes('LAP'));
-    const viewBiayaLokasi = getBiayaLokasi(selectedRecord.lokasi_sewa, selectedRecord.luas_lahan);
+    const viewBiayaLokasi = isKegiatanRecord ? Number(selectedRecord.total_biaya || 0) : getBiayaLokasi(selectedRecord.lokasi_sewa, selectedRecord.luas_lahan);
     const viewBiayaListrik = selectedRecord.listrik_tambahan ? 100000 : 0;
     const viewTotalBiaya = selectedRecord.total_biaya !== undefined ? selectedRecord.total_biaya : (viewBiayaLokasi + viewBiayaListrik);
 
@@ -2421,7 +2466,7 @@ Terima kasih,
 
                       <div className="bg-white rounded-3xl p-5 shadow-[0_4px_20px_rgba(4,120,87,0.03)] border border-slate-100 space-y-4">
                         <div className="bg-slate-50 border border-slate-100 rounded-2xl p-3">
-                            <p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider mb-2">Fasilitas & Lokasi Disewa</p>
+                            <p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider mb-2">{isKegiatanRecord ? 'Jenis Kegiatan' : 'Fasilitas & Lokasi Disewa'}</p>
                             <div className="space-y-2">
                                 {selectedRecord.detail_lokasi && selectedRecord.detail_lokasi.length > 0 ? (
                                     selectedRecord.detail_lokasi.map((loc, i) => (
@@ -2432,7 +2477,7 @@ Terima kasih,
                                     ))
                                 ) : (
                                     <div className="flex justify-between items-center text-xs font-bold">
-                                        <span className={`font-bold ${isLapangan ? 'text-emerald-600' : 'text-slate-900'}`}>{selectedRecord.lokasi_sewa} {selectedRecord.luas_lahan ? `(${selectedRecord.luas_lahan} m²)` : ''}</span>
+                                        <span className={`font-bold ${isLapangan ? 'text-emerald-600' : 'text-slate-900'}`}>{selectedRecord.kegiatan || selectedRecord.lokasi_sewa} {selectedRecord.luas_lahan ? `(${selectedRecord.luas_lahan} m²)` : ''}</span>
                                         <span className="text-slate-500">{formatRupiah(viewBiayaLokasi)}</span>
                                     </div>
                                 )}
@@ -2440,7 +2485,7 @@ Terima kasih,
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
-                            <div><p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider mb-1">Tanggal Sewa</p><p className="font-bold text-emerald-950 text-sm">{formatTanggalPendek(selectedRecord.tanggal_sewa)}</p></div>
+                            <div><p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider mb-1">{isKegiatanRecord ? 'Tanggal Kegiatan' : 'Tanggal Sewa'}</p><p className="font-bold text-emerald-950 text-sm">{formatTanggalPendek(selectedRecord.tanggal_sewa)}</p></div>
                             <div><p className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider mb-1">Waktu Pesanan Dibuat</p><p className="font-bold text-emerald-950 text-sm" title={selectedRecord.tanggal_booking || ''}>{formatBookingDateDetail(selectedRecord.tanggal_booking)}</p></div>
                         </div>
                         {selectedRecord.is_gazebo_package && (
@@ -2645,7 +2690,25 @@ Terima kasih,
               {detailMode === 'edit' && (
                   <form onSubmit={handleSaveEdit} className="bg-white rounded-3xl p-6 shadow-[0_4px_20px_rgba(4,120,87,0.03)] border border-amber-200/60 space-y-4">
                       <div className="bg-amber-50/60 p-3 rounded-2xl border border-amber-100 flex items-center text-amber-800 text-xs font-bold mb-2"><Edit size={14} className="mr-2"/> Mode Edit Data</div>
-                      {isLapangan && (
+                      {selectedRecord.kategori_sewa === 'kegiatan' && (
+                          <div className="space-y-3 bg-emerald-50/40 p-3.5 rounded-2xl border border-emerald-100">
+                              <div>
+                                  <label className="block text-[10px] font-extrabold text-emerald-950 uppercase tracking-wider mb-1">Jenis Kegiatan</label>
+                                  <input required type="text" value={editFormData.lokasi_sewa || ''} onChange={e => setEditFormData({...editFormData, lokasi_sewa: e.target.value, kegiatan: e.target.value})} className="w-full px-4 py-2.5 border border-slate-200 rounded-2xl text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 outline-none font-bold text-emerald-950 bg-white" />
+                              </div>
+                              <div className="grid grid-cols-2 gap-3">
+                                  <div>
+                                      <label className="block text-[10px] font-extrabold text-emerald-950 uppercase tracking-wider mb-1">Besaran Biaya (Rp)</label>
+                                      <input required type="number" min="0" value={editFormData.total_biaya ?? 0} onChange={e => setEditFormData({...editFormData, total_biaya: Number(e.target.value) || 0})} className="w-full px-4 py-2.5 border border-slate-200 rounded-2xl text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 outline-none font-bold text-emerald-950 bg-white" />
+                                  </div>
+                                  <div>
+                                      <label className="block text-[10px] font-extrabold text-emerald-950 uppercase tracking-wider mb-1">Tanggal Kegiatan</label>
+                                      <input required type="date" value={editFormData.tanggal_sewa || ''} onChange={e => setEditFormData({...editFormData, tanggal_sewa: e.target.value})} className="w-full px-3 py-2.5 border border-slate-200 rounded-2xl text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 outline-none font-bold text-emerald-950 bg-white" />
+                                  </div>
+                              </div>
+                          </div>
+                      )}
+                      {isLapangan && selectedRecord.kategori_sewa !== 'kegiatan' && (
                           <div>
                              <label className="block text-[10px] font-extrabold text-emerald-950 uppercase tracking-wider mb-1">Luas Lahan Aktual (m²)</label>
                              <input required type="number" min="50" value={editFormData.luas_lahan || 50} onChange={e => setEditFormData({...editFormData, luas_lahan: e.target.value})} className="w-full px-4 py-2.5 border border-slate-200 rounded-2xl text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 outline-none font-semibold text-emerald-950 bg-white" />
@@ -2657,6 +2720,7 @@ Terima kasih,
                          <div><label className="block text-[10px] font-extrabold text-emerald-950 uppercase tracking-wider mb-1">PIC Rombongan</label><input required type="text" value={editFormData.pic_rombongan || ''} onChange={e => setEditFormData({...editFormData, pic_rombongan: e.target.value})} className="w-full px-4 py-2.5 border border-slate-200 rounded-2xl text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 outline-none font-semibold text-emerald-950 bg-white" /></div>
                          <div><label className="block text-[10px] font-extrabold text-emerald-950 uppercase tracking-wider mb-1">No WhatsApp</label><input required type="text" value={editFormData.no_hp_penyewa || ''} onChange={e => setEditFormData({...editFormData, no_hp_penyewa: e.target.value})} className="w-full px-4 py-2.5 border border-slate-200 rounded-2xl text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 outline-none font-semibold text-emerald-950 bg-white" /></div>
                       </div>
+                      {selectedRecord.kategori_sewa !== 'kegiatan' && (
                       <div>
                          <div className="flex items-center justify-between mb-1">
                             <label className="block text-[10px] font-extrabold text-emerald-950 uppercase tracking-wider">PIC Kantor TMR</label>
@@ -2710,6 +2774,7 @@ Terima kasih,
                              </select>
                          )}
                       </div>
+                      )}
                       <div><label className="block text-[10px] font-extrabold text-emerald-950 uppercase tracking-wider mb-1">Keterangan</label><textarea value={editFormData.keterangan || ''} onChange={e => setEditFormData({...editFormData, keterangan: e.target.value})} rows="2" className="w-full px-4 py-2.5 border border-slate-200 rounded-2xl text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 outline-none font-semibold text-emerald-950 bg-white" /></div>
                       <div><label className="block text-[10px] font-extrabold text-emerald-950 uppercase tracking-wider mb-1">Catatan Tambahan Sewa (Tenda, Kursi, dll)</label><textarea value={editFormData.catatan || ''} onChange={e => setEditFormData({...editFormData, catatan: e.target.value})} rows="2" className="w-full px-4 py-2.5 border border-slate-200 rounded-2xl text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 outline-none font-semibold text-emerald-950 bg-white" placeholder="Contoh: Bawa tenda 3x3..." /></div>
                       <div className="flex space-x-2 pt-4 border-t border-slate-100">
@@ -3314,7 +3379,7 @@ Terima kasih,
             { id: 'kwitansi', label: 'Cetak Kwitansi', icon: Printer },
             { id: 'backup', label: 'Backup ke Excel', icon: FileSpreadsheet },
             { id: 'master', label: 'Master Data', icon: Settings },
-            { id: 'portal', label: 'Portal Bukti', icon: Wallet }
+            { id: 'portal', label: 'Tagihan Kegiatan', icon: Wallet }
           ].map(item => (
             <button 
               type="button" 
@@ -3377,7 +3442,7 @@ Terima kasih,
                 { id: 'kwitansi', label: 'Cetak Kwitansi', icon: Printer },
                 { id: 'backup', label: 'Backup ke Excel', icon: FileSpreadsheet },
                 { id: 'master', label: 'Master Data', icon: Settings },
-                { id: 'portal', label: 'Portal Bukti', icon: Wallet }
+                { id: 'portal', label: 'Tagihan Kegiatan', icon: Wallet }
               ].map(item => (
                 <button 
                   type="button" 
@@ -3662,6 +3727,92 @@ Terima kasih,
                             </h3>
                             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 gap-3 sm:gap-3.5 relative z-10 opacity-60">
                               {listDitutup.map(renderCard)}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Kegiatan di Luar Penyewaan Tempat Section (Gambar 4) */}
+                  {(listKegiatanSudahBayar.length > 0 || listKegiatanBelumBayar.length > 0) && (() => {
+                    const renderKegiatanCard = (kegiatanItem) => {
+                      const isLunas = kegiatanItem.status_pembayaran === 'Sudah Transfer' || kegiatanItem.status_pembayaran === 'Sudah Lunas' || kegiatanItem.status_pembayaran === 'Lunas';
+                      const isMenungguVerifikasi = kegiatanItem.status_pembayaran === 'Menunggu Verifikasi';
+                      const namaKeg = kegiatanItem.kegiatan || kegiatanItem.lokasi_sewa || 'KEGIATAN';
+
+                      return (
+                        <div
+                          key={kegiatanItem.docId || kegiatanItem.id}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenDetail(kegiatanItem);
+                          }}
+                          className="group relative rounded-2xl p-3 sm:p-3.5 flex flex-col justify-between min-h-[115px] overflow-hidden cursor-pointer transition-all duration-300 border bg-white active:scale-[0.97] border-rose-100 hover:border-rose-400/50 hover:shadow-[0_12px_24px_-8px_rgba(239,68,68,0.15)] hover:-translate-y-0.5"
+                        >
+                          <div className="absolute top-0 right-0 w-12 h-12 bg-rose-50/50 rounded-bl-full -z-10 pointer-events-none"></div>
+
+                          {isLunas && (
+                            <div className="absolute top-0 right-0 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white text-[7px] font-black px-2 py-0.5 rounded-bl-lg shadow-sm z-20 flex items-center pointer-events-none tracking-wide">
+                              <CheckCircle2 size={8} className="mr-0.5" /> LUNAS
+                            </div>
+                          )}
+
+                          {isMenungguVerifikasi && (
+                            <div className="absolute top-0 right-0 bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-[7px] font-black px-2 py-0.5 rounded-bl-lg shadow-sm z-20 flex items-center animate-pulse pointer-events-none tracking-wide">
+                              <AlertCircle size={8} className="mr-0.5 animate-bounce" /> VERIFIKASI
+                            </div>
+                          )}
+
+                          <div className="flex items-start justify-between mb-2 pointer-events-none">
+                            <div className="p-1.5 sm:p-2 rounded-xl shadow-sm bg-rose-50 text-rose-500">
+                              <Film size={15} strokeWidth={2.5} />
+                            </div>
+                            <div className="flex items-center justify-center w-4 h-4">
+                              <span className="inline-flex rounded-full w-2 h-2 bg-rose-500 animate-ping opacity-75"></span>
+                            </div>
+                          </div>
+
+                          <div className="mt-auto mb-1 pointer-events-none">
+                            <h4 className="text-[11px] leading-tight line-clamp-2 font-black font-serif text-amber-950 uppercase">
+                              {namaKeg}
+                            </h4>
+                          </div>
+
+                          <div className="pointer-events-none w-full">
+                            <div className="bg-rose-50/40 border border-rose-100/50 rounded-xl p-1.5 mt-0.5 w-full overflow-hidden">
+                              <span className="text-[8.5px] font-extrabold text-rose-900 block truncate">
+                                {kegiatanItem.nama_penyewa}
+                              </span>
+                              <span className="text-[8px] font-medium text-rose-600/80 block truncate">
+                                PIC: {kegiatanItem.pic_rombongan}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    };
+
+                    return (
+                      <div className="space-y-6 mt-6 pt-6 border-t border-emerald-100/80">
+                        {listKegiatanSudahBayar.length > 0 && (
+                          <div>
+                            <h3 className="text-sm font-extrabold text-emerald-950 mb-3 flex items-center">
+                              <span className="w-2 h-2 rounded-full bg-emerald-500 mr-2"></span> Kegiatan Lainnya / Non-Tempat (Sudah Bayar / Verifikasi)
+                            </h3>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 gap-3 sm:gap-3.5 relative z-10 opacity-90">
+                              {listKegiatanSudahBayar.map(renderKegiatanCard)}
+                            </div>
+                          </div>
+                        )}
+
+                        {listKegiatanBelumBayar.length > 0 && (
+                          <div>
+                            <h3 className="text-sm font-extrabold text-emerald-950 mb-3 flex items-center">
+                              <span className="w-2 h-2 rounded-full bg-rose-500 mr-2"></span> Kegiatan Lainnya / Non-Tempat (Belum Bayar)
+                            </h3>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 gap-3 sm:gap-3.5 relative z-10 opacity-90">
+                              {listKegiatanBelumBayar.map(renderKegiatanCard)}
                             </div>
                           </div>
                         )}
@@ -4364,195 +4515,18 @@ Terima kasih,
             {activeTab === 'master' && renderMasterData()}
 
             {activeTab === 'portal' && (
-              <div className="max-w-3xl mx-auto pb-32 lg:pb-12 pt-4 animate-slide-in-right">
-                 <div className="bg-gradient-to-br from-emerald-950 to-emerald-900 rounded-3xl p-8 text-center text-white mb-8 shadow-xl relative overflow-hidden border border-emerald-800/30">
-                     <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500 rounded-bl-full -z-0 opacity-15"></div>
-                     <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-emerald-500 rounded-tr-full -z-0 opacity-10 blur-xl"></div>
-                     <div className="inline-flex p-3 rounded-2xl bg-emerald-800/50 text-amber-400 mb-4 border border-emerald-700/30 shadow-inner relative z-10 animate-bounce"><UploadCloud size={32} /></div>
-                     <h2 className="text-2xl md:text-3xl font-black tracking-tight mb-2 relative z-10">Unggah Bukti Transfer</h2>
-                     <p className="text-emerald-200/80 text-xs md:text-sm font-medium relative z-10 max-w-md mx-auto">Verifikasi pembayaran secara instan menggunakan AI OCR. Silakan cari kode reservasi Anda di bawah.</p>
-                 </div>
-                 <div className="bg-white rounded-3xl shadow-md shadow-emerald-950/[0.01] border border-emerald-900/5 p-6 md:p-8">
-                     <form onSubmit={handlePortalSearch} className="flex flex-col sm:flex-row gap-3 mb-8">
-                          <div className="relative flex-1">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-700/50" size={18} />
-                            <input type="text" required value={portalSearchId} onChange={e => setPortalSearchId(e.target.value)} placeholder="Masukkan Kode Reservasi (Contoh: TMR-52967)" className="w-full pl-11 pr-4 py-3.5 rounded-xl border-2 border-emerald-100 focus:border-emerald-500 outline-none text-emerald-950 font-bold bg-slate-50 transition-all focus:ring-2 focus:ring-emerald-500/10 placeholder:text-slate-400/80" />
-                          </div>
-                          <div className="flex gap-2">
-                             <button type="submit" className="bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white px-8 py-3.5 sm:py-0 rounded-xl font-bold transition-all shadow-md shadow-emerald-600/10 hover:shadow-lg flex items-center justify-center gap-2">Cari Data</button>
-                             {currentUser && <span className="px-2 py-1 bg-emerald-100 text-emerald-800 rounded text-xs ml-2 font-bold">{currentUser.email}</span>}
-                          </div>
-                     </form>
-
-                     <div className="flex gap-2 w-full mt-4 justify-between border-t border-slate-200 pt-4">
-                       <button 
-                         onClick={async () => {
-                           if(!window.confirm("Sinkronkan ulang tabel publik? Ini akan menyalin semua tanggal jadwal penyewaan ke publicSewaList.")) return;
-                           try {
-                             let count = 0;
-                             for (const sewa of sewaList) {
-                               if (sewa.tanggal_sewa && sewa.lokasi_sewa && sewa.docId) {
-                                 await setDoc(doc(db, 'publicSewaList', sewa.docId), {
-                                   tanggal_sewa: sewa.tanggal_sewa,
-                                   lokasi_sewa: sewa.lokasi_sewa
-                                 });
-                                 count++;
-                               }
-                             }
-                             alert(`Berhasil mensinkronkan ${count} jadwal ke kalender publik!`);
-                           } catch (e) {
-                             console.error(e);
-                             alert('Gagal sinkronisasi data.');
-                           }
-                         }}
-                         className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-colors font-bold text-sm"
-                       >
-                         Sync Tabel Publik
-                       </button>
-                       <button 
-                         onClick={() => auth.signOut()}
-                         className="px-4 py-2 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-100 transition-colors font-bold flex items-center justify-center gap-2 text-sm flex-1"
-                       >
-                         <LogOut size={16} /> Logout
-                       </button>
-                     </div>
-                     
-                     {portalBooking && (
-                         <div className="border-t border-emerald-900/10 pt-6 animate-slide-in-right">
-                             
-                             <div className="bg-slate-50 rounded-2xl p-5 mb-6 border border-emerald-900/5">
-                                 <h3 className="font-extrabold text-emerald-950 text-sm mb-4 border-b border-emerald-900/10 pb-2.5 flex items-center justify-between">
-                                    <span>Data Reservasi Ditemukan</span>
-                                    <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest bg-amber-50 px-2 py-1 rounded-md border border-amber-200/50">{portalBooking.id_sewa}</span>
-                                 </h3>
-                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                                     <div><span className="block text-[10px] font-extrabold uppercase text-emerald-700/50 tracking-wider">Lokasi Fasilitas</span><span className="font-extrabold text-emerald-950 text-sm mt-0.5 block">{portalBooking.lokasi_sewa}</span></div>
-                                     <div><span className="block text-[10px] font-extrabold uppercase text-emerald-700/50 tracking-wider">Tanggal Reservasi</span><span className="font-extrabold text-emerald-950 text-sm mt-0.5 block">{formatTanggalIndo(portalBooking.tanggal_sewa)}</span></div>
-                                     <div><span className="block text-[10px] font-extrabold uppercase text-emerald-700/50 tracking-wider">Nama Rombongan / Penyewa</span><span className="font-extrabold text-emerald-950 text-sm mt-0.5 block">{portalBooking.nama_penyewa}</span></div>
-                                     <div>
-                                        <span className="block text-[10px] font-extrabold uppercase text-emerald-700/50 tracking-wider">Status Pembayaran</span>
-                                        <span className={`inline-flex mt-1 px-2.5 py-1 rounded-xl text-[10px] font-black shadow-sm ${getStatusBadgeClass(portalBooking.status_pembayaran)}`}>{portalBooking.status_pembayaran}</span>
-                                     </div>
-                                 </div>
-                             </div>
-
-                             {/* UI MENGHILANGKAN FORM JIKA SUDAH UPLOAD ATAU STATUS MENUNGGU */}
-                             {(portalBooking.bukti_transfer || portalBooking.status_pembayaran === 'Menunggu Verifikasi') && (portalBooking.status_pembayaran !== 'Sudah Transfer' && portalBooking.status_pembayaran !== 'Lunas') ? (
-                                 <div className="text-center py-8 bg-blue-500/5 rounded-2xl border border-blue-500/10 mt-4">
-                                     <AlertCircle size={36} className="mx-auto text-blue-600 mb-3 animate-pulse" />
-                                     <p className="font-extrabold text-blue-950 text-sm">Anda sudah upload bukti transfer dan sedang diverifikasi oleh admin.</p>
-                                 </div>
-                             ) : (
-                                 <>
-                                     {/* INPUT TANGGAL UPLOAD / TRANSFER */}
-                                     {((portalBooking.status_pembayaran !== 'Sudah Transfer') || (portalBooking.listrik_tambahan && portalBooking.akses_upload_listrik && !portalBooking.bukti_transfer_listrik)) && (
-                                         <div className="mb-6 bg-white rounded-2xl p-5 border border-emerald-900/5 shadow-sm hover:border-emerald-300 transition-all duration-200">
-                                             <label className="block text-[10px] font-black text-emerald-900 mb-2 uppercase tracking-wider">Pilih Tanggal Transfer Sesuai Struk</label>
-                                             <input 
-                                                 type="date" 
-                                                 max={getTodayString()}
-                                                 value={tanggalUploadPortal} 
-                                                 onChange={(e) => {
-                                                     if(e.target.value > getTodayString()) {
-                                                         showToast("Tanggal upload tidak boleh melebihi hari ini!", 'error');
-                                                         setTanggalUploadPortal(getTodayString());
-                                                     } else {
-                                                         setTanggalUploadPortal(e.target.value);
-                                                     }
-                                                 }} 
-                                                 className="relative w-full px-4 py-3 rounded-xl border border-emerald-900/10 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10 outline-none text-emerald-950 font-bold bg-slate-50 cursor-pointer custom-date-picker" 
-                                             />
-                                             <p className="text-[10px] text-slate-500 font-semibold mt-2.5 flex items-center gap-1">*Pilih tanggal sesuai struk bukti transfer Anda. Pengisian maksimal adalah tanggal hari ini.</p>
-                                         </div>
-                                     )}
-
-                                     {/* SEKSI 1: UPLOAD BUKTI LOKASI UTAMA */}
-                                     <div className="mb-6">
-                                         <h4 className="font-extrabold text-emerald-950 text-xs uppercase tracking-wider mb-3">Bukti Pembayaran Lokasi Utama</h4>
-                                         {(portalBooking.status_pembayaran === 'Sudah Transfer' || portalBooking.status_pembayaran === 'Lunas') ? (
-                                             <div className="text-center py-8 bg-emerald-500/5 rounded-2xl border border-emerald-500/10 animate-slide-in-right">
-                                                 <CheckCircle2 size={36} className="mx-auto text-emerald-600 mb-3" />
-                                                 <p className="font-extrabold text-emerald-950 text-sm mb-1">Pembayaran Lokasi Utama Lunas & Tervalidasi.</p>
-                                                 <p className="text-xs text-slate-500 font-medium">Data mutasi transfer telah dicocokkan oleh sistem.</p>
-                                                 {portalBooking.status_pembayaran === 'Lunas' && (
-                                                     <button type="button" onClick={() => handlePrintKwitansi(portalBooking)} className="mt-4 inline-flex items-center bg-white border border-emerald-900/15 hover:border-emerald-600 hover:bg-emerald-50 text-emerald-800 hover:text-emerald-950 px-5 py-2.5 rounded-xl font-bold text-xs hover:bg-emerald-100 transition-colors shadow-sm active:scale-95">
-                                                         <Printer size={16} className="mr-2 text-emerald-600"/> Cetak Kwitansi Resmi
-                                                     </button>
-                                                 )}
-                                             </div>
-                                         ) : (
-                                             <div className="space-y-4">
-                                         {!uploadFile && !isScanning && (
-                                            <label className="block w-full border-2 border-dashed border-emerald-900/15 rounded-2xl p-8 text-center cursor-pointer hover:bg-emerald-50/50 hover:border-emerald-400 transition-all duration-200 group">
-                                                <input type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
-                                                <UploadCloud size={32} className="mx-auto text-emerald-400 mb-3 group-hover:scale-110 transition-transform duration-200" />
-                                                <p className="font-extrabold text-emerald-900 text-xs">Klik di sini untuk mengunggah foto struk lokasi</p>
-                                                <p className="text-[10px] text-slate-400 font-medium mt-1">Format file JPG, PNG, atau JPEG</p>
-                                            </label>
-                                         )}
-                                         {isScanning && (
-                                            <div className="relative border border-dashed border-blue-200 bg-blue-50/30 rounded-2xl p-8 text-center overflow-hidden h-[180px] flex flex-col items-center justify-center">
-                                                <div className="absolute left-0 right-0 top-0 h-1 bg-gradient-to-r from-blue-400 to-indigo-500 shadow-md shadow-blue-500/50 animate-scan-line"></div>
-                                                <ScanLine size={32} className="text-blue-600 mb-3 animate-pulse" />
-                                                <p className="font-extrabold text-blue-900 text-sm animate-pulse">Memindai struk dengan AI Gemini...</p>
-                                                <p className="text-xs text-slate-400 font-medium mt-1">Membaca nominal, tanggal, dan mencocokkan mutasi bank</p>
-                                            </div>
-                                         )}
-                                         {scanError && <div className="bg-rose-50 text-rose-800 p-4 rounded-xl flex items-center text-xs font-bold border border-rose-200/50"><AlertCircle size={16} className="mr-2 shrink-0 text-rose-600" /> {scanError}</div>}
-                                         {uploadFile && !isScanning && ocrResult && (
-                                             <div className="bg-white border border-emerald-900/10 rounded-2xl p-5 shadow-sm animate-slide-in-right">
-                                                 <div className="flex flex-col md:flex-row gap-6 mb-4">
-                                                     <img src={uploadFile} alt="Preview" className="w-full md:w-32 h-32 rounded-xl border border-slate-200 object-cover bg-slate-50" />
-                                                     <div className="flex-1 grid grid-cols-2 gap-4 text-xs self-center">
-                                                         <div><span className="block text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">Tgl Diakui</span><span className="font-extrabold text-slate-900 text-sm block mt-0.5">{formatTanggalIndo(tanggalUploadPortal)}</span></div>
-                                                         <div><span className="block text-[10px] font-extrabold uppercase text-slate-500 tracking-wider">Nominal Pembayaran</span><span className="font-extrabold text-emerald-800 text-sm block mt-0.5">{formatRupiah(portalBooking.total_biaya)}</span></div>
-                                                     </div>
-                                                 </div>
-                                                 <button disabled={isSubmittingPortal} onClick={handleKirimBukti} className={`w-full bg-emerald-600 text-white font-bold py-3 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 ${isSubmittingPortal ? 'opacity-50 cursor-not-allowed' : 'hover:bg-emerald-700 active:scale-95'}`}>{isSubmittingPortal ? 'Mengirim...' : 'Kirim Bukti Pembayaran Lokasi'}</button>
-                                             </div>
-                                         )}
-                                     </div>
-                                 )}
-                             </div>
-
-                             {/* SEKSI 2: UPLOAD BUKTI LISTRIK */}
-                             {portalBooking.listrik_tambahan && portalBooking.akses_upload_listrik && (portalBooking.status_pembayaran === 'Lunas' || portalBooking.status_pembayaran === 'Sudah Transfer') && (
-                                 <div className="border-t border-amber-200 pt-6 mt-6 bg-amber-500/[0.03] -mx-6 px-6 pb-6 rounded-b-3xl border-b border-amber-100">
-                                     <h4 className="font-black text-amber-900 text-sm mb-1 flex items-center"><Zap size={18} className="mr-2 text-amber-500" /> Tagihan Listrik Tambahan (+Rp 100.000)</h4>
-                                     <p className="text-[11px] text-amber-800 mb-5 font-semibold">Admin telah mengaktifkan pemakaian listrik untuk acara Anda. Silakan unggah bukti transfer tambahan di bawah ini.</p>
-                                     {portalBooking.bukti_transfer_listrik ? (
-                                         <div className="text-center py-6 bg-white rounded-2xl border border-amber-200/50 shadow-sm">
-                                             <CheckCircle2 size={36} className="mx-auto text-amber-500 mb-2" />
-                                             <p className="font-extrabold text-amber-900 text-xs">Bukti Pembayaran Listrik Anda Sudah Diterima Admin.</p>
-                                             {portalBooking.tanggal_transfer_listrik && <p className="text-[10px] text-amber-700 font-bold mt-2">Tgl Transfer: {formatTanggalIndo(portalBooking.tanggal_transfer_listrik)}</p>}
-                                         </div>
-                                     ) : (
-                                         <div className="space-y-4">
-                                             {!uploadListrikFile && (
-                                                 <label className="block w-full border border-dashed border-amber-900/20 rounded-2xl p-6 text-center cursor-pointer hover:bg-amber-100/50 hover:border-amber-400 transition-all duration-200 bg-white">
-                                                     <input type="file" accept="image/*" className="hidden" onChange={handleFileListrikChangePortal} />
-                                                     <UploadCloud size={24} className="mx-auto text-amber-500 mb-2" />
-                                                     <p className="font-extrabold text-amber-800 text-xs">Klik di sini untuk mengunggah struk listrik</p>
-                                                     <p className="text-[10px] text-slate-400 font-medium mt-1">Format file JPG, PNG, atau JPEG</p>
-                                                 </label>
-                                             )}
-                                             {uploadListrikFile && (
-                                                  <div className="bg-white border border-amber-200/50 rounded-2xl p-4 shadow-sm animate-slide-in-right">
-                                                      <img src={uploadListrikFile} alt="Preview Listrik" className="w-full h-40 object-contain rounded-lg border border-amber-100 bg-slate-50 mb-4" />
-                                                      <button disabled={isSubmittingPortal} onClick={handleKirimBuktiListrik} className={`w-full bg-amber-500 text-white font-bold py-3 rounded-xl shadow-md transition-colors flex justify-center items-center ${isSubmittingPortal ? 'opacity-50 cursor-not-allowed' : 'hover:bg-amber-600'}`}><Send size={16} className="mr-2"/> {isSubmittingPortal ? 'Mengirim...' : 'Kirim Bukti Listrik Tambahan'}</button>
-                                                  </div>
-                                             )}
-                                         </div>
-                                     )}
-                                 </div>
-                             )}
-                                 </>
-                             )}
-                          </div>
-                      )}
-                  </div>
-               </div>
-             )}
+              <PenagihanKegiatanView
+                sewaList={sewaList}
+                selectedDate={selectedDate}
+                setSelectedDate={setSelectedDate}
+                handleOpenDetail={handleOpenDetail}
+                showToast={showToast}
+                formatRupiah={formatRupiah}
+                formatTanggalIndo={formatTanggalIndo}
+                formatTanggalPendek={formatTanggalPendek}
+                getTodayString={getTodayString}
+              />
+            )}
         </div>
 
         {!isPortalRoute && (
@@ -4564,7 +4538,7 @@ Terima kasih,
               { id: 'dispensasi', label: 'Surat', icon: FileText },
               { id: 'kwitansi', label: 'Kwitansi', icon: Printer },
               { id: 'master', label: 'Master', icon: Settings },
-              { id: 'portal', label: 'Upload', icon: UploadCloud }
+              { id: 'portal', label: 'Kegiatan', icon: Wallet }
             ].map(item => (
               <button key={item.id} onClick={() => setActiveTab(item.id)} className={`flex flex-col items-center justify-center flex-1 pt-2.5 pb-1.5 relative min-h-[56px] sm:min-h-[64px] active:opacity-75 transition-opacity`}>
                 {activeTab === item.id && <div className="absolute top-0 left-1/2 -translate-x-1/2 w-10 h-[3px] bg-gradient-to-r from-emerald-500 to-teal-500 rounded-b-full"></div>}

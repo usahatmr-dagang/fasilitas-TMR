@@ -395,12 +395,12 @@ export default function PublicUpload() {
                     <p className="font-bold text-slate-800">{bookingData.nama_penyewa}</p>
                   </div>
                   <div>
-                    <p className="text-slate-500 text-xs mb-0.5">Tanggal Sewa</p>
+                    <p className="text-slate-500 text-xs mb-0.5">{bookingData.kategori_sewa === 'kegiatan' ? 'Tanggal Kegiatan' : 'Tanggal Sewa'}</p>
                     <p className="font-bold text-slate-800">{formatTanggalIndo(bookingData.tanggal_sewa)}</p>
                   </div>
                   <div>
-                    <p className="text-slate-500 text-xs mb-0.5">Lokasi Sewa</p>
-                    <p className="font-bold text-slate-800">{bookingData.lokasi_sewa} {bookingData.luas_lahan && !String(bookingData.lokasi_sewa).includes('m²') && !String(bookingData.lokasi_sewa).includes('m2') ? `(${bookingData.luas_lahan} m²)` : ''}</p>
+                    <p className="text-slate-500 text-xs mb-0.5">{bookingData.kategori_sewa === 'kegiatan' ? 'Jenis Kegiatan' : 'Lokasi Sewa'}</p>
+                    <p className="font-bold text-slate-800">{bookingData.kegiatan || bookingData.lokasi_sewa} {bookingData.luas_lahan && !String(bookingData.lokasi_sewa).includes('m²') && !String(bookingData.lokasi_sewa).includes('m2') ? `(${bookingData.luas_lahan} m²)` : ''}</p>
                   </div>
                 </div>
 
