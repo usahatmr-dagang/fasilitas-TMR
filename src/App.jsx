@@ -878,21 +878,69 @@ export default function App() {
   }, [availableDatesList, sidebarDateSearch]);
 
   const { groupedPembayaran, pembayaranMap } = useMemo(() => {
-    let dataBayar = sewaList.filter(sewa => {
-      return ['Sudah Transfer', 'Lunas', 'Sudah Lunas', 'Menunggu Verifikasi'].includes(sewa.status_pembayaran);
+    const validStatuses = ['Sudah Transfer', 'Lunas', 'Sudah Lunas', 'Menunggu Verifikasi'];
+    const groups = {};
+
+    const addToGroup = (dateStr, itemObj) => {
+      if (!dateStr) return;
+      if (filterDatePembayaran !== '' && dateStr !== filterDatePembayaran) return;
+      if (!groups[dateStr]) groups[dateStr] = [];
+      groups[dateStr].push(itemObj);
+    };
+
+    sewaList.forEach(sewa => {
+      const isPaidOrPending = validStatuses.includes(sewa.status_pembayaran);
+      const hasBuktiListrik = Boolean(sewa.bukti_transfer_listrik || sewa.buktiTransferListrikDocUrl);
+
+      if (!isPaidOrPending && !hasBuktiListrik) return;
+
+      const rawTotal = Number(sewa.total_biaya) || 0;
+      let baseBiayaLokasi = 0;
+      if (Array.isArray(sewa.detail_lokasi) && sewa.detail_lokasi.length > 0) {
+        baseBiayaLokasi = sewa.detail_lokasi.reduce((acc, loc) => acc + (Number(loc.biaya) || 0), 0);
+      } else {
+        baseBiayaLokasi = getBiayaLokasi(sewa.lokasi_sewa, sewa.luas_lahan);
+      }
+
+      // Jika ada bukti transfer listrik terpisah, pisahkan nominal sewa lokasi dari biaya listrik (+Rp 100.000)
+      const biayaLokasi = (sewa.listrik_tambahan && hasBuktiListrik)
+        ? (rawTotal >= baseBiayaLokasi + 100000 ? rawTotal - 100000 : (baseBiayaLokasi || Math.max(0, rawTotal - 100000)))
+        : rawTotal;
+
+      // 1. Mutasi Sewa Lokasi Utama
+      if (isPaidOrPending) {
+        const dateLokasi = normalizeDateString(sewa.tanggal_transfer);
+        if (dateLokasi) {
+          addToGroup(dateLokasi, {
+            ...sewa,
+            _isListrikRow: false,
+            _hasSeparateListrik: hasBuktiListrik,
+            _nominalMutasi: biayaLokasi,
+            _originalRecord: sewa
+          });
+        }
+      }
+
+      // 2. Mutasi Pembayaran Listrik Tambahan (jika ada bukti transfer listrik terpisah / dadakan)
+      if (hasBuktiListrik) {
+        const dateListrik = normalizeDateString(sewa.tanggal_transfer_listrik || sewa.tanggal_transfer || sewa.tanggal_sewa);
+        if (dateListrik) {
+          addToGroup(dateListrik, {
+            ...sewa,
+            _isListrikRow: true,
+            _hasSeparateListrik: true,
+            _nominalMutasi: 100000,
+            _originalRecord: sewa
+          });
+        }
+      }
     });
-    if (filterDatePembayaran !== '') dataBayar = dataBayar.filter(sewa => normalizeDateString(sewa.tanggal_transfer) === filterDatePembayaran);
-    
-    const groups = dataBayar.reduce((acc, curr) => {
-      const date = normalizeDateString(curr.tanggal_transfer); 
-      if (!date) return acc; // Lewati jika tidak ada tanggal transfer
-      if (!acc[date]) acc[date] = [];
-      acc[date].push(curr);
-      return acc;
-    }, {});
-    const list = Object.keys(groups).sort((a, b) => new Date(b) - new Date(a)).map(date => ({ date, data: groups[date] }));
+
+    const list = Object.keys(groups)
+      .sort((a, b) => new Date(b) - new Date(a))
+      .map(date => ({ date, data: groups[date] }));
     return { groupedPembayaran: list, pembayaranMap: groups };
-  }, [sewaList, filterDatePembayaran]);
+  }, [sewaList, filterDatePembayaran, getBiayaLokasi]);
 
   const calendarYear = calendarMonth.getFullYear();
   const calendarMonthIndex = calendarMonth.getMonth();
@@ -1014,14 +1062,15 @@ export default function App() {
 
   const handleOpenDetail = (record) => {
       if (!record) return;
-      const cleanDetail = getSanitizedDetailLokasi(record);
-      const isMismatch = Array.isArray(record.detail_lokasi) && record.detail_lokasi.length > 0 && cleanDetail !== record.detail_lokasi;
+      const baseRecord = record._originalRecord || record;
+      const cleanDetail = getSanitizedDetailLokasi(baseRecord);
+      const isMismatch = Array.isArray(baseRecord.detail_lokasi) && baseRecord.detail_lokasi.length > 0 && cleanDetail !== baseRecord.detail_lokasi;
 
-      if (isMismatch && record.docId) {
-        updateDoc(doc(db, 'sewaList', record.docId), { detail_lokasi: cleanDetail }).catch(() => {});
+      if (isMismatch && baseRecord.docId) {
+        updateDoc(doc(db, 'sewaList', baseRecord.docId), { detail_lokasi: cleanDetail }).catch(() => {});
       }
 
-      const activeRecord = cleanDetail ? { ...record, detail_lokasi: cleanDetail } : record;
+      const activeRecord = cleanDetail ? { ...baseRecord, detail_lokasi: cleanDetail } : baseRecord;
       setSelectedRecord(activeRecord);
       setDetailMode('view');
       setIsCustomPicEdit(false);
@@ -4140,7 +4189,7 @@ Terima kasih,
                         <div className="flex flex-col items-center justify-center py-20 text-emerald-950/30 bg-white rounded-3xl border border-emerald-900/5 shadow-sm"><CreditCard size={48} className="mb-4 text-emerald-950/20" /><p className="font-extrabold text-sm text-emerald-950/50">Belum ada data transfer yang masuk.</p></div>
                     ) : (
                         groupedPembayaran.slice(0, pembayaranDisplayLimit).map(group => {
-                            const totalNominalGroup = group.data.reduce((sum, item) => sum + (item.total_biaya || 0), 0);
+                            const totalNominalGroup = group.data.reduce((sum, item) => sum + (item._nominalMutasi !== undefined ? item._nominalMutasi : (item.total_biaya || 0)), 0);
 
                             return (
                             <div key={group.date} className="mb-10 relative pl-4 sm:pl-0">
@@ -4177,9 +4226,12 @@ Terima kasih,
                                             {group.data.map((item, idx) => {
                                               const locInfo = masterLokasiMap.get(item.lokasi_sewa) || masterLokasi.find(l => l.nama === item.lokasi_sewa);
                                               const isLapangan = locInfo?.tipe === 'lapangan' || (item.lokasi_sewa && item.lokasi_sewa.includes('LAP'));
+                                              const displayNominal = item._nominalMutasi !== undefined ? item._nominalMutasi : item.total_biaya;
                                               return (
                                               <tr key={idx} className="hover:bg-slate-50/50 transition-all duration-200 group/row">
-                                                <td className="px-6 py-4.5 font-black text-emerald-950 group-hover/row:text-emerald-700 transition-colors">{item.id_sewa}</td>
+                                                <td className="px-6 py-4.5 font-black text-emerald-950 group-hover/row:text-emerald-700 transition-colors">
+                                                  {item.id_sewa}
+                                                </td>
                                                 <td className="px-6 py-4.5">
                                                     <p className="font-extrabold text-emerald-950 text-sm">{item.nama_penyewa}</p>
                                                     <p className={`text-[10px] font-bold tracking-wide mt-0.5 flex items-center gap-1 ${isLapangan ? 'text-emerald-700' : 'text-amber-700'}`}>
@@ -4188,11 +4240,17 @@ Terima kasih,
                                                     </p>
                                                 </td>
                                                 <td className="px-6 py-4.5">
-                                                    <p className="font-black text-emerald-800 text-sm">{formatRupiah(item.total_biaya)}</p>
-                                                    {item.listrik_tambahan && (
-                                                      <span className="inline-flex items-center px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200/50 font-extrabold text-[9px] mt-1 shadow-sm">
-                                                          <Zap size={8} className="mr-0.5 text-amber-500 fill-amber-500" /> +Listrik
+                                                    <p className="font-black text-emerald-800 text-sm">{formatRupiah(displayNominal)}</p>
+                                                    {item._isListrikRow ? (
+                                                      <span className="inline-flex items-center px-2 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-300 font-extrabold text-[9px] mt-1 shadow-sm">
+                                                          <Zap size={8} className="mr-0.5 text-amber-600 fill-amber-500" /> Pembayaran Listrik
                                                       </span>
+                                                    ) : (
+                                                      item.listrik_tambahan && !item._hasSeparateListrik && (
+                                                        <span className="inline-flex items-center px-2 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200/50 font-extrabold text-[9px] mt-1 shadow-sm">
+                                                            <Zap size={8} className="mr-0.5 text-amber-500 fill-amber-500" /> +Listrik
+                                                        </span>
+                                                      )
                                                     )}
                                                 </td>
                                                 <td className="px-6 py-4.5">
@@ -4263,7 +4321,7 @@ Terima kasih,
                                     {blanks.map((_, i) => <div key={`b-${i}`} className="bg-slate-50/50 min-h-[140px] p-2"></div>)}
                                     {calendarDays.map(d => {
                                         const dayData = getTransferDataForDate(d);
-                                        const total = dayData.reduce((sum, item) => sum + (item.total_biaya || 0), 0);
+                                        const total = dayData.reduce((sum, item) => sum + (item._nominalMutasi !== undefined ? item._nominalMutasi : (item.total_biaya || 0)), 0);
                                         const isToday = getTodayString() === `${calendarYear}-${String(calendarMonthIndex + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
                                         
                                         return (
@@ -4281,8 +4339,8 @@ Terima kasih,
                                                         <div className="space-y-1 overflow-y-auto max-h-[85px] hide-scrollbar pr-0.5">
                                                             {dayData.map((item, idx) => (
                                                                 <div key={idx} className="text-[9px] bg-slate-50 border border-emerald-900/5 hover:border-emerald-500/30 p-1.5 rounded-lg cursor-pointer hover:bg-emerald-50/40 transition-colors" onClick={() => handleOpenDetail(item)}>
-                                                                    <div className="font-bold text-emerald-950 line-clamp-1">{item.nama_penyewa}</div>
-                                                                    <div className="text-amber-600 font-extrabold mt-0.5">{formatRupiah(item.total_biaya)}</div>
+                                                                    <div className="font-bold text-emerald-950 line-clamp-1">{item.nama_penyewa} {item._isListrikRow ? '(⚡ Listrik)' : ''}</div>
+                                                                    <div className="text-amber-600 font-extrabold mt-0.5">{formatRupiah(item._nominalMutasi !== undefined ? item._nominalMutasi : item.total_biaya)}</div>
                                                                 </div>
                                                             ))}
                                                         </div>
