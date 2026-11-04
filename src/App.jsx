@@ -2834,6 +2834,7 @@ Terima kasih,
                           tanggal: newMulai,
                           tanggalSampai: prev.tanggalSampai && prev.tanggalSampai < newMulai ? newMulai : prev.tanggalSampai
                         }));
+                        e.target.blur();
                       }}
                       className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs font-semibold text-emerald-950 focus:ring-4 focus:ring-rose-500/10 focus:border-rose-450 outline-none shadow-sm cursor-pointer custom-date-picker" 
                     />
@@ -2845,7 +2846,7 @@ Terima kasih,
                       required 
                       value={blockData.tanggalSampai} 
                       min={blockData.tanggal || undefined}
-                      onChange={e => setBlockData({...blockData, tanggalSampai: e.target.value})} 
+                      onChange={e => { setBlockData({...blockData, tanggalSampai: e.target.value}); e.target.blur(); }} 
                       className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs font-semibold text-emerald-950 focus:ring-4 focus:ring-rose-500/10 focus:border-rose-450 outline-none shadow-sm cursor-pointer custom-date-picker" 
                     />
                     {blockData.tanggal && blockData.tanggalSampai && blockData.tanggal !== blockData.tanggalSampai && (
