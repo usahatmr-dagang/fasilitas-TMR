@@ -574,7 +574,7 @@ export default function App() {
   const [toast, setToast] = useState(null); 
 
   const [newPic, setNewPic] = useState('');
-  const [blockData, setBlockData] = useState({ tanggal: getTodayString(), tanggalSampai: getTodayString(), lokasi: 'Semua Lokasi' });
+  const [blockData, setBlockData] = useState({ tanggal: '', tanggalSampai: '', lokasi: 'Semua Lokasi' });
 
   const [selectedDate, setSelectedDate] = useState(getTodayString());
   const [filterTipe, setFilterTipe] = useState('semua');
@@ -1966,7 +1966,7 @@ Terima kasih,
               : formatTanggalPendek(blockData.tanggal);
           const skippedMsg = totalSkipped > 0 ? ` (${totalSkipped} dilewati karena sudah ada booking)` : '';
           showToast(`Berhasil menutup ${totalBlocked} slot lokasi pada ${rangeLabel}.${skippedMsg}`);
-          setBlockData({ tanggal: getTodayString(), tanggalSampai: getTodayString(), lokasi: 'Semua Lokasi' });
+          setBlockData({ tanggal: '', tanggalSampai: '', lokasi: 'Semua Lokasi' });
       } catch (error) {
           showToast('Gagal memblokir lokasi!', 'error');
       }
@@ -2827,7 +2827,14 @@ Terima kasih,
                       type="date" 
                       required 
                       value={blockData.tanggal} 
-                      onChange={e => setBlockData({...blockData, tanggal: e.target.value, tanggalSampai: blockData.tanggalSampai < e.target.value ? e.target.value : blockData.tanggalSampai})} 
+                      onChange={e => {
+                        const newMulai = e.target.value;
+                        setBlockData(prev => ({
+                          ...prev,
+                          tanggal: newMulai,
+                          tanggalSampai: prev.tanggalSampai && prev.tanggalSampai < newMulai ? newMulai : prev.tanggalSampai
+                        }));
+                      }}
                       className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs font-semibold text-emerald-950 focus:ring-4 focus:ring-rose-500/10 focus:border-rose-450 outline-none shadow-sm cursor-pointer custom-date-picker" 
                     />
                   </div>
@@ -2837,11 +2844,11 @@ Terima kasih,
                       type="date" 
                       required 
                       value={blockData.tanggalSampai} 
-                      min={blockData.tanggal}
+                      min={blockData.tanggal || undefined}
                       onChange={e => setBlockData({...blockData, tanggalSampai: e.target.value})} 
                       className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs font-semibold text-emerald-950 focus:ring-4 focus:ring-rose-500/10 focus:border-rose-450 outline-none shadow-sm cursor-pointer custom-date-picker" 
                     />
-                    {blockData.tanggal !== blockData.tanggalSampai && (
+                    {blockData.tanggal && blockData.tanggalSampai && blockData.tanggal !== blockData.tanggalSampai && (
                       <p className="text-[9px] font-bold text-rose-500 mt-1 flex items-center">
                         <span className="mr-1">⚠</span>
                         {(() => {
