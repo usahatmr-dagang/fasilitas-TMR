@@ -11,12 +11,10 @@ import {
   Search,
   Clock,
   Sparkles,
-  LogOut,
-  RefreshCw,
   Eye
 } from 'lucide-react';
-import { db, auth } from '../firebase';
-import { collection, addDoc, setDoc, doc } from 'firebase/firestore';
+import { db } from '../firebase';
+import { collection, addDoc } from 'firebase/firestore';
 
 export const DAFTAR_KEGIATAN_NON_TEMPAT = [
   'Film Cerita',
@@ -650,42 +648,6 @@ Terima kasih.`;
                   );
                 })
               )}
-            </div>
-
-            {/* Footer Utilitas Admin */}
-            <div className="flex gap-2 w-full mt-6 justify-between border-t border-slate-100 pt-4">
-              <button
-                type="button"
-                onClick={async () => {
-                  if (!window.confirm('Sinkronkan ulang tabel publik? Ini akan menyalin semua tanggal jadwal penyewaan tempat ke publicSewaList.')) return;
-                  try {
-                    let count = 0;
-                    for (const sewa of sewaList) {
-                      if (sewa.tanggal_sewa && sewa.lokasi_sewa && sewa.docId && sewa.kategori_sewa !== 'kegiatan') {
-                        await setDoc(doc(db, 'publicSewaList', sewa.docId), {
-                          tanggal_sewa: sewa.tanggal_sewa,
-                          lokasi_sewa: sewa.lokasi_sewa
-                        });
-                        count++;
-                      }
-                    }
-                    alert(`Berhasil mensinkronkan ${count} jadwal ke kalender publik!`);
-                  } catch (e) {
-                    console.error(e);
-                    alert('Gagal sinkronisasi data.');
-                  }
-                }}
-                className="px-4 py-2 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-colors font-bold text-xs flex items-center gap-1.5 cursor-pointer"
-              >
-                <RefreshCw size={13} /> Sync Kalender Publik
-              </button>
-              <button
-                type="button"
-                onClick={() => auth.signOut()}
-                className="px-4 py-2 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-100 transition-colors font-bold flex items-center justify-center gap-1.5 text-xs cursor-pointer"
-              >
-                <LogOut size={14} /> Logout
-              </button>
             </div>
           </div>
         </div>
