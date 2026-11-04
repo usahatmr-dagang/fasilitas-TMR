@@ -1714,6 +1714,7 @@ Terima kasih,
       const tglSewaStr = formatTanggalPendek(selectedRecord.tanggal_sewa);
       const tglTransferStr = formatTanggalPendek(selectedRecord.tanggal_transfer) || '-';
       const displayLokasi = formatLokasiWithLuas(selectedRecord);
+      const isKegiatanDoc = selectedRecord.kategori_sewa === 'kegiatan';
 
       const biayaListrik = selectedRecord.listrik_tambahan ? 100000 : 0;
       let totalBayar = selectedRecord.total_biaya !== undefined ? selectedRecord.total_biaya : (getBiayaLokasi(selectedRecord.lokasi_sewa, selectedRecord.luas_lahan) + biayaListrik);
@@ -1733,13 +1734,19 @@ Terima kasih,
         <body>
           <div style="text-align: center; font-family: Arial, sans-serif;">
             <h2 style="color: #064e3b; margin-bottom: 5px;">TAMAN MARGASATWA RAGUNAN</h2>
-            <h3 style="color: #059669; letter-spacing: 2px; margin-top: 0;">BUKTI PEMBAYARAN RESERVASI LOKASI</h3>
+            <h3 style="color: #059669; letter-spacing: 2px; margin-top: 0;">${isKegiatanDoc ? 'BUKTI PEMBAYARAN KEGIATAN' : 'BUKTI PEMBAYARAN RESERVASI LOKASI'}</h3>
             <hr style="border: 1px solid #059669;" />
             <div style="text-align: left; margin: 20px 0; font-size: 14pt;">
               <p><b>ID Transaksi:</b> ${selectedRecord.id_sewa}</p>
+              ${isKegiatanDoc ? `
+              <p><b>Nama Penanggung Jawab :</b> ${selectedRecord.nama_penyewa}</p>
+              <p><b>Nama kegiatan:</b> ${selectedRecord.kegiatan || selectedRecord.lokasi_sewa || '-'}</p>
+              <p><b>Tanggal Kegiatan :</b> ${tglSewaStr}</p>
+              ` : `
               <p><b>Nama Penyewa:</b> ${selectedRecord.nama_penyewa}</p>
               <p><b>Lokasi Sewa:</b> ${displayLokasi}</p>
               <p><b>Tanggal Sewa:</b> ${tglSewaStr}</p>
+              `}
               <p><b>Tanggal Transfer:</b> ${tglTransferStr}</p>
               <p><b>Nominal Transfer:</b> ${nominalText}</p>
             </div>
@@ -1752,7 +1759,7 @@ Terima kasih,
       `;
 
       const htmlBlob = new Blob([htmlContent], { type: 'text/html' });
-      const finalFileName = `Bukti_Transfer_Reservasi_${selectedRecord.id_sewa}`;
+      const finalFileName = isKegiatanDoc ? `Bukti_Transfer_Kegiatan_${selectedRecord.id_sewa}` : `Bukti_Transfer_Reservasi_${selectedRecord.id_sewa}`;
       
       const docUrl = await uploadToGoogleDrive(htmlBlob, finalFileName, selectedRecord.docId, 'buktiTransferDocUrl');
       
