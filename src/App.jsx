@@ -1926,7 +1926,13 @@ Terima kasih,
   const handleBlockLokasi = async (e) => {
       e.preventDefault();
       const currentDateTime = new Date().toLocaleString('id-ID', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
-      const lokasiTarget = blockData.lokasi === 'Semua Lokasi' ? masterLokasi.map(l => l.nama) : [blockData.lokasi];
+      const lokasiTarget = blockData.lokasi === 'Semua Lokasi'
+          ? masterLokasi.map(l => l.nama)
+          : blockData.lokasi === 'Semua Pendopo'
+          ? masterLokasi.filter(l => l.tipe === 'pendopo').map(l => l.nama)
+          : blockData.lokasi === 'Semua Lapangan'
+          ? masterLokasi.filter(l => l.tipe === 'lapangan').map(l => l.nama)
+          : [blockData.lokasi];
 
       // Buat array semua tanggal dalam range
       const startDate = new Date(blockData.tanggal);
@@ -2904,7 +2910,11 @@ Terima kasih,
                       className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs font-semibold text-emerald-950 focus:ring-4 focus:ring-rose-500/10 focus:border-rose-450 outline-none shadow-sm cursor-pointer appearance-none bg-[url('data:image/svg+xml;charset=UTF-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22%2310b981%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpolyline%20points%3D%226%209%2012%2015%2018%209%22%3E%3C%2Fpolyline%3E%3C%2Fsvg%3E')] bg-[right_1rem_center] bg-[length:1.25em_1.25em] bg-no-repeat pr-10"
                     >
                       <option value="Semua Lokasi" className="font-extrabold text-rose-600">⚠ TUTUP SEMUA LOKASI ⚠</option>
-                      {masterLokasi.map(l => <option key={l.id} value={l.nama}>{l.nama}</option>)}
+                      <option value="Semua Pendopo" className="font-bold text-amber-700">🏛 Semua Pendopo / Ruangan</option>
+                      <option value="Semua Lapangan" className="font-bold text-emerald-700">🌳 Semua Lapangan Terbuka</option>
+                      <optgroup label="── Pilih Satu Fasilitas ──">
+                        {masterLokasi.map(l => <option key={l.id} value={l.nama}>{l.tipe === 'lapangan' ? '🌳' : '🏛'} {l.nama}</option>)}
+                      </optgroup>
                     </select>
                   </div>
                 </div>
