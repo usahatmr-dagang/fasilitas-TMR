@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { UploadCloud, CheckCircle2, ChevronRight, Store, ArrowLeft, Loader2, Calendar, FileText, Banknote, MapPin, AlertCircle } from 'lucide-react';
+import { UploadCloud, CheckCircle2, ChevronRight, Store, ArrowLeft, Loader2, Calendar, FileText, Banknote, MapPin, AlertCircle, ShieldCheck, RefreshCw } from 'lucide-react';
 import { db } from './firebase';
 import { collection, addDoc, doc, getDoc } from 'firebase/firestore';
 
 const monthNames = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+
+const getRandomEasyNum = () => Math.floor(Math.random() * 9) + 1;
 
 export default function PublicPromoForm() {
   const [formData, setFormData] = useState({
@@ -26,6 +28,20 @@ export default function PublicPromoForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [error, setError] = useState('');
+
+  // State Keamanan Captcha Mudah & Honeypot Anti-Bot
+  const [captchaNum1, setCaptchaNum1] = useState(() => getRandomEasyNum());
+  const [captchaNum2, setCaptchaNum2] = useState(() => getRandomEasyNum());
+  const [captchaInput, setCaptchaInput] = useState('');
+  const [honeypot, setHoneypot] = useState('');
+
+  const refreshCaptcha = () => {
+    setCaptchaNum1(getRandomEasyNum());
+    setCaptchaNum2(getRandomEasyNum());
+    setCaptchaInput('');
+  };
+
+  const isCaptchaValid = parseInt(captchaInput, 10) === (captchaNum1 + captchaNum2);
 
   useEffect(() => {
     const fetchTarif = async () => {
@@ -182,8 +198,16 @@ export default function PublicPromoForm() {
   const handleFileChange = async (e) => {
     const selectedFile = e.target.files[0];
     if (selectedFile) {
-      if (!selectedFile.type.startsWith('image/')) {
-        setError('Hanya file gambar (JPG/PNG) yang diperbolehkan.');
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+      if (!selectedFile.type.startsWith('image/') || !allowedTypes.includes(selectedFile.type.toLowerCase())) {
+        setError('Keamanan: Hanya file gambar murni (JPG, JPEG, PNG, WEBP) yang diperbolehkan.');
+        e.target.value = '';
+        return;
+      }
+
+      if (selectedFile.size > 15 * 1024 * 1024) {
+        setError('Ukuran file asli terlalu besar (Maksimal 15MB).');
+        e.target.value = '';
         return;
       }
       
@@ -200,7 +224,7 @@ export default function PublicPromoForm() {
         setError('');
       } catch (err) {
         console.error(err);
-        setError('Gagal memproses gambar.');
+        setError('Gagal memproses gambar. Pastikan file gambar valid dan tidak rusak.');
       }
     }
   };
@@ -226,6 +250,20 @@ export default function PublicPromoForm() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Proteksi Honeypot (Jebakan Bot Otomatis)
+    if (honeypot) {
+      setError('Aktivitas mencurigakan terdeteksi.');
+      return;
+    }
+
+    // Validasi Captcha Manusia
+    if (!isCaptchaValid) {
+      setError('Jawaban verifikasi keamanan (Captcha) belum benar. Silakan hitung penjumlahan sederhana di bawah.');
+      refreshCaptcha();
+      return;
+    }
+
     if (!file) {
       setError('Bukti transfer wajib diupload!');
       return;
@@ -494,14 +532,84 @@ export default function PublicPromoForm() {
               </div>
             </div>
 
-            <div className="pt-6 border-t border-slate-100">
+            {/* Honeypot tersembunyi untuk menjebak bot otomatis */}
+            <div className="hidden" aria-hidden="true">
+              <input
+                type="text"
+                name="website_url_trap"
+                tabIndex={-1}
+                autoComplete="off"
+                value={honeypot}
+                onChange={(e) => setHoneypot(e.target.value)}
+              />
+            </div>
+
+            {/* Bagian 4: Verifikasi Keamanan Captcha Mudah */}
+            <div className={`p-5 rounded-2xl border-2 transition-all ${isCaptchaValid ? 'bg-emerald-50/70 border-emerald-400' : 'bg-slate-50 border-slate-200'}`}>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${isCaptchaValid ? 'bg-emerald-600 text-white' : 'bg-amber-100 text-amber-700'}`}>
+                    <ShieldCheck size={22} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h4 className="text-sm font-black text-slate-800">Verifikasi Keamanan (Anti-Bot) <span className="text-rose-500">*</span></h4>
+                      {isCaptchaValid && (
+                        <span className="inline-flex items-center gap-1 bg-emerald-600 text-white text-[10px] font-black uppercase px-2 py-0.5 rounded-full">
+                          ✓ Terverifikasi Manusia
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-500 font-medium mt-0.5">
+                      Jawab hitungan mudah ini untuk memastikan Anda bukan robot/virus.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 sm:shrink-0">
+                  <div className="bg-white border-2 border-emerald-200 rounded-xl px-4 py-2.5 font-black text-emerald-950 text-base tracking-wider select-none shadow-sm flex items-center gap-2">
+                    <span>{captchaNum1}</span>
+                    <span className="text-emerald-600">+</span>
+                    <span>{captchaNum2}</span>
+                    <span className="text-slate-400">=</span>
+                  </div>
+                  <input
+                    required
+                    type="number"
+                    inputMode="numeric"
+                    placeholder="?"
+                    value={captchaInput}
+                    onChange={(e) => setCaptchaInput(e.target.value)}
+                    className={`w-20 text-center font-black text-base rounded-xl px-3 py-2.5 border-2 focus:outline-none transition-all ${
+                      isCaptchaValid
+                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                        : captchaInput !== ''
+                        ? 'bg-rose-50 text-rose-700 border-rose-300'
+                        : 'bg-white text-slate-800 border-slate-300 focus:border-emerald-500'
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={refreshCaptcha}
+                    title="Ganti angka"
+                    className="p-2.5 rounded-xl bg-white border border-slate-200 text-slate-500 hover:text-emerald-600 hover:border-emerald-300 transition-all active:scale-95"
+                  >
+                    <RefreshCw size={18} />
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-slate-100">
               <button 
                 type="submit" 
-                disabled={isSubmitting}
-                className={`w-full py-4 rounded-xl font-bold text-white shadow-lg transition-all flex items-center justify-center gap-2 ${isSubmitting ? 'bg-emerald-400 cursor-not-allowed shadow-none' : 'bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] shadow-emerald-600/20 hover:shadow-emerald-600/40'}`}
+                disabled={isSubmitting || !isCaptchaValid}
+                className={`w-full py-4 rounded-xl font-bold text-white shadow-lg transition-all flex items-center justify-center gap-2 ${(isSubmitting || !isCaptchaValid) ? 'bg-slate-300 text-slate-500 cursor-not-allowed shadow-none' : 'bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] shadow-emerald-600/20 hover:shadow-emerald-600/40'}`}
               >
                 {isSubmitting ? (
                   <><Loader2 size={20} className="animate-spin" /> Sedang Mengirim...</>
+                ) : !isCaptchaValid ? (
+                  <><ShieldCheck size={20} /> Selesaikan Verifikasi Keamanan di Atas untuk Mengirim</>
                 ) : (
                   <><CheckCircle2 size={20} /> Kirim Pengajuan Promo</>
                 )}
