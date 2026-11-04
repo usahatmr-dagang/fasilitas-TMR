@@ -63,9 +63,13 @@ function transformSewaDoc(doc) {
     const tglListrik = normalizeDate(d.tanggal_transfer_listrik) || tglLokasi;
     const tglSewa = normalizeDate(d.tanggal_sewa) || '';
     const luasLahan = Number(d.luas_lahan) || 0;
+    const statusNormalized = (d.status_pembayaran || '').trim().toLowerCase();
+    const isUnpaid = statusNormalized === 'belum transfer' || statusNormalized === 'belum bayar' || statusNormalized === 'batal' || statusNormalized === 'ditutup';
+    const isPaid = statusNormalized === 'sudah transfer' || statusNormalized === 'lunas' || statusNormalized === 'sudah lunas' || statusNormalized === 'menunggu verifikasi';
 
     // Transaksi 1: Sewa Lokasi / Fasilitas Utama
-    if (hasBuktiLokasi || d.status_pembayaran === 'Sudah Transfer' || d.tanggal_transfer || rawTotal > 0) {
+    // Hanya masukkan jika memiliki bukti transfer nyata atau status pembayaran lunas/terverifikasi (bukan Belum Transfer/Belum Bayar)
+    if ((hasBuktiLokasi || isPaid) && !isUnpaid) {
         transactions.push({
             ...d,
             id: hasBuktiListrik ? `${doc.id}_lokasi` : doc.id,
@@ -95,7 +99,7 @@ function transformSewaDoc(doc) {
     }
 
     // Transaksi 2: Listrik Tambahan
-    if (hasBuktiListrik) {
+    if (hasBuktiListrik && !isUnpaid) {
         transactions.push({
             ...d,
             id: `${doc.id}_listrik`,

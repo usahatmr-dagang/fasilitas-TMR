@@ -50,7 +50,8 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  LockOpen
+  LockOpen,
+  FileSpreadsheet
 } from 'lucide-react';
 import { db, storage, auth } from './firebase';
 import { collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, setDoc, getDoc } from 'firebase/firestore';
@@ -64,6 +65,7 @@ import MigrateData from './MigrateData';
 import SyncPembayaran from './SyncPembayaran';
 import SuratDispensasi from './SuratDispensasi';
 import CetakKwitansi from './CetakKwitansi';
+import BackupExcelView from './components/BackupExcelView';
 import CheckoutModal from './components/CheckoutModal';
 import MediaModal from './components/MediaModal';
 import { openKwitansiPrintWindow } from './utils/kwitansiHelper';
@@ -3132,6 +3134,29 @@ Terima kasih,
             </div>
           )}
 
+          {/* Banner Backup ke Excel */}
+          <div className="mt-8 bg-gradient-to-r from-emerald-900 to-teal-900 rounded-3xl p-6 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-lg border border-emerald-700/40 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-32 h-32 bg-amber-400/10 rounded-full blur-2xl pointer-events-none"></div>
+            <div className="relative z-10 flex items-center space-x-4">
+              <div className="p-3 bg-white/10 rounded-2xl text-amber-400 shrink-0 border border-white/10">
+                <FileSpreadsheet size={24} />
+              </div>
+              <div>
+                <h4 className="text-sm font-black tracking-tight">Cadangan & Ekspor Data Excel (.xlsx)</h4>
+                <p className="text-[11px] text-emerald-200/80 mt-0.5">
+                  Unduh seluruh database reservasi atau kirim otomatis ke email pengelola (alfadijkt@gmail.com).
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveTab('backup')}
+              className="relative z-10 bg-amber-400 hover:bg-amber-300 active:scale-[0.98] text-emerald-950 font-black text-xs px-5 py-3 rounded-2xl shadow-md transition-all whitespace-nowrap cursor-pointer self-start sm:self-auto"
+            >
+              Buka Menu Backup Excel &rarr;
+            </button>
+          </div>
+
         </div>
       </div>
     );
@@ -3238,6 +3263,7 @@ Terima kasih,
             { id: 'pembayaran', label: 'Keuangan / Pembayaran', icon: CreditCard },
             { id: 'dispensasi', label: 'Surat Dispensasi', icon: FileText },
             { id: 'kwitansi', label: 'Cetak Kwitansi', icon: Printer },
+            { id: 'backup', label: 'Backup ke Excel', icon: FileSpreadsheet },
             { id: 'master', label: 'Master Data', icon: Settings },
             { id: 'portal', label: 'Portal Bukti', icon: Wallet }
           ].map(item => (
@@ -3300,6 +3326,7 @@ Terima kasih,
                 { id: 'pembayaran', label: 'Keuangan / Pembayaran', icon: CreditCard },
                 { id: 'dispensasi', label: 'Surat Dispensasi', icon: FileText },
                 { id: 'kwitansi', label: 'Cetak Kwitansi', icon: Printer },
+                { id: 'backup', label: 'Backup ke Excel', icon: FileSpreadsheet },
                 { id: 'master', label: 'Master Data', icon: Settings },
                 { id: 'portal', label: 'Portal Bukti', icon: Wallet }
               ].map(item => (
@@ -4274,6 +4301,7 @@ Terima kasih,
 
             {activeTab === 'dispensasi' && <SuratDispensasi onNavigate={setActiveTab} initialSewaList={sewaList} />}
             {activeTab === 'kwitansi' && <CetakKwitansi onNavigate={setActiveTab} initialSewaList={sewaList} />}
+            {activeTab === 'backup' && <BackupExcelView sewaList={sewaList} showToast={showToast} />}
 
             {activeTab === 'master' && renderMasterData()}
 
