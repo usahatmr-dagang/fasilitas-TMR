@@ -3144,7 +3144,7 @@ Terima kasih,
               <div>
                 <h4 className="text-sm font-black tracking-tight">Cadangan & Ekspor Data Excel (.xlsx)</h4>
                 <p className="text-[11px] text-emerald-200/80 mt-0.5">
-                  Unduh seluruh database reservasi atau kirim otomatis ke email pengelola (alfadijkt@gmail.com).
+                  Unduh cadangan database reservasi penyewaan fasilitas ke format Microsoft Excel resmi.
                 </p>
               </div>
             </div>
