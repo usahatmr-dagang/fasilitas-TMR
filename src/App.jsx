@@ -1,5 +1,5 @@
 /* eslint-disable */
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { 
   LayoutDashboard, 
   Users, 
@@ -588,6 +588,8 @@ export default function App() {
   const [unblockSelectedIds, setUnblockSelectedIds] = useState([]);
 
   const [selectedDate, setSelectedDate] = useState(getTodayString());
+  const reservasiDateInputRef = useRef(null);
+  const pembayaranDateInputRef = useRef(null);
   const [filterTipe, setFilterTipe] = useState('semua');
   const [filterDateSewa, setFilterDateSewa] = useState('');
   const [filterStatusSewa, setFilterStatusSewa] = useState('Semua');
@@ -2710,7 +2712,7 @@ Terima kasih,
                                   </div>
                                   <div>
                                       <label className="block text-[10px] font-extrabold text-emerald-950 uppercase tracking-wider mb-1">Tanggal Kegiatan</label>
-                                      <input required type="date" value={editFormData.tanggal_sewa || ''} onChange={e => setEditFormData({...editFormData, tanggal_sewa: e.target.value})} className="w-full px-3 py-2.5 border border-slate-200 rounded-2xl text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 outline-none font-bold text-emerald-950 bg-white" />
+                                      <input required type="date" value={editFormData.tanggal_sewa || ''} onChange={e => setEditFormData({...editFormData, tanggal_sewa: e.target.value})} onClick={(e) => { try { if (e.target.showPicker) e.target.showPicker(); } catch (err) {} }} className="w-full px-3 py-2.5 border border-slate-200 rounded-2xl text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-600 outline-none font-bold text-emerald-950 bg-white cursor-pointer" />
                                   </div>
                               </div>
                           </div>
@@ -2826,7 +2828,7 @@ Terima kasih,
                               const sewaHariItu = sewaList.filter(s => s.tanggal_sewa === newDate && s.id_sewa !== selectedRecord.id_sewa && s.status_pembayaran !== 'Ditutup');
                               const isCurrentLocationAvailable = !sewaHariItu.find(s => s.lokasi_sewa === selectedRecord.lokasi_sewa);
                               setRescheduleData(prev => ({...prev, tanggal: newDate, lokasi: isCurrentLocationAvailable ? selectedRecord.lokasi_sewa : ''}));
-                          }} className="relative w-full px-4 py-2.5 border border-slate-200 rounded-2xl text-sm focus:ring-4 focus:ring-blue-500/10 focus:border-blue-600 outline-none font-semibold text-emerald-950 bg-white cursor-pointer custom-date-picker" />
+                          }} onClick={(e) => { try { if (e.target.showPicker) e.target.showPicker(); } catch (err) {} }} className="relative w-full px-4 py-2.5 border border-slate-200 rounded-2xl text-sm focus:ring-4 focus:ring-blue-500/10 focus:border-blue-600 outline-none font-semibold text-emerald-950 bg-white cursor-pointer custom-date-picker" />
                       </div>
                       <div>
                           <label className="block text-xs font-black text-blue-900 mb-2 uppercase tracking-wider">Pilih Lokasi yang Tersedia</label>
@@ -2995,6 +2997,7 @@ Terima kasih,
                         }));
                         e.target.blur();
                       }}
+                      onClick={(e) => { try { if (e.target.showPicker) e.target.showPicker(); } catch (err) {} }}
                       className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs font-semibold text-emerald-950 focus:ring-4 focus:ring-rose-500/10 focus:border-rose-450 outline-none shadow-sm cursor-pointer custom-date-picker" 
                     />
                   </div>
@@ -3010,7 +3013,8 @@ Terima kasih,
                         value={blockData.tanggalSampai} 
                         min={blockData.tanggal}
                         onChange={e => { setBlockData({...blockData, tanggalSampai: e.target.value}); e.target.blur(); }} 
-                        className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs font-semibold text-emerald-950 focus:ring-4 focus:ring-rose-500/10 focus:border-rose-450 outline-none shadow-sm cursor-pointer custom-date-picker" 
+                        onClick={(e) => { try { if (e.target.showPicker) e.target.showPicker(); } catch (err) {} }}
+                      className="w-full px-4 py-3 bg-white border border-slate-200 rounded-2xl text-xs font-semibold text-emerald-950 focus:ring-4 focus:ring-rose-500/10 focus:border-rose-450 outline-none shadow-sm cursor-pointer custom-date-picker" 
                       />
                       {blockData.tanggal && blockData.tanggalSampai && blockData.tanggal !== blockData.tanggalSampai && (
                         <p className="text-[9px] font-bold text-rose-500 mt-1 flex items-center">
@@ -3061,6 +3065,7 @@ Terima kasih,
                       type="date" 
                       value={unblockFilter.tanggal}
                       onChange={e => { setUnblockFilter(p => ({...p, tanggal: e.target.value})); setUnblockSelectedIds([]); e.target.blur(); }}
+                      onClick={(e) => { try { if (e.target.showPicker) e.target.showPicker(); } catch (err) {} }}
                       className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-2xl text-xs font-semibold text-emerald-950 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none shadow-sm cursor-pointer custom-date-picker"
                     />
                   </div>
@@ -3568,10 +3573,38 @@ Terima kasih,
                             </button>
                           ))}
                         </div>
-                        <div className="relative flex items-center justify-center bg-white px-3.5 py-1.5 rounded-xl border border-emerald-200/65 shadow-sm shrink-0 hover:ring-4 ring-emerald-500/10 hover:border-emerald-400 transition-all cursor-pointer z-[60] pointer-events-auto">
-                          <Calendar className="text-emerald-600 mr-1.5" size={14} />
-                          <span className="text-xs font-bold text-emerald-950 mr-1">Pilih Tanggal</span>
-                          <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-[60] custom-date-picker pointer-events-auto" />
+                        <div 
+                          onClick={() => {
+                            try {
+                              if (reservasiDateInputRef.current && typeof reservasiDateInputRef.current.showPicker === 'function') {
+                                reservasiDateInputRef.current.showPicker();
+                              } else if (reservasiDateInputRef.current) {
+                                reservasiDateInputRef.current.focus();
+                              }
+                            } catch (e) {
+                              if (reservasiDateInputRef.current) reservasiDateInputRef.current.focus();
+                            }
+                          }}
+                          className="relative flex items-center justify-center bg-white px-3.5 py-1.5 rounded-xl border border-emerald-200/65 shadow-sm shrink-0 hover:ring-4 ring-emerald-500/10 hover:border-emerald-400 transition-all cursor-pointer z-[60] pointer-events-auto select-none overflow-hidden"
+                          title="Klik untuk memilih tanggal reservasi"
+                        >
+                          <Calendar className="text-emerald-600 mr-1.5 pointer-events-none select-none" size={14} />
+                          <span className="text-xs font-bold text-emerald-950 mr-1 pointer-events-none select-none">Pilih Tanggal</span>
+                          <input 
+                            ref={reservasiDateInputRef}
+                            type="date" 
+                            value={selectedDate} 
+                            onChange={(e) => setSelectedDate(e.target.value)} 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              try {
+                                if (typeof e.target.showPicker === 'function') {
+                                  e.target.showPicker();
+                                }
+                              } catch (err) {}
+                            }}
+                            className="overlay-date-picker pointer-events-auto" 
+                          />
                         </div>
                       </div>
                     </div>
@@ -4331,10 +4364,38 @@ Terima kasih,
                          <button onClick={() => setPembayaranViewMode('calendar')} className={`flex items-center justify-center flex-1 sm:flex-none px-4 py-2.5 rounded-lg text-xs font-bold transition-all ${ pembayaranViewMode === 'calendar' ? 'bg-white text-emerald-900 shadow-sm border border-emerald-900/5 font-extrabold' : 'text-emerald-850/70 hover:text-emerald-950 hover:bg-emerald-900/5' }`}><LayoutGrid size={14} className="mr-1.5" /> Kalender</button>
                       </div>
                       <div className="flex items-center gap-2">
-                          <div className="relative flex items-center bg-white px-4 py-2.5 rounded-xl border border-emerald-900/10 shadow-sm hover:shadow hover:border-emerald-300 transition-all cursor-pointer">
-                              <Wallet className="text-amber-500 mr-2" size={16} />
-                              <span className="text-emerald-950 font-bold text-sm w-full text-left whitespace-nowrap">{filterDatePembayaran ? formatTanggalPendek(filterDatePembayaran) : 'Semua Mutasi'}</span>
-                              <input type="date" value={filterDatePembayaran} onChange={(e) => setFilterDatePembayaran(e.target.value)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 custom-date-picker" />
+                          <div 
+                              onClick={() => {
+                                try {
+                                  if (pembayaranDateInputRef.current && typeof pembayaranDateInputRef.current.showPicker === 'function') {
+                                    pembayaranDateInputRef.current.showPicker();
+                                  } else if (pembayaranDateInputRef.current) {
+                                    pembayaranDateInputRef.current.focus();
+                                  }
+                                } catch (e) {
+                                  if (pembayaranDateInputRef.current) pembayaranDateInputRef.current.focus();
+                                }
+                              }}
+                              className="relative flex items-center bg-white px-4 py-2.5 rounded-xl border border-emerald-900/10 shadow-sm hover:shadow hover:border-emerald-300 transition-all cursor-pointer select-none overflow-hidden"
+                              title="Klik untuk filter tanggal mutasi pembayaran"
+                          >
+                              <Wallet className="text-amber-500 mr-2 pointer-events-none select-none" size={16} />
+                              <span className="text-emerald-950 font-bold text-sm w-full text-left whitespace-nowrap pointer-events-none select-none">{filterDatePembayaran ? formatTanggalPendek(filterDatePembayaran) : 'Semua Mutasi'}</span>
+                              <input 
+                                ref={pembayaranDateInputRef}
+                                type="date" 
+                                value={filterDatePembayaran} 
+                                onChange={(e) => setFilterDatePembayaran(e.target.value)} 
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  try {
+                                    if (typeof e.target.showPicker === 'function') {
+                                      e.target.showPicker();
+                                    }
+                                  } catch (err) {}
+                                }}
+                                className="overlay-date-picker pointer-events-auto" 
+                              />
                           </div>
                           {filterDatePembayaran && <button onClick={() => setFilterDatePembayaran('')} className="bg-rose-50 hover:bg-rose-100 text-rose-600 p-2.5 rounded-xl transition-colors border border-rose-100 shadow-sm"><X size={20} /></button>}
                       </div>
@@ -4601,6 +4662,8 @@ Terima kasih,
         .visible-scrollbar { scrollbar-width: thin; scrollbar-color: #10b981 #f1f5f9; }
         .custom-date-picker { position: relative; }
         .custom-date-picker::-webkit-calendar-picker-indicator { position: absolute; top: 0; left: 0; right: 0; bottom: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; padding: 0; margin: 0; }
+        .overlay-date-picker { position: absolute !important; inset: 0 !important; width: 100% !important; height: 100% !important; opacity: 0 !important; cursor: pointer !important; z-index: 20 !important; margin: 0 !important; padding: 0 !important; border: none !important; }
+        .overlay-date-picker::-webkit-calendar-picker-indicator { position: absolute !important; top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important; width: 100% !important; height: 100% !important; opacity: 0 !important; cursor: pointer !important; margin: 0 !important; padding: 0 !important; }
       `}} />
     </div>
   );
