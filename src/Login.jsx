@@ -3,7 +3,7 @@ import { auth } from './firebase';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { Lock, User } from 'lucide-react';
 
-export default function Login() {
+export default function Login({ onLoginSuccess }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -14,7 +14,10 @@ export default function Login() {
     setError('');
     setLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      if (onLoginSuccess) {
+        onLoginSuccess(userCredential.user);
+      }
     } catch (err) {
       setError('Login gagal. Periksa kembali email dan password Anda.');
     } finally {

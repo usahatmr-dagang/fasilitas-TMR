@@ -452,6 +452,7 @@ export default function App() {
   const isSyncRoute = window.location.search.includes('sync=secret');
   const [adminUser, setAdminUser] = useState(null);
   const [activeApp, setActiveApp] = useState('dashboard'); // 'dashboard', 'fasilitas'
+  const isKp3User = useMemo(() => adminUser?.email?.trim().toLowerCase() === 'kp3@ragunanzoo.com', [adminUser]);
   
   // Data State (Firebase)
   const [masterLokasi, setMasterLokasi] = useState([]);
@@ -474,6 +475,10 @@ export default function App() {
     const unsubAuth = onAuthStateChanged(auth, (user) => {
       setAdminUser(user);
       setIsAuthChecking(false);
+      if (user?.email?.trim().toLowerCase() === 'kp3@ragunanzoo.com') {
+        setActiveApp('fasilitas');
+        setActiveTab('portal');
+      }
     });
     return () => unsubAuth();
   }, []);
@@ -3296,12 +3301,26 @@ Terima kasih,
   if (isSyncRoute) return <SyncPembayaran />;
 
   if (!adminUser && !isPortalRoute) {
-    return <Login onLoginSuccess={() => {}} />;
+    return (
+      <Login 
+        onLoginSuccess={(user) => {
+          if (user?.email?.trim().toLowerCase() === 'kp3@ragunanzoo.com') {
+            setActiveApp('fasilitas');
+            setActiveTab('portal');
+          }
+        }} 
+      />
+    );
   }
 
   if (!dataLoaded) return <div className="h-screen w-full flex items-center justify-center bg-[#F4F7F4] text-emerald-800 font-bold">Memuat Data Server...</div>;
 
   if (activeApp === 'dashboard' && adminUser && !isPortalRoute) {
+    if (isKp3User) {
+      setActiveApp('fasilitas');
+      setActiveTab('portal');
+      return null;
+    }
     return <MainDashboard onNavigate={(appId) => setActiveApp(appId)} onLogout={() => auth.signOut()} />;
   }
 
@@ -3413,14 +3432,25 @@ Terima kasih,
             </button>
           ))}
         </nav>
-        <div className="p-4 relative z-10 border-t border-emerald-800/20">
+        <div className="p-4 relative z-10 border-t border-emerald-800/20 space-y-2">
+          {!isKp3User && (
+            <button 
+              type="button" 
+              onClick={() => setActiveApp('dashboard')}
+              className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-emerald-900/40 hover:bg-emerald-800/60 border border-emerald-700/30 hover:border-emerald-600/50 text-emerald-100 hover:text-white rounded-2xl transition-all duration-300 text-xs font-bold group shadow-sm cursor-pointer"
+            >
+              <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
+              <span>Master Menu</span>
+            </button>
+          )}
           <button 
             type="button" 
-            onClick={() => setActiveApp('dashboard')}
-            className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-emerald-900/40 hover:bg-emerald-800/60 border border-emerald-700/30 hover:border-emerald-600/50 text-emerald-100 hover:text-white rounded-2xl transition-all duration-300 text-xs font-bold group shadow-sm"
+            onClick={() => auth.signOut()}
+            className="w-full flex items-center justify-center space-x-2 px-4 py-2.5 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-300 hover:text-rose-100 rounded-2xl transition-all duration-300 text-xs font-bold group shadow-sm cursor-pointer"
+            title="Keluar dari akun"
           >
-            <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
-            <span>Master Menu</span>
+            <LogOut size={15} />
+            <span>Keluar ({isKp3User ? 'KP3' : 'Admin'})</span>
           </button>
         </div>
       </aside>
@@ -3474,14 +3504,24 @@ Terima kasih,
                 </button>
               ))}
             </nav>
-            <div className="p-4 relative z-10 border-t border-emerald-800/20">
+            <div className="p-4 relative z-10 border-t border-emerald-800/20 space-y-2">
+              {!isKp3User && (
+                <button 
+                  type="button" 
+                  onClick={() => { setActiveApp('dashboard'); setIsMobileMenuOpen(false); }}
+                  className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-emerald-900/40 border border-emerald-700/30 text-emerald-100 rounded-2xl text-xs font-bold shadow-sm"
+                >
+                  <ArrowLeft size={16} />
+                  <span>Master Menu</span>
+                </button>
+              )}
               <button 
                 type="button" 
-                onClick={() => { setActiveApp('dashboard'); setIsMobileMenuOpen(false); }}
-                className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-emerald-900/40 border border-emerald-700/30 text-emerald-100 rounded-2xl text-xs font-bold shadow-sm"
+                onClick={() => auth.signOut()}
+                className="w-full flex items-center justify-center space-x-2 px-4 py-2.5 bg-rose-500/10 border border-rose-500/20 text-rose-300 rounded-2xl text-xs font-bold shadow-sm"
               >
-                <ArrowLeft size={16} />
-                <span>Master Menu</span>
+                <LogOut size={15} />
+                <span>Keluar ({isKp3User ? 'KP3' : 'Admin'})</span>
               </button>
             </div>
           </aside>
@@ -3522,7 +3562,13 @@ Terima kasih,
           </div>
 
           <div className="flex items-center space-x-2">
-            {!isPortalRoute && (
+            {adminUser?.email && (
+              <span className="hidden sm:inline-flex items-center gap-1.5 text-[10px] md:text-[11px] font-bold text-emerald-200/90 bg-emerald-900/60 border border-emerald-700/40 px-2.5 py-1.5 rounded-xl">
+                <span className={`w-1.5 h-1.5 rounded-full ${isKp3User ? 'bg-amber-400' : 'bg-emerald-400'}`}></span>
+                {isKp3User ? 'Akun KP3' : 'Admin'}: {adminUser.email}
+              </span>
+            )}
+            {!isPortalRoute && !isKp3User && (
               <button 
                 type="button"
                 onClick={() => setActiveApp('dashboard')} 
@@ -3533,6 +3579,15 @@ Terima kasih,
                 <span className="hidden sm:inline">Master Menu</span>
               </button>
             )}
+            <button 
+              type="button"
+              onClick={() => auth.signOut()} 
+              className="flex items-center space-x-1.5 px-2.5 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/30 rounded-xl text-rose-200 hover:text-white text-xs font-bold transition-colors cursor-pointer" 
+              title="Keluar / Logout"
+            >
+              <LogOut size={14} />
+              <span className="hidden sm:inline">Keluar</span>
+            </button>
           </div>
         </header>
 
