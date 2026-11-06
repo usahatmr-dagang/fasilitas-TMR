@@ -452,7 +452,38 @@ export default function App() {
   const isSyncRoute = window.location.search.includes('sync=secret');
   const [adminUser, setAdminUser] = useState(null);
   const [activeApp, setActiveApp] = useState('dashboard'); // 'dashboard', 'fasilitas'
-  const isKp3User = useMemo(() => adminUser?.email?.trim().toLowerCase() === 'kp3@ragunanzoo.com', [adminUser]);
+  
+  const isKp3User = useMemo(() => {
+    const email = adminUser?.email;
+    if (!email) return false;
+    const clean = String(email).trim().toLowerCase();
+    return clean === 'kp3@ragunanzoo.com' || clean.startsWith('kp3@');
+  }, [adminUser]);
+
+  useEffect(() => {
+    if (isKp3User) {
+      setActiveApp('fasilitas');
+      setActiveTab('portal');
+    }
+  }, [isKp3User]);
+
+  const sidebarMenuItems = useMemo(() => {
+    if (isKp3User) {
+      return [
+        { id: 'portal', label: 'Tagihan Kegiatan', icon: Wallet }
+      ];
+    }
+    return [
+      { id: 'reservasi', label: 'Reservasi Lokasi', icon: LayoutDashboard },
+      { id: 'sewa', label: 'Data Pengunjung', icon: Users },
+      { id: 'pembayaran', label: 'Keuangan / Pembayaran', icon: CreditCard },
+      { id: 'dispensasi', label: 'Surat Dispensasi', icon: FileText },
+      { id: 'kwitansi', label: 'Cetak Kwitansi', icon: Printer },
+      { id: 'backup', label: 'Backup ke Excel', icon: FileSpreadsheet },
+      { id: 'master', label: 'Master Data', icon: Settings },
+      { id: 'portal', label: 'Tagihan Kegiatan', icon: Wallet }
+    ];
+  }, [isKp3User]);
   
   // Data State (Firebase)
   const [masterLokasi, setMasterLokasi] = useState([]);
@@ -475,7 +506,8 @@ export default function App() {
     const unsubAuth = onAuthStateChanged(auth, (user) => {
       setAdminUser(user);
       setIsAuthChecking(false);
-      if (user?.email?.trim().toLowerCase() === 'kp3@ragunanzoo.com') {
+      const cleanEmail = String(user?.email || '').trim().toLowerCase();
+      if (cleanEmail === 'kp3@ragunanzoo.com' || cleanEmail.startsWith('kp3@')) {
         setActiveApp('fasilitas');
         setActiveTab('portal');
       }
@@ -3304,7 +3336,8 @@ Terima kasih,
     return (
       <Login 
         onLoginSuccess={(user) => {
-          if (user?.email?.trim().toLowerCase() === 'kp3@ragunanzoo.com') {
+          const cleanEmail = String(user?.email || '').trim().toLowerCase();
+          if (cleanEmail === 'kp3@ragunanzoo.com' || cleanEmail.startsWith('kp3@')) {
             setActiveApp('fasilitas');
             setActiveTab('portal');
           }
@@ -3402,16 +3435,7 @@ Terima kasih,
         </div>
         
         <nav className="flex-1 px-4 py-2 space-y-1.5 relative z-10 overflow-y-auto hide-scrollbar">
-          {[
-            { id: 'reservasi', label: 'Reservasi Lokasi', icon: LayoutDashboard },
-            { id: 'sewa', label: 'Data Pengunjung', icon: Users },
-            { id: 'pembayaran', label: 'Keuangan / Pembayaran', icon: CreditCard },
-            { id: 'dispensasi', label: 'Surat Dispensasi', icon: FileText },
-            { id: 'kwitansi', label: 'Cetak Kwitansi', icon: Printer },
-            { id: 'backup', label: 'Backup ke Excel', icon: FileSpreadsheet },
-            { id: 'master', label: 'Master Data', icon: Settings },
-            { id: 'portal', label: 'Tagihan Kegiatan', icon: Wallet }
-          ].map(item => (
+          {sidebarMenuItems.map(item => (
             <button 
               type="button" 
               key={item.id} 
@@ -3476,16 +3500,7 @@ Terima kasih,
             </div>
             
             <nav className="flex-1 px-4 py-2 space-y-1.5 relative z-10 overflow-y-auto hide-scrollbar">
-              {[
-                { id: 'reservasi', label: 'Reservasi Lokasi', icon: LayoutDashboard },
-                { id: 'sewa', label: 'Data Pengunjung', icon: Users },
-                { id: 'pembayaran', label: 'Keuangan / Pembayaran', icon: CreditCard },
-                { id: 'dispensasi', label: 'Surat Dispensasi', icon: FileText },
-                { id: 'kwitansi', label: 'Cetak Kwitansi', icon: Printer },
-                { id: 'backup', label: 'Backup ke Excel', icon: FileSpreadsheet },
-                { id: 'master', label: 'Master Data', icon: Settings },
-                { id: 'portal', label: 'Tagihan Kegiatan', icon: Wallet }
-              ].map(item => (
+              {sidebarMenuItems.map(item => (
                 <button 
                   type="button" 
                   key={item.id} 
@@ -3592,7 +3607,7 @@ Terima kasih,
         </header>
 
         <div className={`flex-1 relative z-10 bg-[#f8faf9] ${activeTab === 'sewa' ? 'p-2 sm:p-3 overflow-hidden flex flex-col' : 'overflow-y-auto px-4 sm:px-6 lg:px-10 pb-20'}`}>
-            {activeTab === 'reservasi' && (
+            {!isKp3User && activeTab === 'reservasi' && (
               <div className="max-w-[90rem] mx-auto pb-32 lg:pb-12">
                 <div className="sticky top-0 z-[40] bg-[#f8faf9]/80 backdrop-blur-md pt-4 pb-3 mb-6 -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-10 lg:px-10 border-b border-emerald-100/50">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -3936,7 +3951,9 @@ Terima kasih,
                         </div>
                     </button>
                 </div>
-            )}            {activeTab === 'sewa' && (
+            )}
+
+            {!isKp3User && activeTab === 'sewa' && (
               <div className="w-full h-full flex flex-col flex-1 overflow-hidden min-h-[500px]">
                 <div className="flex flex-col md:flex-row gap-3 h-full flex-1 overflow-hidden">
                    {/* Left Date Column - Compact AppSheet Style */}
@@ -4403,7 +4420,7 @@ Terima kasih,
               </div>
             )}
 
-            {activeTab === 'pembayaran' && (
+            {!isKp3User && activeTab === 'pembayaran' && (
               <div className="space-y-6 max-w-[90rem] mx-auto pb-32 lg:pb-12 animate-slide-in-right">
                 <div className="sticky top-0 z-[40] bg-slate-50/80 backdrop-blur-lg pt-4 sm:pt-5 lg:pt-8 pb-4 mb-4 -mx-4 px-4 sm:-mx-5 sm:px-5 lg:-mx-8 lg:px-8 border-b border-emerald-900/10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                   <div>
@@ -4631,11 +4648,11 @@ Terima kasih,
               </div>
             )}
 
-            {activeTab === 'dispensasi' && <SuratDispensasi onNavigate={setActiveTab} initialSewaList={sewaList} />}
-            {activeTab === 'kwitansi' && <CetakKwitansi onNavigate={setActiveTab} initialSewaList={sewaList} />}
-            {activeTab === 'backup' && <BackupExcelView sewaList={sewaList} showToast={showToast} />}
+            {!isKp3User && activeTab === 'dispensasi' && <SuratDispensasi onNavigate={setActiveTab} initialSewaList={sewaList} />}
+            {!isKp3User && activeTab === 'kwitansi' && <CetakKwitansi onNavigate={setActiveTab} initialSewaList={sewaList} />}
+            {!isKp3User && activeTab === 'backup' && <BackupExcelView sewaList={sewaList} showToast={showToast} />}
 
-            {activeTab === 'master' && renderMasterData()}
+            {!isKp3User && activeTab === 'master' && renderMasterData()}
 
             {activeTab === 'portal' && (
               <PenagihanKegiatanView
@@ -4652,7 +4669,7 @@ Terima kasih,
             )}
         </div>
 
-        {!isPortalRoute && (
+        {!isPortalRoute && !isKp3User && (
           <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-emerald-100/80 flex justify-between px-1 pb-safe z-[55] shadow-[0_-8px_30px_rgba(4,120,87,0.07)]">
             {[
               { id: 'reservasi', label: 'Reservasi', icon: LayoutDashboard },
