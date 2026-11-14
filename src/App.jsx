@@ -1057,8 +1057,9 @@ export default function App() {
         const mId = (s.id_sewa || '').toLowerCase().includes(q);
         const mHp = (s.no_hp_penyewa || '').toLowerCase().includes(q);
         const mKet = (s.keterangan || '').toLowerCase().includes(q);
+        const mCat = (s.catatan || '').toLowerCase().includes(q);
         const mPic = (s.pic_kantor || s.pic_rombongan || '').toLowerCase().includes(q);
-        return mNama || mLok || mId || mHp || mKet || mPic;
+        return mNama || mLok || mId || mHp || mKet || mCat || mPic;
       });
     }
 
@@ -1085,6 +1086,9 @@ export default function App() {
         } else if (sewaSortField === 'pic') {
           valA = (a.pic_kantor && a.pic_kantor !== '-' ? a.pic_kantor : (a.pic_rombongan || '')).toLowerCase();
           valB = (b.pic_kantor && b.pic_kantor !== '-' ? b.pic_kantor : (b.pic_rombongan || '')).toLowerCase();
+        } else if (sewaSortField === 'keterangan') {
+          valA = ((a.catatan && a.catatan !== '-' ? a.catatan : a.keterangan) || '').toLowerCase();
+          valB = ((b.catatan && b.catatan !== '-' ? b.catatan : b.keterangan) || '').toLowerCase();
         } else {
           valA = String(a[sewaSortField] || '').toLowerCase();
           valB = String(b[sewaSortField] || '').toLowerCase();
@@ -3799,6 +3803,11 @@ Terima kasih,
                                 <div className="bg-rose-50/40 border border-rose-100/50 rounded-xl p-1.5 mt-0.5 w-full overflow-hidden">
                                     <span className="text-[8.5px] font-extrabold text-rose-900 block truncate">{fasilitas.bookingInfo?.nama_penyewa}</span>
                                     <span className="text-[8px] font-medium text-rose-600/80 block truncate">PIC: {fasilitas.bookingInfo?.pic_rombongan}</span>
+                                    {Boolean(fasilitas.bookingInfo?.catatan && fasilitas.bookingInfo.catatan.trim() && fasilitas.bookingInfo.catatan.trim() !== '-') && (
+                                      <span className="text-[7.5px] font-black text-amber-950 bg-amber-100/90 border border-amber-300 px-1 py-0.5 rounded block truncate mt-0.5" title={`Catatan: ${fasilitas.bookingInfo.catatan}`}>
+                                        ⛺ {fasilitas.bookingInfo.catatan}
+                                      </span>
+                                    )}
                                 </div>
                             )}
                           </div>
@@ -3897,6 +3906,11 @@ Terima kasih,
                               <span className="text-[8px] font-medium text-rose-600/80 block truncate">
                                 PIC: {kegiatanItem.pic_rombongan}
                               </span>
+                              {Boolean(kegiatanItem.catatan && kegiatanItem.catatan.trim() && kegiatanItem.catatan.trim() !== '-') && (
+                                <span className="text-[7.5px] font-black text-amber-950 bg-amber-100/90 border border-amber-300 px-1 py-0.5 rounded block truncate mt-0.5" title={`Catatan: ${kegiatanItem.catatan}`}>
+                                  ⛺ {kegiatanItem.catatan}
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -4080,6 +4094,7 @@ Terima kasih,
                                                       sewaSortField === 'total_biaya' ? 'Biaya' :
                                                       sewaSortField === 'luas_lahan' ? 'Luas' :
                                                       sewaSortField === 'status_pembayaran' ? 'Status' :
+                                                      sewaSortField === 'keterangan' ? 'Catatan / Ket' :
                                                       sewaSortField === 'pic' ? 'PIC' : sewaSortField
                                                    }</strong> ({
                                                       sewaSortField === 'tanggal_booking' ? (sewaSortDirection === 'desc' ? 'Terbaru' : 'Terlama') :
@@ -4221,7 +4236,7 @@ Terima kasih,
                                                   { key: 'status_pembayaran', label: 'Status Pembayar..', align: 'left' },
                                                   { key: 'hari', label: 'Hari', align: 'left' },
                                                   { key: 'nama_penyewa', label: 'Nama Penyewa', align: 'left' },
-                                                  { key: 'keterangan', label: 'keterang..', align: 'left' },
+                                                  { key: 'keterangan', label: 'Keterangan / Catatan', align: 'left' },
                                                   { key: 'tanggal_sewa', label: 'Tanggal Penyewaan', align: 'left' },
                                                   { key: 'no_hp_penyewa', label: 'No.HP Penyewa', align: 'left' },
                                                   { key: 'tanggal_booking', label: 'Tanggal Pemesanan..', align: 'left' },
@@ -4376,9 +4391,42 @@ Terima kasih,
                                                        {item.nama_penyewa}
                                                     </td>
 
-                                                    {/* Column 7: Keterangan */}
-                                                    <td className="py-2 px-3 text-slate-600 max-w-[150px] truncate" title={item.keterangan}>
-                                                       {item.keterangan || '-'}
+                                                    {/* Column 7: Keterangan & Catatan Tambahan (Tenda, Kursi, dll) */}
+                                                    <td className="py-2 px-3 max-w-[220px]">
+                                                       {(() => {
+                                                          const cleanCatatan = (item.catatan || '').trim();
+                                                          const cleanKeterangan = (item.keterangan || '').trim();
+                                                          const hasCatatan = cleanCatatan !== '' && cleanCatatan !== '-';
+                                                          const hasKeterangan = cleanKeterangan !== '' && cleanKeterangan !== '-';
+
+                                                          if (!hasCatatan && !hasKeterangan) {
+                                                             return <span className="text-slate-400 font-medium">-</span>;
+                                                          }
+
+                                                          const tooltipText = [
+                                                             hasCatatan ? `Catatan Sewa: ${cleanCatatan}` : '',
+                                                             hasKeterangan && cleanKeterangan !== cleanCatatan ? `Keterangan: ${cleanKeterangan}` : ''
+                                                          ].filter(Boolean).join('\n');
+
+                                                          return (
+                                                             <div className="flex flex-col gap-1 items-start max-w-[220px]" title={tooltipText}>
+                                                                {hasCatatan && (
+                                                                   <span className="inline-flex items-center gap-1 font-extrabold text-[10.5px] text-amber-950 bg-amber-50 hover:bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-lg shadow-2xs max-w-full transition-colors">
+                                                                      <span className="text-amber-600 font-black text-xs shrink-0">⛺</span>
+                                                                      <span className="truncate" title={cleanCatatan}>{cleanCatatan}</span>
+                                                                   </span>
+                                                                )}
+                                                                {hasKeterangan && cleanKeterangan !== cleanCatatan && (
+                                                                   <span 
+                                                                      className={`max-w-full truncate ${hasCatatan ? 'text-slate-500 font-semibold text-[10px] pl-0.5' : 'text-slate-700 font-bold text-xs'}`}
+                                                                      title={cleanKeterangan}
+                                                                   >
+                                                                      {cleanKeterangan}
+                                                                   </span>
+                                                                )}
+                                                             </div>
+                                                          );
+                                                       })()}
                                                     </td>
 
                                                     {/* Column 8: Tanggal Penyewaan */}

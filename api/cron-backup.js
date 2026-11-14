@@ -178,7 +178,16 @@ async function generateExcelBuffer(records, startDateStr, titleLabel) {
             status_pembayaran: record.status_pembayaran || 'Belum Transfer',
             total_biaya: nominalNum,
             listrik_tambahan: record.listrik_tambahan ? 'Ya' : 'Tidak',
-            keterangan: record.keterangan || record.catatan || '-',
+            keterangan: (() => {
+                const parts = [];
+                if (record.catatan && record.catatan.trim() !== '' && record.catatan.trim() !== '-') {
+                    parts.push(`[Catatan: ${record.catatan.trim()}]`);
+                }
+                if (record.keterangan && record.keterangan.trim() !== '' && record.keterangan.trim() !== '-') {
+                    parts.push(record.keterangan.trim());
+                }
+                return parts.length > 0 ? parts.join(' | ') : (record.keterangan || record.catatan || '-');
+            })(),
             tanggal_booking: record.tanggal_booking || '-'
         };
 
@@ -513,3 +522,4 @@ export default async function handler(req, res) {
         });
     }
 }
+
