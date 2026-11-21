@@ -70,6 +70,7 @@ import PenagihanKegiatanView, { DAFTAR_KEGIATAN_NON_TEMPAT } from './components/
 import CheckoutModal from './components/CheckoutModal';
 import MediaModal from './components/MediaModal';
 import { openKwitansiPrintWindow } from './utils/kwitansiHelper';
+import PizZip from 'pizzip';
 // --- DATA LOKASI ---
 const defaultDataLokasi = [
   { id: 1, nama: 'PENDOPO TSA 1', tipe: 'pendopo', harga: 500000, urutan: 1 },
@@ -1964,7 +1965,208 @@ Terima kasih,
     });
   };
 
-  // --- HANDLER FITUR CETAK BUKTI TRANSFER (1 HALAMAN PENUH & TEKS JELAS) ---
+  // --- HELPER: MEMBUAT FILE DOCX NATIVE AGAR MARGIN ATAS (HEADER) GOOGLE DOCS SANGAT RAPAT (0.4 CM) ---
+  const buildBuktiTransferDocxBlob = ({ titleText, detailRows, enhancedImg }) => {
+    const escapeXmlStr = (unsafe) => {
+      if (unsafe === undefined || unsafe === null) return '';
+      return String(unsafe).replace(/[<>&'"]/g, (c) => {
+        switch (c) {
+          case '<': return '&lt;';
+          case '>': return '&gt;';
+          case '&': return '&amp;';
+          case "'": return '&apos;';
+          case '"': return '&quot;';
+          default: return c;
+        }
+      });
+    };
+
+    const rawDataUrl = enhancedImg?.dataUrl || '';
+    const isPng = rawDataUrl.startsWith('data:image/png');
+    const imgExt = isPng ? 'png' : 'jpeg';
+    const imgMime = isPng ? 'image/png' : 'image/jpeg';
+    const base64Clean = rawDataUrl.includes(',') ? rawDataUrl.split(',')[1] : rawDataUrl;
+
+    // Konversi pixel (96 DPI) ke EMU (1 px = 9525 EMU)
+    const cx = Math.round((enhancedImg?.displayWidth || 340) * 9525);
+    const cy = Math.round((enhancedImg?.displayHeight || 520) * 9525);
+
+    const detailsXml = detailRows.map((row, idx) => {
+      const spaceBefore = idx === 0 ? 100 : 0;
+      const spaceAfter = idx === detailRows.length - 1 ? 100 : 30;
+      return `
+        <w:p>
+          <w:pPr>
+            <w:spacing w:before="${spaceBefore}" w:after="${spaceAfter}" w:line="240" w:lineRule="auto"/>
+            <w:jc w:val="left"/>
+          </w:pPr>
+          <w:r>
+            <w:rPr>
+              <w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/>
+              <w:b/>
+              <w:color w:val="000000"/>
+              <w:sz w:val="22"/>
+              <w:szCs w:val="22"/>
+            </w:rPr>
+            <w:t xml:space="preserve">${escapeXmlStr(row.label)} </w:t>
+          </w:r>
+          <w:r>
+            <w:rPr>
+              <w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/>
+              <w:color w:val="000000"/>
+              <w:sz w:val="22"/>
+              <w:szCs w:val="22"/>
+            </w:rPr>
+            <w:t xml:space="preserve">${escapeXmlStr(row.value)}</w:t>
+          </w:r>
+        </w:p>`;
+    }).join('');
+
+    const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
+  <w:body>
+    <w:p>
+      <w:pPr>
+        <w:spacing w:before="0" w:after="20" w:line="240" w:lineRule="auto"/>
+        <w:jc w:val="center"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/>
+          <w:color w:val="064E3B"/>
+          <w:sz w:val="20"/>
+          <w:szCs w:val="20"/>
+        </w:rPr>
+        <w:t>TAMAN MARGASATWA RAGUNAN</w:t>
+      </w:r>
+    </w:p>
+    <w:p>
+      <w:pPr>
+        <w:pBdr>
+          <w:bottom w:val="single" w:sz="6" w:space="6" w:color="059669"/>
+        </w:pBdr>
+        <w:spacing w:before="0" w:after="80" w:line="240" w:lineRule="auto"/>
+        <w:jc w:val="center"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/>
+          <w:b/>
+          <w:color w:val="059669"/>
+          <w:spacing w:val="20"/>
+          <w:sz w:val="25"/>
+          <w:szCs w:val="25"/>
+        </w:rPr>
+        <w:t>${escapeXmlStr(titleText)}</w:t>
+      </w:r>
+    </w:p>
+    ${detailsXml}
+    <w:p>
+      <w:pPr>
+        <w:spacing w:before="40" w:after="0" w:line="240" w:lineRule="auto"/>
+        <w:jc w:val="center"/>
+      </w:pPr>
+      <w:r>
+        <w:drawing>
+          <wp:inline distT="0" distB="0" distL="0" distR="0">
+            <wp:extent cx="${cx}" cy="${cy}"/>
+            <wp:effectExtent l="0" t="0" r="0" b="0"/>
+            <wp:docPr id="1" name="Bukti Transfer"/>
+            <wp:cNvGraphicFramePr>
+              <a:graphicFrameLocks noChangeAspect="1"/>
+            </wp:cNvGraphicFramePr>
+            <a:graphic>
+              <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
+                <pic:pic>
+                  <pic:nvPicPr>
+                    <pic:cNvPr id="0" name="receipt.${imgExt}"/>
+                    <pic:cNvPicPr>
+                      <a:picLocks noChangeAspect="1" noChangeArrowheads="1"/>
+                    </pic:cNvPicPr>
+                  </pic:nvPicPr>
+                  <pic:blipFill>
+                    <a:blip r:embed="rId2"/>
+                    <a:stretch>
+                      <a:fillRect/>
+                    </a:stretch>
+                  </pic:blipFill>
+                  <pic:spPr bwMode="auto">
+                    <a:xfrm>
+                      <a:off x="0" y="0"/>
+                      <a:ext cx="${cx}" cy="${cy}"/>
+                    </a:xfrm>
+                    <a:prstGeom prst="rect">
+                      <a:avLst/>
+                    </a:prstGeom>
+                  </pic:spPr>
+                </pic:pic>
+              </a:graphicData>
+            </a:graphic>
+          </wp:inline>
+        </w:drawing>
+      </w:r>
+    </w:p>
+    <w:sectPr>
+      <w:pgSz w:w="11906" w:h="16838"/>
+      <w:pgMar w:top="240" w:right="1000" w:bottom="240" w:left="1000" w:header="0" w:footer="0" w:gutter="0"/>
+    </w:sectPr>
+  </w:body>
+</w:document>`;
+
+    const contentTypesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Default Extension="${imgExt}" ContentType="${imgMime}"/>
+  <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+  <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
+</Types>`;
+
+    const rootRelsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+</Relationships>`;
+
+    const docRelsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/receipt.${imgExt}"/>
+</Relationships>`;
+
+    const stylesXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:docDefaults>
+    <w:rPrDefault>
+      <w:rPr>
+        <w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/>
+        <w:sz w:val="22"/>
+        <w:szCs w:val="22"/>
+      </w:rPr>
+    </w:rPrDefault>
+    <w:pPrDefault>
+      <w:pPr>
+        <w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/>
+      </w:pPr>
+    </w:pPrDefault>
+  </w:docDefaults>
+</w:styles>`;
+
+    const zip = new PizZip();
+    zip.file('[Content_Types].xml', contentTypesXml);
+    zip.file('_rels/.rels', rootRelsXml);
+    zip.file('word/_rels/document.xml.rels', docRelsXml);
+    zip.file('word/styles.xml', stylesXml);
+    zip.file('word/document.xml', documentXml);
+    zip.file(`word/media/receipt.${imgExt}`, base64Clean, { base64: true });
+
+    return zip.generate({
+      type: 'blob',
+      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      compression: 'DEFLATE',
+    });
+  };
+
+  // --- HANDLER FITUR CETAK BUKTI TRANSFER (1 HALAMAN PENUH, HEADER RAPAT & TEKS JELAS) ---
   const handlePrintBukti = async () => {
     if (!selectedRecord || !selectedRecord.bukti_transfer) return;
     
@@ -1997,59 +2199,29 @@ Terima kasih,
           nominalText = `${formatRupiah(totalBayar)} (${formatRupiah(biayaTempat)} Tempat + ${formatRupiah(biayaListrik)} Listrik)`;
       }
 
-      const htmlContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8" />
-          <title>Cetak Bukti Transfer - ${selectedRecord.id_sewa}</title>
-          <style>
-            @page {
-              size: A4 portrait;
-              margin: 0.25in 0.5in 0.25in 0.5in;
-              margin-top: 0.25in;
-              margin-bottom: 0.25in;
-              margin-left: 0.5in;
-              margin-right: 0.5in;
-            }
-            body {
-              margin: 0;
-              padding: 0;
-              font-family: Arial, sans-serif;
-            }
-          </style>
-        </head>
-        <body style="margin: 0; padding: 0; font-family: Arial, sans-serif;">
-          <div style="text-align: center; font-family: Arial, sans-serif; margin: 0; padding: 0;">
-            <p style="color: #064e3b; font-size: 10.5pt; margin: 0 0 2pt 0; padding: 0; line-height: 1.15;">TAMAN MARGASATWA RAGUNAN</p>
-            <p style="color: #059669; font-size: 13pt; font-weight: bold; letter-spacing: 1.5px; margin: 0 0 6pt 0; padding: 0; line-height: 1.15;">${isKegiatanDoc ? 'BUKTI PEMBAYARAN KEGIATAN' : 'BUKTI PEMBAYARAN RESERVASI LOKASI'}</p>
-            <hr style="border: 0; border-top: 1px solid #059669; margin: 4pt 0 6pt 0;" />
-            <p style="text-align: left; margin: 4pt 0 8pt 0; font-size: 11.5pt; line-height: 1.3;">
-              <b>ID Transaksi:</b> ${selectedRecord.id_sewa}<br />
-              ${isKegiatanDoc ? `
-              <b>Nama Penanggung Jawab :</b> ${selectedRecord.nama_penyewa}<br />
-              <b>Nama kegiatan:</b> ${selectedRecord.kegiatan || selectedRecord.lokasi_sewa || '-'}<br />
-              <b>Tanggal Kegiatan :</b> ${tglSewaStr}<br />
-              ` : `
-              <b>Nama Penyewa:</b> ${selectedRecord.nama_penyewa}<br />
-              <b>Lokasi Sewa:</b> ${displayLokasi}<br />
-              <b>Tanggal Sewa:</b> ${tglSewaStr}<br />
-              `}
-              <b>Tanggal Transfer:</b> ${tglTransferStr}<br />
-              <b>Nominal Transfer:</b> ${nominalText}
-            </p>
-            <p style="text-align: center; margin: 0; padding: 0;">
-              <img src="${enhancedImg.dataUrl}" alt="Bukti Transfer" width="${enhancedImg.displayWidth}" height="${enhancedImg.displayHeight}" style="width: ${enhancedImg.displayWidth}px; height: ${enhancedImg.displayHeight}px;" />
-            </p>
-          </div>
-        </body>
-        </html>
-      `;
+      const titleText = isKegiatanDoc ? 'BUKTI PEMBAYARAN KEGIATAN' : 'BUKTI PEMBAYARAN RESERVASI LOKASI';
+      const detailRows = isKegiatanDoc
+        ? [
+            { label: 'ID Transaksi:', value: selectedRecord.id_sewa || '-' },
+            { label: 'Nama Penanggung Jawab :', value: selectedRecord.nama_penyewa || '-' },
+            { label: 'Nama kegiatan:', value: selectedRecord.kegiatan || selectedRecord.lokasi_sewa || '-' },
+            { label: 'Tanggal Kegiatan :', value: tglSewaStr || '-' },
+            { label: 'Tanggal Transfer:', value: tglTransferStr || '-' },
+            { label: 'Nominal Transfer:', value: nominalText || '-' },
+          ]
+        : [
+            { label: 'ID Transaksi:', value: selectedRecord.id_sewa || '-' },
+            { label: 'Nama Penyewa:', value: selectedRecord.nama_penyewa || '-' },
+            { label: 'Lokasi Sewa:', value: displayLokasi || '-' },
+            { label: 'Tanggal Sewa:', value: tglSewaStr || '-' },
+            { label: 'Tanggal Transfer:', value: tglTransferStr || '-' },
+            { label: 'Nominal Transfer:', value: nominalText || '-' },
+          ];
 
-      const htmlBlob = new Blob([htmlContent], { type: 'text/html' });
+      const docxBlob = buildBuktiTransferDocxBlob({ titleText, detailRows, enhancedImg });
       const finalFileName = isKegiatanDoc ? `Bukti_Transfer_Kegiatan_${selectedRecord.id_sewa}` : `Bukti_Transfer_Reservasi_${selectedRecord.id_sewa}`;
       
-      const docUrl = await uploadToGoogleDrive(htmlBlob, finalFileName, selectedRecord.docId, 'buktiTransferDocUrl');
+      const docUrl = await uploadToGoogleDrive(docxBlob, finalFileName, selectedRecord.docId, 'buktiTransferDocUrl');
       
       setSelectedRecord(prev => ({...prev, buktiTransferDocUrl: docUrl}));
       setSewaList(prev => prev.map(item => item.docId === selectedRecord.docId ? { ...item, buktiTransferDocUrl: docUrl } : item));
@@ -2085,53 +2257,20 @@ Terima kasih,
       const tglTransferStr = selectedRecord.tanggal_transfer_listrik ? formatTanggalPendek(selectedRecord.tanggal_transfer_listrik) : '-';
       const displayLokasi = formatLokasiWithLuas(selectedRecord);
 
-      const htmlContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="utf-8" />
-          <title>Cetak Bukti Listrik - ${selectedRecord.id_sewa}</title>
-          <style>
-            @page {
-              size: A4 portrait;
-              margin: 0.25in 0.5in 0.25in 0.5in;
-              margin-top: 0.25in;
-              margin-bottom: 0.25in;
-              margin-left: 0.5in;
-              margin-right: 0.5in;
-            }
-            body {
-              margin: 0;
-              padding: 0;
-              font-family: Arial, sans-serif;
-            }
-          </style>
-        </head>
-        <body style="margin: 0; padding: 0; font-family: Arial, sans-serif;">
-          <div style="text-align: center; font-family: Arial, sans-serif; margin: 0; padding: 0;">
-            <p style="color: #064e3b; font-size: 10.5pt; margin: 0 0 2pt 0; padding: 0; line-height: 1.15;">TAMAN MARGASATWA RAGUNAN</p>
-            <p style="color: #059669; font-size: 13pt; font-weight: bold; letter-spacing: 1.5px; margin: 0 0 6pt 0; padding: 0; line-height: 1.15;">BUKTI PEMBAYARAN LISTRIK TAMBAHAN</p>
-            <hr style="border: 0; border-top: 1px solid #059669; margin: 4pt 0 6pt 0;" />
-            <p style="text-align: left; margin: 4pt 0 8pt 0; font-size: 11.5pt; line-height: 1.3;">
-              <b>ID Transaksi:</b> ${selectedRecord.id_sewa}<br />
-              <b>Nama Penyewa:</b> ${selectedRecord.nama_penyewa}<br />
-              <b>Lokasi Sewa:</b> ${displayLokasi}<br />
-              <b>Tanggal Sewa:</b> ${tglSewaStr}<br />
-              <b>Tanggal Transfer Listrik:</b> ${tglTransferStr}<br />
-              <b>Nominal Transfer:</b> Rp 100.000
-            </p>
-            <p style="text-align: center; margin: 0; padding: 0;">
-              <img src="${enhancedImg.dataUrl}" alt="Bukti Transfer Listrik" width="${enhancedImg.displayWidth}" height="${enhancedImg.displayHeight}" style="width: ${enhancedImg.displayWidth}px; height: ${enhancedImg.displayHeight}px;" />
-            </p>
-          </div>
-        </body>
-        </html>
-      `;
+      const titleText = 'BUKTI PEMBAYARAN LISTRIK TAMBAHAN';
+      const detailRows = [
+        { label: 'ID Transaksi:', value: selectedRecord.id_sewa || '-' },
+        { label: 'Nama Penyewa:', value: selectedRecord.nama_penyewa || '-' },
+        { label: 'Lokasi Sewa:', value: displayLokasi || '-' },
+        { label: 'Tanggal Sewa:', value: tglSewaStr || '-' },
+        { label: 'Tanggal Transfer Listrik:', value: tglTransferStr || '-' },
+        { label: 'Nominal Transfer:', value: 'Rp 100.000' },
+      ];
 
-      const htmlBlob = new Blob([htmlContent], { type: 'text/html' });
+      const docxBlob = buildBuktiTransferDocxBlob({ titleText, detailRows, enhancedImg });
       const finalFileName = `Bukti_Transfer_Listrik_${selectedRecord.id_sewa}`;
       
-      const docUrl = await uploadToGoogleDrive(htmlBlob, finalFileName, selectedRecord.docId, 'buktiTransferListrikDocUrl');
+      const docUrl = await uploadToGoogleDrive(docxBlob, finalFileName, selectedRecord.docId, 'buktiTransferListrikDocUrl');
       
       setSelectedRecord(prev => ({...prev, buktiTransferListrikDocUrl: docUrl}));
       setSewaList(prev => prev.map(item => item.docId === selectedRecord.docId ? { ...item, buktiTransferListrikDocUrl: docUrl } : item));
