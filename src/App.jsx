@@ -1991,12 +1991,24 @@ Terima kasih,
     const cx = Math.round((enhancedImg?.displayWidth || 340) * 9525);
     const cy = Math.round((enhancedImg?.displayHeight || 520) * 9525);
 
+    // Hitung posisi tab-stop otomatis agar titik dua (:) dan isi data sejajar lurus vertikal
+    const maxLabelLen = detailRows.reduce((max, r) => {
+      const clean = String(r.label || '').replace(/\s*:?\s*$/, '').length;
+      return Math.max(max, clean);
+    }, 0);
+    // 2160 twips = 3.81 cm (untuk Reservasi Lokasi), 2880 twips = 5.08 cm (untuk label panjang Kegiatan/Listrik)
+    const tabPosTwips = maxLabelLen > 17 ? 2880 : 2160;
+
     const detailsXml = detailRows.map((row, idx) => {
       const spaceBefore = idx === 0 ? 100 : 0;
       const spaceAfter = idx === detailRows.length - 1 ? 100 : 30;
+      const cleanLabel = String(row.label || '').replace(/\s*:?\s*$/, '');
       return `
         <w:p>
           <w:pPr>
+            <w:tabs>
+              <w:tab w:val="left" w:pos="${tabPosTwips}"/>
+            </w:tabs>
             <w:spacing w:before="${spaceBefore}" w:after="${spaceAfter}" w:line="240" w:lineRule="auto"/>
             <w:jc w:val="left"/>
           </w:pPr>
@@ -2008,7 +2020,7 @@ Terima kasih,
               <w:sz w:val="22"/>
               <w:szCs w:val="22"/>
             </w:rPr>
-            <w:t xml:space="preserve">${escapeXmlStr(row.label)} </w:t>
+            <w:t xml:space="preserve">${escapeXmlStr(cleanLabel)}</w:t>
           </w:r>
           <w:r>
             <w:rPr>
@@ -2017,7 +2029,8 @@ Terima kasih,
               <w:sz w:val="22"/>
               <w:szCs w:val="22"/>
             </w:rPr>
-            <w:t xml:space="preserve">${escapeXmlStr(row.value)}</w:t>
+            <w:tab/>
+            <w:t xml:space="preserve">: ${escapeXmlStr(row.value)}</w:t>
           </w:r>
         </w:p>`;
     }).join('');
@@ -2108,7 +2121,7 @@ Terima kasih,
     </w:p>
     <w:sectPr>
       <w:pgSz w:w="11906" w:h="16838"/>
-      <w:pgMar w:top="240" w:right="1000" w:bottom="240" w:left="1000" w:header="0" w:footer="0" w:gutter="0"/>
+      <w:pgMar w:top="850" w:right="1000" w:bottom="340" w:left="1000" w:header="0" w:footer="0" w:gutter="0"/>
     </w:sectPr>
   </w:body>
 </w:document>`;
