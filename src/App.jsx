@@ -1737,7 +1737,234 @@ Terima kasih,
     }, 500);
   };
 
-  // --- HANDLER FITUR CETAK BUKTI TRANSFER (F4 PORTRAIT) ---
+  // --- HELPER: PERTAJAM TEKS BUKTI TRANSFER & SESUAIKAN UKURAN PROPORSIONAL 1 HALAMAN ---
+  const prepareReceiptImageForDoc = (srcDataUrl) => {
+    return new Promise((resolve) => {
+      const fallback = {
+        dataUrl: srcDataUrl,
+        displayWidth: 340,
+        displayHeight: 520,
+      };
+      if (!srcDataUrl) return resolve(fallback);
+
+      const img = new window.Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        try {
+          const origW = img.naturalWidth || img.width || 600;
+          const origH = img.naturalHeight || img.height || 900;
+
+          // 1. Render ke canvas resolusi tinggi (supersampling jika gambar kecil agar huruf tajam)
+          const TARGET_MIN_W = 960;
+          const MAX_WORK_W = 1200;
+          const MAX_WORK_H = 1800;
+          let scale = origW < TARGET_MIN_W ? TARGET_MIN_W / origW : 1;
+          if (origW * scale > MAX_WORK_W || origH * scale > MAX_WORK_H) {
+            scale = Math.min(MAX_WORK_W / origW, MAX_WORK_H / origH);
+          }
+          const workW = Math.max(1, Math.round(origW * scale));
+          const workH = Math.max(1, Math.round(origH * scale));
+
+          const workCanvas = document.createElement('canvas');
+          workCanvas.width = workW;
+          workCanvas.height = workH;
+          const workCtx = workCanvas.getContext('2d');
+          workCtx.imageSmoothingEnabled = true;
+          workCtx.imageSmoothingQuality = 'high';
+          workCtx.fillStyle = '#FFFFFF';
+          workCtx.fillRect(0, 0, workW, workH);
+          workCtx.drawImage(img, 0, 0, workW, workH);
+
+          // 2. Auto-trim area kosong polos berlebih di tepi atas/bawah/kiri/kanan screenshot
+          const imgDataObj = workCtx.getImageData(0, 0, workW, workH);
+          const data = imgDataObj.data;
+
+          const isRowUniform = (y) => {
+            const xStart = Math.floor(workW * 0.08);
+            const xEnd = Math.ceil(workW * 0.92);
+            const baseIdx = (y * workW + xStart) * 4;
+            const r0 = data[baseIdx], g0 = data[baseIdx + 1], b0 = data[baseIdx + 2];
+            for (let x = xStart; x < xEnd; x += 3) {
+              const idx = (y * workW + x) * 4;
+              if (
+                Math.abs(data[idx] - r0) > 8 ||
+                Math.abs(data[idx + 1] - g0) > 8 ||
+                Math.abs(data[idx + 2] - b0) > 8
+              ) {
+                return false;
+              }
+            }
+            return true;
+          };
+
+          const isColUniform = (x, yTop, yBot) => {
+            const yStart = Math.max(yTop, Math.floor(workH * 0.08));
+            const yEnd = Math.min(yBot, Math.ceil(workH * 0.92));
+            const baseIdx = (yStart * workW + x) * 4;
+            const r0 = data[baseIdx], g0 = data[baseIdx + 1], b0 = data[baseIdx + 2];
+            for (let y = yStart; y < yEnd; y += 3) {
+              const idx = (y * workW + x) * 4;
+              if (
+                Math.abs(data[idx] - r0) > 8 ||
+                Math.abs(data[idx + 1] - g0) > 8 ||
+                Math.abs(data[idx + 2] - b0) > 8
+              ) {
+                return false;
+              }
+            }
+            return true;
+          };
+
+          const maxTopTrim = Math.floor(workH * 0.14);
+          let topTrim = 0;
+          while (topTrim < maxTopTrim && isRowUniform(topTrim)) topTrim++;
+          topTrim = Math.max(0, topTrim - 16);
+
+          const maxBottomTrim = Math.floor(workH * 0.18);
+          let bottomTrim = 0;
+          while (bottomTrim < maxBottomTrim && isRowUniform(workH - 1 - bottomTrim)) bottomTrim++;
+          bottomTrim = Math.max(0, bottomTrim - 16);
+
+          const cropY = topTrim;
+          const cropH = Math.max(120, workH - topTrim - bottomTrim);
+
+          const maxSideTrim = Math.floor(workW * 0.12);
+          let leftTrim = 0;
+          while (leftTrim < maxSideTrim && isColUniform(leftTrim, cropY, cropY + cropH)) leftTrim++;
+          leftTrim = Math.max(0, leftTrim - 16);
+
+          let rightTrim = 0;
+          while (rightTrim < maxSideTrim && isColUniform(workW - 1 - rightTrim, cropY, cropY + cropH)) rightTrim++;
+          rightTrim = Math.max(0, rightTrim - 16);
+
+          const cropX = leftTrim;
+          const cropW = Math.max(120, workW - leftTrim - rightTrim);
+
+          // 3. Adaptive Text Clarity Filter (Memperjelas & mempertajam tulisan struk/m-banking)
+          const totalPixels = workW * workH;
+          const lum = new Float32Array(totalPixels);
+          let lumSum = 0;
+          for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+            const l = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+            lum[p] = l;
+            lumSum += l;
+          }
+          const avgLum = lumSum / Math.max(1, totalPixels);
+          const isLightBg = avgLum > 135;
+
+          const yMin = Math.max(3, cropY);
+          const yMax = Math.min(workH - 3, cropY + cropH);
+          const xMin = Math.max(3, cropX);
+          const xMax = Math.min(workW - 3, cropX + cropW);
+
+          for (let y = yMin; y < yMax; y++) {
+            const rowOffset = y * workW;
+            for (let x = xMin; x < xMax; x++) {
+              const p = rowOffset + x;
+              const l = lum[p];
+
+              // Radius 1 untuk unsharp mask tepi karakter
+              const meanNear = (
+                lum[p - 1] + lum[p + 1] +
+                lum[p - workW] + lum[p + workW]
+              ) * 0.25;
+
+              // Radius 2-3 untuk mendeteksi goresan huruf terhadap background lokal
+              const meanWide = (
+                lum[p - 2] + lum[p + 2] +
+                lum[p - 2 * workW] + lum[p + 2 * workW] +
+                lum[p - 3] + lum[p + 3] +
+                lum[p - 3 * workW] + lum[p + 3 * workW]
+              ) * 0.125;
+
+              let newL = l;
+
+              if (isLightBg) {
+                const localStrokeDiff = meanWide - l;
+                if (localStrokeDiff > 3.5) {
+                  // Pertegas goresan teks tipis/abu-abu (No. Referensi, tanggal, rekening, nominal)
+                  newL -= localStrokeDiff * 0.72;
+                }
+                newL += (l - meanNear) * 0.55;
+
+                if (newL > 243 && meanWide > 238) {
+                  newL = 255;
+                } else if (newL < 225) {
+                  const norm = Math.max(0, newL) / 225;
+                  newL = Math.pow(norm, 1.22) * 225;
+                }
+              } else {
+                // Dark mode screenshot: pertegas teks terang di atas background gelap
+                const localStrokeDiff = l - meanWide;
+                if (localStrokeDiff > 3.5) {
+                  newL += localStrokeDiff * 0.65;
+                }
+                newL += (l - meanNear) * 0.5;
+              }
+
+              newL = Math.max(0, Math.min(255, newL));
+
+              const idx = p * 4;
+              const r = data[idx], g = data[idx + 1], b = data[idx + 2];
+              const sat = Math.max(r, g, b) - Math.min(r, g, b);
+
+              if (isLightBg && sat < 28 && newL < 210) {
+                // Teks hitam/abu-abu: bersihkan artefak warna JPEG agar huruf tajam sempurna
+                const v = Math.round(newL);
+                data[idx] = v;
+                data[idx + 1] = v;
+                data[idx + 2] = v;
+              } else if (l > 1) {
+                const ratio = newL / l;
+                data[idx] = Math.max(0, Math.min(255, Math.round(r * ratio)));
+                data[idx + 1] = Math.max(0, Math.min(255, Math.round(g * ratio)));
+                data[idx + 2] = Math.max(0, Math.min(255, Math.round(b * ratio)));
+              }
+            }
+          }
+
+          workCtx.putImageData(imgDataObj, 0, 0);
+
+          // 4. Render area hasil crop ke canvas output
+          const outCanvas = document.createElement('canvas');
+          outCanvas.width = cropW;
+          outCanvas.height = cropH;
+          const outCtx = outCanvas.getContext('2d');
+          outCtx.fillStyle = '#FFFFFF';
+          outCtx.fillRect(0, 0, cropW, cropH);
+          outCtx.drawImage(workCanvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+
+          // 5. Hitung dimensi tampilan proporsional agar pas 1 halaman penuh tanpa gepeng/distorsi
+          const MAX_DISPLAY_W = 480;
+          const MAX_DISPLAY_H = 540;
+          const fitRatio = Math.min(MAX_DISPLAY_W / cropW, MAX_DISPLAY_H / cropH);
+          const displayWidth = Math.max(180, Math.round(cropW * fitRatio));
+          const displayHeight = Math.max(180, Math.round(cropH * fitRatio));
+
+          const enhancedDataUrl = outCanvas.toDataURL('image/jpeg', 0.92);
+          resolve({
+            dataUrl: enhancedDataUrl,
+            displayWidth,
+            displayHeight,
+          });
+        } catch (err) {
+          console.warn('Enhancement fallback:', err);
+          const origW = img.naturalWidth || img.width || 500;
+          const origH = img.naturalHeight || img.height || 800;
+          const fitRatio = Math.min(480 / origW, 540 / origH);
+          resolve({
+            dataUrl: srcDataUrl,
+            displayWidth: Math.round(origW * fitRatio),
+            displayHeight: Math.round(origH * fitRatio),
+          });
+        }
+      };
+      img.onerror = () => resolve(fallback);
+      img.src = srcDataUrl;
+    });
+  };
+
+  // --- HANDLER FITUR CETAK BUKTI TRANSFER (1 HALAMAN PENUH & TEKS JELAS) ---
   const handlePrintBukti = async () => {
     if (!selectedRecord || !selectedRecord.bukti_transfer) return;
     
@@ -1753,6 +1980,8 @@ Terima kasih,
              reader.readAsDataURL(blob);
           });
       }
+
+      const enhancedImg = await prepareReceiptImageForDoc(base64data);
 
       const tglSewaStr = formatTanggalPendek(selectedRecord.tanggal_sewa);
       const tglTransferStr = formatTanggalPendek(selectedRecord.tanggal_transfer) || '-';
@@ -1772,30 +2001,46 @@ Terima kasih,
         <!DOCTYPE html>
         <html>
         <head>
+          <meta charset="utf-8" />
           <title>Cetak Bukti Transfer - ${selectedRecord.id_sewa}</title>
+          <style>
+            @page {
+              size: A4 portrait;
+              margin: 0.25in 0.5in 0.25in 0.5in;
+              margin-top: 0.25in;
+              margin-bottom: 0.25in;
+              margin-left: 0.5in;
+              margin-right: 0.5in;
+            }
+            body {
+              margin: 0;
+              padding: 0;
+              font-family: Arial, sans-serif;
+            }
+          </style>
         </head>
-        <body>
-          <div style="text-align: center; font-family: Arial, sans-serif;">
-            <h2 style="color: #064e3b; margin-bottom: 5px;">TAMAN MARGASATWA RAGUNAN</h2>
-            <h3 style="color: #059669; letter-spacing: 2px; margin-top: 0;">${isKegiatanDoc ? 'BUKTI PEMBAYARAN KEGIATAN' : 'BUKTI PEMBAYARAN RESERVASI LOKASI'}</h3>
-            <hr style="border: 1px solid #059669;" />
-            <div style="text-align: left; margin: 20px 0; font-size: 14pt;">
-              <p><b>ID Transaksi:</b> ${selectedRecord.id_sewa}</p>
+        <body style="margin: 0; padding: 0; font-family: Arial, sans-serif;">
+          <div style="text-align: center; font-family: Arial, sans-serif; margin: 0; padding: 0;">
+            <p style="color: #064e3b; font-size: 10.5pt; margin: 0 0 2pt 0; padding: 0; line-height: 1.15;">TAMAN MARGASATWA RAGUNAN</p>
+            <p style="color: #059669; font-size: 13pt; font-weight: bold; letter-spacing: 1.5px; margin: 0 0 6pt 0; padding: 0; line-height: 1.15;">${isKegiatanDoc ? 'BUKTI PEMBAYARAN KEGIATAN' : 'BUKTI PEMBAYARAN RESERVASI LOKASI'}</p>
+            <hr style="border: 0; border-top: 1px solid #059669; margin: 4pt 0 6pt 0;" />
+            <p style="text-align: left; margin: 4pt 0 8pt 0; font-size: 11.5pt; line-height: 1.3;">
+              <b>ID Transaksi:</b> ${selectedRecord.id_sewa}<br />
               ${isKegiatanDoc ? `
-              <p><b>Nama Penanggung Jawab :</b> ${selectedRecord.nama_penyewa}</p>
-              <p><b>Nama kegiatan:</b> ${selectedRecord.kegiatan || selectedRecord.lokasi_sewa || '-'}</p>
-              <p><b>Tanggal Kegiatan :</b> ${tglSewaStr}</p>
+              <b>Nama Penanggung Jawab :</b> ${selectedRecord.nama_penyewa}<br />
+              <b>Nama kegiatan:</b> ${selectedRecord.kegiatan || selectedRecord.lokasi_sewa || '-'}<br />
+              <b>Tanggal Kegiatan :</b> ${tglSewaStr}<br />
               ` : `
-              <p><b>Nama Penyewa:</b> ${selectedRecord.nama_penyewa}</p>
-              <p><b>Lokasi Sewa:</b> ${displayLokasi}</p>
-              <p><b>Tanggal Sewa:</b> ${tglSewaStr}</p>
+              <b>Nama Penyewa:</b> ${selectedRecord.nama_penyewa}<br />
+              <b>Lokasi Sewa:</b> ${displayLokasi}<br />
+              <b>Tanggal Sewa:</b> ${tglSewaStr}<br />
               `}
-              <p><b>Tanggal Transfer:</b> ${tglTransferStr}</p>
-              <p><b>Nominal Transfer:</b> ${nominalText}</p>
-            </div>
-            <div style="border: 2px dashed #059669; padding: 10px;">
-              <img src="${base64data}" alt="Bukti Transfer" style="max-width: 100%; max-height: 800px; object-fit: contain;" />
-            </div>
+              <b>Tanggal Transfer:</b> ${tglTransferStr}<br />
+              <b>Nominal Transfer:</b> ${nominalText}
+            </p>
+            <p style="text-align: center; margin: 0; padding: 0;">
+              <img src="${enhancedImg.dataUrl}" alt="Bukti Transfer" width="${enhancedImg.displayWidth}" height="${enhancedImg.displayHeight}" style="width: ${enhancedImg.displayWidth}px; height: ${enhancedImg.displayHeight}px;" />
+            </p>
           </div>
         </body>
         </html>
@@ -1834,6 +2079,8 @@ Terima kasih,
           });
       }
 
+      const enhancedImg = await prepareReceiptImageForDoc(base64data);
+
       const tglSewaStr = formatTanggalPendek(selectedRecord.tanggal_sewa);
       const tglTransferStr = selectedRecord.tanggal_transfer_listrik ? formatTanggalPendek(selectedRecord.tanggal_transfer_listrik) : '-';
       const displayLokasi = formatLokasiWithLuas(selectedRecord);
@@ -1842,24 +2089,40 @@ Terima kasih,
         <!DOCTYPE html>
         <html>
         <head>
+          <meta charset="utf-8" />
           <title>Cetak Bukti Listrik - ${selectedRecord.id_sewa}</title>
+          <style>
+            @page {
+              size: A4 portrait;
+              margin: 0.25in 0.5in 0.25in 0.5in;
+              margin-top: 0.25in;
+              margin-bottom: 0.25in;
+              margin-left: 0.5in;
+              margin-right: 0.5in;
+            }
+            body {
+              margin: 0;
+              padding: 0;
+              font-family: Arial, sans-serif;
+            }
+          </style>
         </head>
-        <body>
-          <div style="text-align: center; font-family: Arial, sans-serif;">
-            <h2 style="color: #064e3b; margin-bottom: 5px;">TAMAN MARGASATWA RAGUNAN</h2>
-            <h3 style="color: #059669; letter-spacing: 2px; margin-top: 0;">BUKTI PEMBAYARAN LISTRIK TAMBAHAN</h3>
-            <hr style="border: 1px solid #059669;" />
-            <div style="text-align: left; margin: 20px 0; font-size: 14pt;">
-              <p><b>ID Transaksi:</b> ${selectedRecord.id_sewa}</p>
-              <p><b>Nama Penyewa:</b> ${selectedRecord.nama_penyewa}</p>
-              <p><b>Lokasi Sewa:</b> ${displayLokasi}</p>
-              <p><b>Tanggal Sewa:</b> ${tglSewaStr}</p>
-              <p><b>Tanggal Transfer Listrik:</b> ${tglTransferStr}</p>
-              <p><b>Nominal Transfer:</b> Rp 100.000</p>
-            </div>
-            <div style="border: 2px dashed #059669; padding: 10px;">
-              <img src="${base64data}" alt="Bukti Transfer Listrik" style="max-width: 100%; max-height: 800px; object-fit: contain;" />
-            </div>
+        <body style="margin: 0; padding: 0; font-family: Arial, sans-serif;">
+          <div style="text-align: center; font-family: Arial, sans-serif; margin: 0; padding: 0;">
+            <p style="color: #064e3b; font-size: 10.5pt; margin: 0 0 2pt 0; padding: 0; line-height: 1.15;">TAMAN MARGASATWA RAGUNAN</p>
+            <p style="color: #059669; font-size: 13pt; font-weight: bold; letter-spacing: 1.5px; margin: 0 0 6pt 0; padding: 0; line-height: 1.15;">BUKTI PEMBAYARAN LISTRIK TAMBAHAN</p>
+            <hr style="border: 0; border-top: 1px solid #059669; margin: 4pt 0 6pt 0;" />
+            <p style="text-align: left; margin: 4pt 0 8pt 0; font-size: 11.5pt; line-height: 1.3;">
+              <b>ID Transaksi:</b> ${selectedRecord.id_sewa}<br />
+              <b>Nama Penyewa:</b> ${selectedRecord.nama_penyewa}<br />
+              <b>Lokasi Sewa:</b> ${displayLokasi}<br />
+              <b>Tanggal Sewa:</b> ${tglSewaStr}<br />
+              <b>Tanggal Transfer Listrik:</b> ${tglTransferStr}<br />
+              <b>Nominal Transfer:</b> Rp 100.000
+            </p>
+            <p style="text-align: center; margin: 0; padding: 0;">
+              <img src="${enhancedImg.dataUrl}" alt="Bukti Transfer Listrik" width="${enhancedImg.displayWidth}" height="${enhancedImg.displayHeight}" style="width: ${enhancedImg.displayWidth}px; height: ${enhancedImg.displayHeight}px;" />
+            </p>
           </div>
         </body>
         </html>
@@ -1921,8 +2184,8 @@ Terima kasih,
           clearTimeout(timer);
           try {
             const canvas = document.createElement('canvas');
-            const MAX_WIDTH = 800;
-            const MAX_HEIGHT = 1000;
+            const MAX_WIDTH = 1200;
+            const MAX_HEIGHT = 1800;
             let width = img.naturalWidth || img.width;
             let height = img.naturalHeight || img.height;
 
@@ -1936,13 +2199,16 @@ Terima kasih,
             canvas.height = height;
             const ctx = canvas.getContext('2d');
             ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = 'medium';
+            ctx.imageSmoothingQuality = 'high';
             ctx.fillStyle = '#FFFFFF';
             ctx.fillRect(0, 0, width, height);
             ctx.drawImage(img, 0, 0, width, height);
 
             URL.revokeObjectURL(objectUrl);
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.65);
+            let dataUrl = canvas.toDataURL('image/jpeg', 0.84);
+            if (dataUrl.length > 750000) {
+              dataUrl = canvas.toDataURL('image/jpeg', 0.74);
+            }
             done(dataUrl);
           } catch (canvasErr) {
             URL.revokeObjectURL(objectUrl);

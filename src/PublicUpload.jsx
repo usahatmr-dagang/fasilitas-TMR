@@ -129,11 +129,11 @@ export default function PublicUpload() {
         img.src = event.target.result;
         img.onload = () => {
           const canvas = document.createElement('canvas');
-          // Dimensi optimal: proporsi cetak F4/A4 tajam, teks struk/m-banking tetap terbaca jelas
-          const MAX_WIDTH = 900;
-          const MAX_HEIGHT = 1200;
-          let width = img.width;
-          let height = img.height;
+          // Dimensi tinggi (1200x1800) agar screenshot m-banking panjang tetap tajam & tidak pecah
+          const MAX_WIDTH = 1200;
+          const MAX_HEIGHT = 1800;
+          let width = img.naturalWidth || img.width;
+          let height = img.naturalHeight || img.height;
 
           if (width > MAX_WIDTH || height > MAX_HEIGHT) {
             const ratio = Math.min(MAX_WIDTH / width, MAX_HEIGHT / height);
@@ -154,8 +154,62 @@ export default function PublicUpload() {
           ctx.fillRect(0, 0, width, height);
           ctx.drawImage(img, 0, 0, width, height);
 
-          // Kualitas 0.72 (72%) menghasilkan teks sangat tajam & jelas dibaca mata manusia (~60KB - 100KB)
-          const dataUrl = canvas.toDataURL('image/jpeg', 0.72);
+          // Perjelas kontras dan ketajaman huruf/angka pada bukti transfer
+          try {
+            const imgData = ctx.getImageData(0, 0, width, height);
+            const data = imgData.data;
+            const totalPixels = width * height;
+            const lum = new Float32Array(totalPixels);
+            let lumSum = 0;
+            for (let i = 0, p = 0; i < data.length; i += 4, p++) {
+              const l = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+              lum[p] = l;
+              lumSum += l;
+            }
+            const isLightBg = (lumSum / Math.max(1, totalPixels)) > 135;
+
+            for (let y = 2; y < height - 2; y++) {
+              const rowOffset = y * width;
+              for (let x = 2; x < width - 2; x++) {
+                const p = rowOffset + x;
+                const l = lum[p];
+                const meanNear = (lum[p - 1] + lum[p + 1] + lum[p - width] + lum[p + width]) * 0.25;
+                const meanWide = (
+                  lum[p - 2] + lum[p + 2] +
+                  lum[p - 2 * width] + lum[p + 2 * width]
+                ) * 0.25;
+
+                let newL = l;
+                if (isLightBg) {
+                  const diff = meanWide - l;
+                  if (diff > 4) newL -= diff * 0.45;
+                  newL += (l - meanNear) * 0.35;
+                  if (newL > 245 && meanWide > 240) newL = 255;
+                } else {
+                  const diff = l - meanWide;
+                  if (diff > 4) newL += diff * 0.4;
+                  newL += (l - meanNear) * 0.3;
+                }
+                newL = Math.max(0, Math.min(255, newL));
+
+                if (l > 1) {
+                  const idx = p * 4;
+                  const ratio = newL / l;
+                  data[idx] = Math.max(0, Math.min(255, Math.round(data[idx] * ratio)));
+                  data[idx + 1] = Math.max(0, Math.min(255, Math.round(data[idx + 1] * ratio)));
+                  data[idx + 2] = Math.max(0, Math.min(255, Math.round(data[idx + 2] * ratio)));
+                }
+              }
+            }
+            ctx.putImageData(imgData, 0, 0);
+          } catch (enhanceErr) {
+            console.warn('Skip upload filter:', enhanceErr);
+          }
+
+          let dataUrl = canvas.toDataURL('image/jpeg', 0.84);
+          if (dataUrl.length > 750000) {
+            dataUrl = canvas.toDataURL('image/jpeg', 0.74);
+          }
           resolve(dataUrl);
         };
         img.onerror = (error) => reject(error);
