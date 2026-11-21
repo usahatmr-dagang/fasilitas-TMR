@@ -1816,27 +1816,27 @@ Terima kasih,
             return true;
           };
 
-          const maxTopTrim = Math.floor(workH * 0.14);
+          const maxTopTrim = Math.floor(workH * 0.22);
           let topTrim = 0;
           while (topTrim < maxTopTrim && isRowUniform(topTrim)) topTrim++;
-          topTrim = Math.max(0, topTrim - 16);
+          topTrim = Math.max(0, topTrim - 8);
 
-          const maxBottomTrim = Math.floor(workH * 0.18);
+          const maxBottomTrim = Math.floor(workH * 0.22);
           let bottomTrim = 0;
           while (bottomTrim < maxBottomTrim && isRowUniform(workH - 1 - bottomTrim)) bottomTrim++;
-          bottomTrim = Math.max(0, bottomTrim - 16);
+          bottomTrim = Math.max(0, bottomTrim - 8);
 
           const cropY = topTrim;
           const cropH = Math.max(120, workH - topTrim - bottomTrim);
 
-          const maxSideTrim = Math.floor(workW * 0.12);
+          const maxSideTrim = Math.floor(workW * 0.22);
           let leftTrim = 0;
           while (leftTrim < maxSideTrim && isColUniform(leftTrim, cropY, cropY + cropH)) leftTrim++;
-          leftTrim = Math.max(0, leftTrim - 16);
+          leftTrim = Math.max(0, leftTrim - 8);
 
           let rightTrim = 0;
           while (rightTrim < maxSideTrim && isColUniform(workW - 1 - rightTrim, cropY, cropY + cropH)) rightTrim++;
-          rightTrim = Math.max(0, rightTrim - 16);
+          rightTrim = Math.max(0, rightTrim - 8);
 
           const cropX = leftTrim;
           const cropW = Math.max(120, workW - leftTrim - rightTrim);
@@ -1935,12 +1935,17 @@ Terima kasih,
           outCtx.fillRect(0, 0, cropW, cropH);
           outCtx.drawImage(workCanvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
 
-          // 5. Hitung dimensi tampilan proporsional agar pas 1 halaman penuh tanpa gepeng/distorsi
-          const MAX_DISPLAY_W = 480;
-          const MAX_DISPLAY_H = 540;
+          // 5. Hitung dimensi tampilan maksimal memenuhi 1 halaman penuh tanpa berpindah ke halaman 2
+          const MAX_DISPLAY_W = 600;
+          const MAX_DISPLAY_H = 590;
           const fitRatio = Math.min(MAX_DISPLAY_W / cropW, MAX_DISPLAY_H / cropH);
-          const displayWidth = Math.max(180, Math.round(cropW * fitRatio));
-          const displayHeight = Math.max(180, Math.round(cropH * fitRatio));
+          let displayWidth = Math.max(220, Math.round(cropW * fitRatio));
+          const displayHeight = Math.max(220, Math.round(cropH * fitRatio));
+
+          // Jika screenshot ponsel bertipe panjang/ramping, lebarkan sedikit secara proporsional agar lebih besar memenuhi ruang halaman
+          if (displayWidth / displayHeight < 0.62) {
+            displayWidth = Math.min(MAX_DISPLAY_W, Math.round(displayWidth * 1.18), Math.round(displayHeight * 0.62));
+          }
 
           const enhancedDataUrl = outCanvas.toDataURL('image/jpeg', 0.92);
           resolve({
@@ -1952,7 +1957,7 @@ Terima kasih,
           console.warn('Enhancement fallback:', err);
           const origW = img.naturalWidth || img.width || 500;
           const origH = img.naturalHeight || img.height || 800;
-          const fitRatio = Math.min(480 / origW, 540 / origH);
+          const fitRatio = Math.min(600 / origW, 590 / origH);
           resolve({
             dataUrl: srcDataUrl,
             displayWidth: Math.round(origW * fitRatio),
@@ -1965,7 +1970,7 @@ Terima kasih,
     });
   };
 
-  // --- HELPER: MEMBUAT FILE DOCX NATIVE AGAR MARGIN ATAS (HEADER) GOOGLE DOCS SANGAT RAPAT (0.4 CM) ---
+  // --- HELPER: MEMBUAT FILE DOCX NATIVE AGAR MARGIN ATAS (HEADER) GOOGLE DOCS 1.5 CM & IMAGE MAKSIMAL 1 HALAMAN ---
   const buildBuktiTransferDocxBlob = ({ titleText, detailRows, enhancedImg }) => {
     const escapeXmlStr = (unsafe) => {
       if (unsafe === undefined || unsafe === null) return '';
@@ -1988,8 +1993,8 @@ Terima kasih,
     const base64Clean = rawDataUrl.includes(',') ? rawDataUrl.split(',')[1] : rawDataUrl;
 
     // Konversi pixel (96 DPI) ke EMU (1 px = 9525 EMU)
-    const cx = Math.round((enhancedImg?.displayWidth || 340) * 9525);
-    const cy = Math.round((enhancedImg?.displayHeight || 520) * 9525);
+    const cx = Math.round((enhancedImg?.displayWidth || 380) * 9525);
+    const cy = Math.round((enhancedImg?.displayHeight || 585) * 9525);
 
     // Hitung posisi tab-stop otomatis agar titik dua (:) dan isi data sejajar lurus vertikal
     const maxLabelLen = detailRows.reduce((max, r) => {
@@ -2000,8 +2005,8 @@ Terima kasih,
     const tabPosTwips = maxLabelLen > 17 ? 2880 : 2160;
 
     const detailsXml = detailRows.map((row, idx) => {
-      const spaceBefore = idx === 0 ? 100 : 0;
-      const spaceAfter = idx === detailRows.length - 1 ? 100 : 30;
+      const spaceBefore = idx === 0 ? 60 : 0;
+      const spaceAfter = idx === detailRows.length - 1 ? 40 : 12;
       const cleanLabel = String(row.label || '').replace(/\s*:?\s*$/, '');
       return `
         <w:p>
@@ -2009,7 +2014,7 @@ Terima kasih,
             <w:tabs>
               <w:tab w:val="left" w:pos="${tabPosTwips}"/>
             </w:tabs>
-            <w:spacing w:before="${spaceBefore}" w:after="${spaceAfter}" w:line="240" w:lineRule="auto"/>
+            <w:spacing w:before="${spaceBefore}" w:after="${spaceAfter}" w:line="220" w:lineRule="auto"/>
             <w:jc w:val="left"/>
           </w:pPr>
           <w:r>
@@ -2056,9 +2061,9 @@ Terima kasih,
     <w:p>
       <w:pPr>
         <w:pBdr>
-          <w:bottom w:val="single" w:sz="6" w:space="6" w:color="059669"/>
+          <w:bottom w:val="single" w:sz="6" w:space="4" w:color="059669"/>
         </w:pBdr>
-        <w:spacing w:before="0" w:after="80" w:line="240" w:lineRule="auto"/>
+        <w:spacing w:before="0" w:after="40" w:line="240" w:lineRule="auto"/>
         <w:jc w:val="center"/>
       </w:pPr>
       <w:r>
@@ -2076,7 +2081,7 @@ Terima kasih,
     ${detailsXml}
     <w:p>
       <w:pPr>
-        <w:spacing w:before="40" w:after="0" w:line="240" w:lineRule="auto"/>
+        <w:spacing w:before="20" w:after="0" w:line="240" w:lineRule="auto"/>
         <w:jc w:val="center"/>
       </w:pPr>
       <w:r>
@@ -2121,7 +2126,7 @@ Terima kasih,
     </w:p>
     <w:sectPr>
       <w:pgSz w:w="11906" w:h="16838"/>
-      <w:pgMar w:top="850" w:right="1000" w:bottom="340" w:left="1000" w:header="0" w:footer="0" w:gutter="0"/>
+      <w:pgMar w:top="850" w:right="900" w:bottom="120" w:left="900" w:header="0" w:footer="0" w:gutter="0"/>
     </w:sectPr>
   </w:body>
 </w:document>`;
